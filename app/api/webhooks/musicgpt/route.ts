@@ -14,10 +14,15 @@ import { COLLECTIONS } from '@/lib/firebase/collections';
 import { getSong, getSongVersions, setPrimarySongVersion } from '@/lib/services/songs';
 import type { SongVersionDocument, GenerationDocument } from '@/types/firestore';
 import { createSongReadyNotification } from '@/lib/services/notifications';
+import { getConversionDataByConversionID } from '@/lib/ai/providers/musicgpt';
 
 /**
  * MusicGPT webhook payload structure as documented.
  * See: https://musicgpt.com/docs/webhooks
+ * 
+ * IMPORTANT: This interface must match the webhook payload structure used in
+ * components/songs/DeveloperSection.tsx for webhook simulation.
+ * If you update this interface, update the simulator as well.
  */
 interface MusicGPTWebhookPayload {
   success: boolean;
@@ -55,6 +60,8 @@ function verifySignature(rawBody: string, signature: string | null): boolean {
 }
 
 export async function POST(request: Request) {
+    
+  console.log('[MusicGPT Webhook] Received request');
   try {
     const rawBody = await request.text();
 
@@ -219,6 +226,39 @@ export async function POST(request: Request) {
     // OR if we don't have conversion IDs tracked (legacy/fallback)
     const shouldMarkCompleted = allProcessed || allConversionIds.length === 0;
 
+    // Fetch additional conversion details from MusicGPT API
+    // This provides more complete metadata than what's in the webhook payload
+    const conversionDetailsResponse = await getConversionDataByConversionID(body.conversion_id);
+
+    if (conversionDetailsResponse && conversionDetailsResponse.success) {
+      console.log(
+        `[MusicGPT Webhook] Fetched additional details for conversion ${body.conversion_id}`
+      );
+    }
+
+    // Build conversion metadata object, only including fields that have values
+    // Firestore doesn't accept undefined values
+    const conversionMetadata: Record<string, unknown> = {
+      conversion_path: body.conversion_path,
+    };
+    
+    if (body.title) conversionMetadata.title = body.title;
+    if (body.conversion_path_wav) conversionMetadata.conversion_path_wav = body.conversion_path_wav;
+    if (body.conversion_duration !== undefined) conversionMetadata.conversion_duration = body.conversion_duration;
+    if (body.lyrics) conversionMetadata.lyrics = body.lyrics;
+    if (body.lyrics_timestamped) conversionMetadata.lyrics_timestamped = body.lyrics_timestamped;
+
+    // Include full conversion details if fetched from API
+    // This provides additional metadata that might not be in the webhook payload
+    if (conversionDetailsResponse && conversionDetailsResponse.success) {
+      const conversion = conversionDetailsResponse.conversion;
+      conversionMetadata.fullDetails = conversion;
+      // Extract specific useful fields if they exist in the API response
+      if (conversion.status) conversionMetadata.status = conversion.status;
+      if (conversion.createdAt) conversionMetadata.created_at = conversion.createdAt;
+      if (conversion.updatedAt) conversionMetadata.updated_at = conversion.updatedAt;
+    }
+
     await setDoc(
       doc(db, COLLECTIONS.generations, generation.id),
       {
@@ -230,14 +270,7 @@ export async function POST(request: Request) {
           stems: body.conversion_path_wav ? [body.conversion_path_wav] : null,
           metadata: {
             ...generation.output.metadata,
-            [`conversion_${body.conversion_id}`]: {
-              title: body.title,
-              conversion_path: body.conversion_path,
-              conversion_path_wav: body.conversion_path_wav,
-              conversion_duration: body.conversion_duration,
-              lyrics: body.lyrics,
-              lyrics_timestamped: body.lyrics_timestamped,
-            },
+            [`conversion_${body.conversion_id}`]: conversionMetadata,
           },
         },
       },

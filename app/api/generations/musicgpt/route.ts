@@ -40,6 +40,15 @@ export async function POST(request: Request) {
       ? `${webhookBaseUrl}/api/webhooks/musicgpt`
       : undefined;
 
+    console.log('[MusicGPT API Route] Webhook URL being set:', webhookUrl);
+    console.log('[MusicGPT API Route] Webhook base URL source:', {
+      WEBHOOK_BASE_URL: process.env.WEBHOOK_BASE_URL ? 'set' : 'not set',
+      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ? 'set' : 'not set',
+      VERCEL_URL: process.env.VERCEL_URL ? 'set' : 'not set',
+      constructedFromHeaders: !process.env.WEBHOOK_BASE_URL && !process.env.NEXT_PUBLIC_APP_URL && !process.env.VERCEL_URL,
+      finalBaseUrl: webhookBaseUrl,
+    });
+
     const response = await createMusicGPTSong({
       prompt,
       music_style,

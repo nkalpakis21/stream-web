@@ -1,15 +1,26 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import type { SongDocument, SongVersionDocument } from '@/types/firestore';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { setPrimarySongVersion } from '@/lib/services/songs';
 
+// Serialized versions for client components (Timestamps converted to numbers)
+type SerializedSongVersionDocument = Omit<SongVersionDocument, 'createdAt'> & {
+  createdAt: number;
+};
+
+type SerializedSongDocument = Omit<SongDocument, 'createdAt' | 'updatedAt' | 'deletedAt'> & {
+  createdAt: number;
+  updatedAt: number | null;
+  deletedAt: number | null;
+};
+
 interface SongVersionsSectionProps {
-  song: SongDocument;
-  initialVersions: SongVersionDocument[];
+  song: SerializedSongDocument;
+  initialVersions: SerializedSongVersionDocument[];
   hasPendingGeneration: boolean;
 }
 
@@ -19,7 +30,7 @@ export function SongVersionsSection({
   hasPendingGeneration,
 }: SongVersionsSectionProps) {
   const { user } = useAuth();
-  const [versions, setVersions] = useState<SongVersionDocument[]>(initialVersions);
+  const [versions, setVersions] = useState<SerializedSongVersionDocument[]>(initialVersions);
   const [updatingPrimary, setUpdatingPrimary] = useState<string | null>(null);
 
   const isOwner = user?.uid === song.ownerId;
@@ -33,7 +44,13 @@ export function SongVersionsSection({
     );
 
     const unsubscribe = onSnapshot(q, snapshot => {
-      const next: SongVersionDocument[] = snapshot.docs.map(doc => doc.data() as SongVersionDocument);
+      const next: SerializedSongVersionDocument[] = snapshot.docs.map(doc => {
+        const data = doc.data() as SongVersionDocument;
+        return {
+          ...data,
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toMillis() : data.createdAt,
+        };
+      });
       setVersions(next);
     });
 
@@ -41,7 +58,15 @@ export function SongVersionsSection({
   }, [song.id]);
 
   const playableVersions = useMemo(
-    () => versions.filter(v => !!v.audioURL),
+    () => {
+      const filtered = versions.filter(v => v.audioURL && v.audioURL.trim() !== '');
+      console.log('[SongVersionsSection] All versions:', versions);
+      console.log('[SongVersionsSection] Playable versions:', filtered);
+      filtered.forEach(v => {
+        console.log(`[SongVersionsSection] Version ${v.id} audioURL:`, v.audioURL);
+      });
+      return filtered;
+    },
     [versions]
   );
 
@@ -107,13 +132,31 @@ export function SongVersionsSection({
                   )}
                 </div>
 
-                <audio
-                  controls
-                  className="w-full"
-                  src={version.audioURL || undefined}
-                >
-                  Your browser does not support the audio element.
-                </audio>
+                <div>
+                  <audio
+                    controls
+                    className="w-full"
+                    src={version.audioURL || undefined}
+                    preload="metadata"
+                    onError={(e) => {
+                      console.error('Audio playback error:', e);
+                      console.error('Audio URL:', version.audioURL);
+                    }}
+                    onLoadStart={() => {
+                      console.log('Audio loading started:', version.audioURL);
+                    }}
+                    onCanPlay={() => {
+                      console.log('Audio can play:', version.audioURL);
+                    }}
+                  >
+                    Your browser does not support the audio element.
+                  </audio>
+                  {version.audioURL && (
+                    <p className="text-xs text-gray-500 mt-1 break-all">
+                      URL: {version.audioURL}
+                    </p>
+                  )}
+                </div>
               </div>
             );
           })}

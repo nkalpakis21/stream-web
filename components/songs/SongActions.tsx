@@ -4,8 +4,15 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import type { SongDocument } from '@/types/firestore';
 import Link from 'next/link';
 
+// Serialized version for client components (Timestamps as numbers)
+type SerializedSongDocument = Omit<SongDocument, 'createdAt' | 'updatedAt' | 'deletedAt'> & {
+  createdAt: number;
+  updatedAt: number;
+  deletedAt: number | null;
+};
+
 interface SongActionsProps {
-  song: SongDocument;
+  song: SerializedSongDocument;
 }
 
 export function SongActions({ song }: SongActionsProps) {

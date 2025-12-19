@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { Timestamp } from 'firebase/firestore';
 import { getSong } from '@/lib/services/songs';
 import { getSongVersion } from '@/lib/services/songVersions';
 import { getSongGenerations } from '@/lib/services/generations';
@@ -7,6 +8,8 @@ import { SongActions } from '@/components/songs/SongActions';
 import { formatDistanceToNow } from 'date-fns';
 import { getSongVersions } from '@/lib/services/songs';
 import { SongVersionsSection } from '@/components/songs/SongVersionsSection';
+import { DeveloperSection } from '@/components/songs/DeveloperSection';
+import type { SongDocument } from '@/types/firestore';
 
 interface SongPageProps {
   params: {
@@ -41,6 +44,30 @@ export default async function SongPage({ params }: SongPageProps) {
     addSuffix: true,
   });
 
+  // Convert Timestamp fields to plain objects for client components
+  // This prevents "Only plain objects can be passed to Client Components" warnings
+  const serializedVersions = versions.map(version => ({
+    ...version,
+    createdAt: version.createdAt.toMillis(), // Convert Timestamp to milliseconds
+  }));
+
+  // Convert Timestamp fields to plain numbers for client components
+  // This prevents "Only plain objects can be passed to Client Components" warnings
+  const songData = song as SongDocument;
+  const serializedSong = {
+    ...songData,
+    createdAt: songData.createdAt.toMillis(),
+    updatedAt: songData.updatedAt.toMillis(),
+    deletedAt: songData.deletedAt ? songData.deletedAt.toMillis() : null,
+  };
+
+  // Serialize generations for client component
+  const serializedGenerations = generations.map(gen => ({
+    ...gen,
+    createdAt: gen.createdAt.toMillis(),
+    completedAt: gen.completedAt ? gen.completedAt.toMillis() : null,
+  }));
+
   return (
     <div className="min-h-screen">
       <nav className="border-b border-gray-200 dark:border-gray-800">
@@ -65,13 +92,13 @@ export default async function SongPage({ params }: SongPageProps) {
         </div>
 
         <SongVersionsSection
-          song={song}
-          initialVersions={versions}
+          song={serializedSong}
+          initialVersions={serializedVersions}
           hasPendingGeneration={hasPendingGeneration}
         />
 
         <div className="mb-8 mt-8">
-          <SongActions song={song} />
+          <SongActions song={serializedSong} />
         </div>
 
         <section className="border-t border-gray-200 dark:border-gray-800 pt-8">
@@ -107,6 +134,8 @@ export default async function SongPage({ params }: SongPageProps) {
             )}
           </div>
         </section>
+
+        <DeveloperSection generations={serializedGenerations} songId={song.id} />
       </main>
     </div>
   );
