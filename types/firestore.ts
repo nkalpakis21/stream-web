@@ -150,6 +150,16 @@ export interface GenerationDocument {
    * Used to correlate asynchronous webhooks with this generation.
    */
   providerTaskId: string | null;
+  /**
+   * Provider-side conversion identifiers (e.g., conversion_id_1, conversion_id_2 from MusicGPT).
+   * Each conversion_id corresponds to a variation of the generated content.
+   */
+  providerConversionIds: string[] | null;
+  /**
+   * Track which conversion_ids have been processed via webhooks.
+   * Used for idempotency and to determine when generation is fully complete.
+   */
+  providerProcessedConversions: string[];
   output: {
     audioURL: string | null; // Main audio file
     stems: string[] | null; // Individual stem URLs if available

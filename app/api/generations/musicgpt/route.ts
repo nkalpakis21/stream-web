@@ -47,12 +47,23 @@ export async function POST(request: Request) {
       webhook_url: webhookUrl,
     });
 
+    // Extract task_id and conversion_ids from MusicGPT response
+    const taskId =
+      (response.task_id as string | undefined) ||
+      (response.taskId as string | undefined) ||
+      (response.job_id as string | undefined) ||
+      (response.id as string | undefined) ||
+      `musicgpt-${Date.now()}`;
+
+    const conversionId1 = response.conversion_id_1 as string | undefined;
+    const conversionId2 = response.conversion_id_2 as string | undefined;
+    const conversionIds: string[] = [];
+    if (conversionId1) conversionIds.push(conversionId1);
+    if (conversionId2) conversionIds.push(conversionId2);
+
     return NextResponse.json({
-      taskId:
-        (response.taskId as string | undefined) ||
-        (response.job_id as string | undefined) ||
-        (response.id as string | undefined) ||
-        `musicgpt-${Date.now()}`,
+      taskId,
+      conversionIds,
       raw: response,
     });
   } catch (error) {

@@ -101,6 +101,17 @@ export async function createGeneration(
       if (!providerTaskId) {
         throw new Error('MusicGPT API did not return a task ID');
       }
+
+      // Store conversion IDs and full response in metadata for later use
+      const conversionIds = result.conversionIds || [];
+      const metadata = {
+        ...result.raw,
+        conversionIds,
+      };
+
+      // Store these for generation creation
+      (data as { providerConversionIds?: string[]; providerMetadata?: Record<string, unknown> }).providerConversionIds = conversionIds;
+      (data as { providerMetadata?: Record<string, unknown> }).providerMetadata = metadata;
     } catch (error) {
       // Don't create generation document if API call fails
       // The song still exists, but user can retry generation
@@ -117,6 +128,10 @@ export async function createGeneration(
   const generationRef = doc(collection(db, COLLECTIONS.generations));
   const generationId = generationRef.id;
 
+  // Extract MusicGPT-specific data if present
+  const providerConversionIds = (data as { providerConversionIds?: string[] }).providerConversionIds || null;
+  const providerMetadata = (data as { providerMetadata?: Record<string, unknown> }).providerMetadata || {};
+
   const generation: GenerationDocument = {
     id: generationId,
     songId,
@@ -127,10 +142,12 @@ export async function createGeneration(
     provider: data.provider,
     status: data.provider === 'stub' ? 'pending' : 'pending',
     providerTaskId: providerTaskId || data.providerTaskId || null,
+    providerConversionIds: providerConversionIds,
+    providerProcessedConversions: [],
     output: {
       audioURL: null,
       stems: null,
-      metadata: {},
+      metadata: providerMetadata,
     },
     error: null,
     createdAt: Timestamp.now(),

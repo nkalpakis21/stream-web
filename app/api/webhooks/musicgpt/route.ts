@@ -20,15 +20,18 @@ import { createSongReadyNotification } from '@/lib/services/notifications';
  * See: https://musicgpt.com/docs/webhooks
  */
 interface MusicGPTWebhookPayload {
-  task_id: string;
-  status: 'COMPLETED' | 'FAILED' | 'PENDING';
-  status_msg: string;
+  success: boolean;
   conversion_type: string;
-  audio_url: string;
+  task_id: string;
+  conversion_id: string;
+  conversion_path: string;
+  conversion_path_wav?: string;
+  conversion_duration?: number;
+  is_flagged: boolean;
+  reason?: string;
+  lyrics?: string;
+  lyrics_timestamped?: unknown;
   title?: string;
-  conversion_cost?: number;
-  createdAt: string;
-  updatedAt: string;
 }
 
 function verifySignature(rawBody: string, signature: string | null): boolean {
@@ -63,25 +66,61 @@ export async function POST(request: Request) {
     const body = JSON.parse(rawBody) as MusicGPTWebhookPayload;
 
     // Validate payload structure
-    if (!body.task_id || !body.status || !body.audio_url) {
+    if (!body.task_id || !body.conversion_id || !body.conversion_path) {
       console.error('[MusicGPT Webhook] Invalid payload structure:', body);
       return NextResponse.json(
-        { error: 'Invalid payload: missing required fields' },
+        { error: 'Invalid payload: missing required fields (task_id, conversion_id, conversion_path)' },
         { status: 400 }
       );
     }
 
-    // Find generation by providerTaskId (which should match task_id)
-    const generationsQuery = query(
+    // Find generation by providerTaskId (task_id) OR by conversion_id in providerConversionIds
+    // Try task_id first (most common case)
+    let generationsQuery = query(
       collection(db, COLLECTIONS.generations),
-      where('providerTaskId', '==', body.task_id),
-      where('status', '==', 'pending')
+      where('providerTaskId', '==', body.task_id)
     );
-    const generationsSnapshot = await getDocs(generationsQuery);
+    let generationsSnapshot = await getDocs(generationsQuery);
+
+    // If not found by task_id, try to find by conversion_id
+    if (generationsSnapshot.empty) {
+      // Note: Firestore doesn't support array-contains queries on nested fields easily,
+      // so we'll fetch pending/processing generations and filter in memory
+      // Try pending first
+      const pendingQuery = query(
+        collection(db, COLLECTIONS.generations),
+        where('status', '==', 'pending')
+      );
+      let allPendingSnapshot = await getDocs(pendingQuery);
+      
+      // Also check processing status
+      const processingQuery = query(
+        collection(db, COLLECTIONS.generations),
+        where('status', '==', 'processing')
+      );
+      const processingSnapshot = await getDocs(processingQuery);
+      
+      // Combine results
+      const allDocs = [...allPendingSnapshot.docs, ...processingSnapshot.docs];
+      
+      const matchingDoc = allDocs.find(doc => {
+        const gen = doc.data() as GenerationDocument;
+        return gen.providerConversionIds?.includes(body.conversion_id);
+      });
+
+      if (matchingDoc) {
+        generationsSnapshot = {
+          empty: false,
+          docs: [matchingDoc],
+        } as typeof generationsSnapshot;
+      }
+    }
 
     if (generationsSnapshot.empty) {
-      // Unknown task – acknowledge to avoid retries but do nothing.
-      console.warn(`[MusicGPT Webhook] No pending generation found for task_id: ${body.task_id}`);
+      // Unknown task/conversion – acknowledge to avoid retries but do nothing.
+      console.warn(
+        `[MusicGPT Webhook] No generation found for task_id: ${body.task_id} or conversion_id: ${body.conversion_id}`
+      );
       return NextResponse.json({ ok: true });
     }
 
@@ -89,23 +128,11 @@ export async function POST(request: Request) {
     const generationDoc = generationsSnapshot.docs[0];
     const generation = generationDoc.data() as GenerationDocument;
 
-    // Handle different statuses
-    if (body.status === 'FAILED') {
-      // Mark generation as failed
-      await setDoc(
-        doc(db, COLLECTIONS.generations, generation.id),
-        {
-          status: 'failed',
-          error: body.status_msg || 'MusicGPT generation failed',
-          completedAt: Timestamp.now(),
-        },
-        { merge: true }
+    // Check if this conversion_id has already been processed
+    if (generation.providerProcessedConversions?.includes(body.conversion_id)) {
+      console.log(
+        `[MusicGPT Webhook] Conversion ${body.conversion_id} already processed for generation ${generation.id}. Skipping.`
       );
-      return NextResponse.json({ ok: true });
-    }
-
-    if (body.status !== 'COMPLETED') {
-      // Still processing - acknowledge but don't update
       return NextResponse.json({ ok: true });
     }
 
@@ -130,12 +157,20 @@ export async function POST(request: Request) {
         .filter((id): id is string => !!id)
     );
 
-    // Use task_id as providerOutputId for idempotency
-    const providerOutputId = body.task_id;
+    // Use conversion_id as providerOutputId (not task_id)
+    const providerOutputId = body.conversion_id;
 
-    // Skip if we've already processed this output
+    // Skip if we've already processed this conversion_id as a song version
     if (existingProviderOutputIds.has(providerOutputId)) {
-      console.log(`[MusicGPT Webhook] Output ${providerOutputId} already processed. Skipping.`);
+      console.log(`[MusicGPT Webhook] Conversion ${providerOutputId} already exists as song version. Skipping.`);
+      // Still mark it as processed in the generation
+      await setDoc(
+        doc(db, COLLECTIONS.generations, generation.id),
+        {
+          providerProcessedConversions: [...(generation.providerProcessedConversions || []), body.conversion_id],
+        },
+        { merge: true }
+      );
       return NextResponse.json({ ok: true });
     }
 
@@ -157,8 +192,8 @@ export async function POST(request: Request) {
       createdBy: song.ownerId,
       createdAt: now,
       parentVersionId: song.currentVersionId,
-      audioURL: body.audio_url,
-      providerOutputId: providerOutputId,
+      audioURL: body.conversion_path, // Use conversion_path from webhook
+      providerOutputId: providerOutputId, // Use conversion_id
       isPrimary: existingVersions.length === 0, // First version is primary
     };
 
@@ -169,32 +204,55 @@ export async function POST(request: Request) {
       await setPrimarySongVersion(song.id, versionId);
     }
 
-    // Mark generation as completed
+    // Mark this conversion_id as processed
+    const updatedProcessedConversions = [
+      ...(generation.providerProcessedConversions || []),
+      body.conversion_id,
+    ];
+
+    // Check if all expected conversions have been processed
+    const allConversionIds = generation.providerConversionIds || [];
+    const allProcessed = allConversionIds.length > 0 && 
+      allConversionIds.every(id => updatedProcessedConversions.includes(id));
+
+    // Mark generation as completed only if all conversions are processed
+    // OR if we don't have conversion IDs tracked (legacy/fallback)
+    const shouldMarkCompleted = allProcessed || allConversionIds.length === 0;
+
     await setDoc(
       doc(db, COLLECTIONS.generations, generation.id),
       {
-        status: 'completed',
-        providerTaskId: body.task_id,
-        completedAt: now,
+        providerProcessedConversions: updatedProcessedConversions,
+        status: shouldMarkCompleted ? 'completed' : generation.status,
+        completedAt: shouldMarkCompleted ? now : generation.completedAt,
         output: {
-          audioURL: body.audio_url,
-          stems: null,
+          audioURL: shouldMarkCompleted ? body.conversion_path : generation.output.audioURL,
+          stems: body.conversion_path_wav ? [body.conversion_path_wav] : null,
           metadata: {
-            title: body.title,
-            conversion_cost: body.conversion_cost,
-            conversion_type: body.conversion_type,
+            ...generation.output.metadata,
+            [`conversion_${body.conversion_id}`]: {
+              title: body.title,
+              conversion_path: body.conversion_path,
+              conversion_path_wav: body.conversion_path_wav,
+              conversion_duration: body.conversion_duration,
+              lyrics: body.lyrics,
+              lyrics_timestamped: body.lyrics_timestamped,
+            },
           },
         },
       },
       { merge: true }
     );
 
-    // Create a notification for the song owner.
-    await createSongReadyNotification({
-      userId: song.ownerId,
-      songId: song.id,
-      generationId: generation.id,
-    });
+    // Create a notification for the song owner only when generation is fully completed
+    // (all conversions have been processed)
+    if (shouldMarkCompleted) {
+      await createSongReadyNotification({
+        userId: song.ownerId,
+        songId: song.id,
+        generationId: generation.id,
+      });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
