@@ -83,6 +83,16 @@ export interface SongDocument {
   currentVersionId: string; // Latest version ID
   parentSongId: string | null; // If forked/remixed, reference original
   collaborationType: CollaborationType | null; // Type of collaboration if applicable
+  /**
+   * Album cover image URL (full size).
+   * Shared across all conversions for a single song generation.
+   */
+  albumCoverPath: string | null;
+  /**
+   * Album cover thumbnail URL.
+   * Shared across all conversions for a single song generation.
+   */
+  albumCoverThumbnail: string | null;
 }
 
 export interface SongVersionDocument {

@@ -79,6 +79,8 @@ export async function createSong(
     currentVersionId: versionId,
     parentSongId: data.parentSongId || null,
     collaborationType: data.collaborationType || null,
+    albumCoverPath: null,
+    albumCoverThumbnail: null,
   };
 
   // Write both documents

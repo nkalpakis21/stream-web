@@ -12,7 +12,7 @@ import {
 import { db } from '@/lib/firebase/config';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import { getSong, getSongVersions, setPrimarySongVersion } from '@/lib/services/songs';
-import type { SongVersionDocument, GenerationDocument } from '@/types/firestore';
+import type { SongDocument, SongVersionDocument, GenerationDocument } from '@/types/firestore';
 import { createSongReadyNotification } from '@/lib/services/notifications';
 import { getConversionDataByConversionID } from '@/lib/ai/providers/musicgpt';
 
@@ -257,6 +257,34 @@ export async function POST(request: Request) {
       if (conversion.status) conversionMetadata.status = conversion.status;
       if (conversion.createdAt) conversionMetadata.created_at = conversion.createdAt;
       if (conversion.updatedAt) conversionMetadata.updated_at = conversion.updatedAt;
+      
+      // Extract album cover URLs and store on song document (shared across all conversions)
+      // Only update if not already set (idempotent) - all conversions share the same album cover
+      const albumCoverPath = conversion.album_cover_path as string | undefined;
+      const albumCoverThumbnail = conversion.album_cover_thumbnail as string | undefined;
+      
+      if (albumCoverPath || albumCoverThumbnail) {
+        const songUpdates: Partial<SongDocument> = {};
+        if (albumCoverPath && !song.albumCoverPath) {
+          songUpdates.albumCoverPath = albumCoverPath;
+        }
+        if (albumCoverThumbnail && !song.albumCoverThumbnail) {
+          songUpdates.albumCoverThumbnail = albumCoverThumbnail;
+        }
+        
+        // Only update song if we have new album cover data
+        if (Object.keys(songUpdates).length > 0) {
+          await setDoc(
+            doc(db, COLLECTIONS.songs, song.id),
+            {
+              ...songUpdates,
+              updatedAt: Timestamp.now(),
+            },
+            { merge: true }
+          );
+          console.log(`[MusicGPT Webhook] Updated album cover for song ${song.id}`);
+        }
+      }
     }
 
     await setDoc(
