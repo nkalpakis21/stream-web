@@ -11,6 +11,9 @@ import { SongVersionsSection } from '@/components/songs/SongVersionsSection';
 import { DeveloperSection } from '@/components/songs/DeveloperSection';
 import type { SongDocument } from '@/types/firestore';
 
+// Force dynamic rendering to always fetch fresh data from Firestore
+export const dynamic = 'force-dynamic';
+
 interface SongPageProps {
   params: {
     id: string;

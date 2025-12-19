@@ -4,6 +4,9 @@ import { getPublicArtists } from '@/lib/services/artists';
 import { SongCard } from '@/components/songs/SongCard';
 import { ArtistCard } from '@/components/artists/ArtistCard';
 
+// Force dynamic rendering to always fetch fresh data from Firestore
+export const dynamic = 'force-dynamic';
+
 export default async function HomePage() {
   // Fetch public content for discovery feed
   const [songs, artists] = await Promise.all([

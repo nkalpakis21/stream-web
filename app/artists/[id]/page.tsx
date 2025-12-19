@@ -5,6 +5,9 @@ import { ArtistCard } from '@/components/artists/ArtistCard';
 import { SongCard } from '@/components/songs/SongCard';
 import { formatDistanceToNow } from 'date-fns';
 
+// Force dynamic rendering to always fetch fresh data from Firestore
+export const dynamic = 'force-dynamic';
+
 interface ArtistPageProps {
   params: {
     id: string;

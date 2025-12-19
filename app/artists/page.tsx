@@ -1,6 +1,9 @@
 import { getPublicArtists } from '@/lib/services/artists';
 import { ArtistCard } from '@/components/artists/ArtistCard';
 
+// Force dynamic rendering to always fetch fresh data from Firestore
+export const dynamic = 'force-dynamic';
+
 export default async function ArtistsPage() {
   const artists = await getPublicArtists(50);
 
