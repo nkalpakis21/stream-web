@@ -69,13 +69,17 @@ export function CreateSongForm() {
 
       // Get artist version for context
       const { getArtistVersion } = await import('@/lib/services/artists');
-      const artistVersion = await getArtistVersion(selectedArtist.currentVersionId);
+      const artistVersion = await getArtistVersion(
+        selectedArtist.currentVersionId
+      );
       if (!artistVersion) {
         throw new Error('Artist version not found');
       }
 
-      // Create generation
-      await createGeneration(song.currentVersionId, {
+      // Create generation record for this song.
+      // For MusicGPT-style providers this will be fulfilled asynchronously
+      // via webhook; for the stub provider we still generate synchronously.
+      await createGeneration(song.id, selectedArtist.currentVersionId, {
         prompt: {
           structured: {},
           freeText: formData.prompt,
@@ -178,7 +182,7 @@ export function CreateSongForm() {
           className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900"
         >
           <option value="stub">Stub Provider (Development)</option>
-          {/* More providers will be added here */}
+          <option value="musicgpt">MusicGPT (Production)</option>
         </select>
       </div>
 

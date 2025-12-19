@@ -15,6 +15,7 @@ import {
   orderBy,
   Timestamp,
   serverTimestamp,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import {
@@ -59,6 +60,9 @@ export async function createSong(
     createdBy: ownerId,
     createdAt: now,
     parentVersionId: null,
+    audioURL: null,
+    providerOutputId: null,
+    isPrimary: true,
   };
 
   // Create song document
@@ -161,6 +165,9 @@ export async function createSongVersion(
     createdBy: userId,
     createdAt: Timestamp.now(),
     parentVersionId: currentVersion.id,
+    audioURL: null,
+    providerOutputId: null,
+    isPrimary: true,
   };
 
   await setDoc(versionRef, newVersion);
@@ -297,4 +304,40 @@ export async function getArtistSongs(
     .filter(song => song.deletedAt === null)
     .slice(0, limit);
 }
+
+/**
+ * Set the primary version for a song.
+ *
+ * This updates:
+ * - The `isPrimary` flag on all versions for the song
+ * - The `currentVersionId` field on the song document
+ *
+ * Writes are performed in a single batch for basic atomicity.
+ */
+export async function setPrimarySongVersion(
+  songId: string,
+  versionId: string
+): Promise<void> {
+  const versionsQuery = query(
+    collection(db, COLLECTIONS.songVersions),
+    where('songId', '==', songId)
+  );
+  const versionsSnapshot = await getDocs(versionsQuery);
+
+  const batch = writeBatch(db);
+
+  versionsSnapshot.docs.forEach(docSnapshot => {
+    const isTarget = docSnapshot.id === versionId;
+    batch.update(docSnapshot.ref, { isPrimary: isTarget });
+  });
+
+  const songRef = doc(db, getSongPath(songId));
+  batch.update(songRef, {
+    currentVersionId: versionId,
+    updatedAt: serverTimestamp(),
+  });
+
+  await batch.commit();
+}
+
 

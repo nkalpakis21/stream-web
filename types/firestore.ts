@@ -93,7 +93,23 @@ export interface SongVersionDocument {
   createdBy: string; // User ID
   createdAt: Timestamp;
   parentVersionId: string | null; // Previous version ID (null for v1)
-  // Immutable - never changes after creation
+  /**
+   * URL to the generated audio for this specific version.
+   * Once set, this must never be mutated.
+   */
+  audioURL: string | null;
+  /**
+   * Provider-specific identifier for this output.
+   * Used for idempotency in webhook handlers.
+   */
+  providerOutputId: string | null;
+  /**
+   * Whether this version is currently the primary / canonical version
+   * for the parent song. Only one version per song should have this set
+   * to true at any given time.
+   */
+  isPrimary: boolean;
+  // Other fields are immutable once created, but isPrimary may change.
 }
 
 // ============================================================================
@@ -108,7 +124,20 @@ export interface GenerationParameters {
 
 export interface GenerationDocument {
   id: string;
-  songVersionId: string; // Which song version this generation belongs to
+  /**
+   * Parent song this generation was requested for.
+   * All versions created from this generation will share this songId.
+   */
+  songId: string;
+  /**
+   * Artist version used as context for this generation.
+   */
+  artistVersionId: string;
+  /**
+   * Optional link to a specific song version.
+   * For legacy flows that generated directly into a single version.
+   */
+  songVersionId: string | null;
   prompt: {
     structured: Record<string, unknown>; // Structured prompt data
     freeText: string; // Free-form prompt text
@@ -116,6 +145,11 @@ export interface GenerationDocument {
   parameters: GenerationParameters;
   provider: string; // AI provider identifier (e.g., "openai", "stability")
   status: 'pending' | 'processing' | 'completed' | 'failed';
+  /**
+   * Provider-side task / job identifier.
+   * Used to correlate asynchronous webhooks with this generation.
+   */
+  providerTaskId: string | null;
   output: {
     audioURL: string | null; // Main audio file
     stems: string[] | null; // Individual stem URLs if available
@@ -141,6 +175,22 @@ export interface CollaborationDocument {
   notes: string | null; // Optional collaboration notes
   createdAt: Timestamp;
   // Tracks the lineage: sourceSongId -> targetSongId
+}
+
+// ============================================================================
+// Notifications
+// ============================================================================
+
+export type NotificationType = 'song_ready';
+
+export interface NotificationDocument {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  songId: string;
+  generationId: string;
+  read: boolean;
+  createdAt: Timestamp;
 }
 
 // ============================================================================

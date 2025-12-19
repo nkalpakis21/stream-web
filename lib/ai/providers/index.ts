@@ -8,6 +8,7 @@
 
 import { getAIService } from '../types';
 import { StubAIProvider } from './stub';
+import { MusicGPTProvider } from './musicgpt';
 
 // Initialize and register providers
 const aiService = getAIService();
@@ -15,9 +16,9 @@ const aiService = getAIService();
 // Register stub provider for development
 aiService.registerProvider(new StubAIProvider());
 
-// TODO: Register real providers here
-// aiService.registerProvider(new OpenAIProvider());
-// aiService.registerProvider(new StabilityAIProvider());
+// Register MusicGPT provider for production usage. This provider only
+// registers async tasks; audio is delivered later via webhook.
+aiService.registerProvider(new MusicGPTProvider());
 
 export { aiService };
 

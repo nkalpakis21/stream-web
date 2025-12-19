@@ -1,11 +1,12 @@
 import { notFound } from 'next/navigation';
 import { getSong } from '@/lib/services/songs';
 import { getSongVersion } from '@/lib/services/songVersions';
-import { getSongVersionGenerations } from '@/lib/services/generations';
+import { getSongGenerations } from '@/lib/services/generations';
 import { getArtist } from '@/lib/services/artists';
-import { SongPlayer } from '@/components/songs/SongPlayer';
 import { SongActions } from '@/components/songs/SongActions';
 import { formatDistanceToNow } from 'date-fns';
+import { getSongVersions } from '@/lib/services/songs';
+import { SongVersionsSection } from '@/components/songs/SongVersionsSection';
 
 interface SongPageProps {
   params: {
@@ -23,10 +24,11 @@ export default async function SongPage({ params }: SongPageProps) {
   // Check if song is public or user has access
   // TODO: Add auth check for private songs
 
-  const [songVersion, generations, artist] = await Promise.all([
+  const [songVersion, artist, versions, generations] = await Promise.all([
     getSongVersion(song.currentVersionId),
-    getSongVersionGenerations(song.currentVersionId),
     getArtist(song.artistId),
+    getSongVersions(song.id),
+    getSongGenerations(song.id),
   ]);
 
   if (!songVersion) {
@@ -34,6 +36,7 @@ export default async function SongPage({ params }: SongPageProps) {
   }
 
   const latestGeneration = generations.find(g => g.status === 'completed');
+  const hasPendingGeneration = generations.some(g => g.status === 'pending' || g.status === 'processing');
   const timeAgo = formatDistanceToNow(song.createdAt.toDate(), {
     addSuffix: true,
   });
@@ -61,13 +64,13 @@ export default async function SongPage({ params }: SongPageProps) {
           <p className="text-sm text-gray-500">Created {timeAgo}</p>
         </div>
 
-        {latestGeneration && (
-          <div className="mb-8">
-            <SongPlayer generation={latestGeneration} />
-          </div>
-        )}
+        <SongVersionsSection
+          song={song}
+          initialVersions={versions}
+          hasPendingGeneration={hasPendingGeneration}
+        />
 
-        <div className="mb-8">
+        <div className="mb-8 mt-8">
           <SongActions song={song} />
         </div>
 

@@ -13,6 +13,7 @@ export const COLLECTIONS = {
   songVersions: 'songVersions',
   generations: 'generations',
   collaborations: 'collaborations',
+  notifications: 'notifications',
 } as const;
 
 export type CollectionName = typeof COLLECTIONS[keyof typeof COLLECTIONS];
@@ -50,5 +51,9 @@ export const getGenerationPath = (generationId: string): string => {
 
 export const getCollaborationPath = (collaborationId: string): string => {
   return `${COLLECTIONS.collaborations}/${collaborationId}`;
+};
+
+export const getNotificationPath = (notificationId: string): string => {
+  return `${COLLECTIONS.notifications}/${notificationId}`;
 };
 

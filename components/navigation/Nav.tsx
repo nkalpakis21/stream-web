@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { NotificationsBell } from '@/components/navigation/NotificationsBell';
 
 export function Nav() {
   const { user, signOut } = useAuth();
@@ -28,6 +29,7 @@ export function Nav() {
             </Link>
             {user ? (
               <>
+                <NotificationsBell />
                 <Link
                   href="/create"
                   className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"

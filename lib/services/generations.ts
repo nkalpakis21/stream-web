@@ -27,10 +27,17 @@ import { aiService } from '@/lib/ai/providers';
 import { hashGeneration } from '@/lib/utils/hash';
 
 /**
- * Create a generation request
+ * Create a generation request.
+ *
+ * For providers like MusicGPT that complete asynchronously via webhook,
+ * this function only records the pending generation and returns immediately.
+ *
+ * For the "stub" provider used in development, we still perform a
+ * synchronous generation via the AI service for convenience.
  */
 export async function createGeneration(
-  songVersionId: string,
+  songId: string,
+  artistVersionId: string,
   data: {
     prompt: {
       structured: Record<string, unknown>;
@@ -51,18 +58,75 @@ export async function createGeneration(
       };
       lore: string;
     };
+  } & {
+    /**
+     * Optional provider task/job identifier for async providers.
+     */
+    providerTaskId?: string;
   }
 ): Promise<GenerationDocument> {
+  // For async providers like MusicGPT, we need to get the task ID first
+  // before creating the generation document. This ensures we don't create
+  // orphaned records if the API call fails.
+  let providerTaskId: string | null = null;
+
+  if (data.provider === 'musicgpt') {
+    try {
+      // Call server-side API route to initiate MusicGPT generation
+      // This ensures API keys are never exposed to the client
+      const apiResponse = await fetch('/api/generations/musicgpt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: data.prompt.freeText,
+          music_style: (data.artistContext?.styleDNA.genres ?? [])[0],
+          isInstrumental: data.artistContext?.lore
+            ? data.artistContext.lore.toLowerCase().includes('instrumental')
+            : false,
+        }),
+      });
+
+      if (!apiResponse.ok) {
+        const errorData = await apiResponse.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || `MusicGPT API returned ${apiResponse.status}`
+        );
+      }
+
+      const result = await apiResponse.json();
+      providerTaskId = result.taskId || null;
+
+      if (!providerTaskId) {
+        throw new Error('MusicGPT API did not return a task ID');
+      }
+    } catch (error) {
+      // Don't create generation document if API call fails
+      // The song still exists, but user can retry generation
+      console.error('[createGeneration] MusicGPT request failed', error);
+      throw new Error(
+        `Failed to initiate MusicGPT generation: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
+    }
+  }
+
+  // Only create generation document after successful API call (or for stub provider)
   const generationRef = doc(collection(db, COLLECTIONS.generations));
   const generationId = generationRef.id;
 
   const generation: GenerationDocument = {
     id: generationId,
-    songVersionId,
+    songId,
+    artistVersionId,
+    songVersionId: null,
     prompt: data.prompt,
     parameters: data.parameters,
     provider: data.provider,
-    status: 'pending',
+    status: data.provider === 'stub' ? 'pending' : 'pending',
+    providerTaskId: providerTaskId || data.providerTaskId || null,
     output: {
       audioURL: null,
       stems: null,
@@ -76,11 +140,20 @@ export async function createGeneration(
 
   await setDoc(generationRef, generation);
 
-  // Start generation asynchronously
-  processGeneration(generationId, data).catch(error => {
-    console.error('Generation failed:', error);
-    updateGenerationStatus(generationId, 'failed', null, error.message);
-  });
+  // Provider-specific behavior:
+  //
+  // - "stub": perform a fake synchronous generation so the UI behaves as if
+  //   audio were generated immediately.
+  // - "musicgpt": generation document is already created with task ID above;
+  //   final audio will arrive via webhook and be written by the webhook handler.
+  if (data.provider === 'stub') {
+    processGeneration(generationId, data).catch(error => {
+      console.error('Generation failed:', error);
+      updateGenerationStatus(generationId, 'failed', null, error.message);
+    });
+  }
+  // For musicgpt, we've already created the generation with the task ID
+  // and it will be completed via webhook
 
   return generation;
 }
@@ -224,4 +297,20 @@ export async function getSongVersionGenerations(
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => doc.data() as GenerationDocument);
 }
+
+/**
+ * Get generations for a song (across all versions).
+ */
+export async function getSongGenerations(
+  songId: string
+): Promise<GenerationDocument[]> {
+  const q = query(
+    collection(db, COLLECTIONS.generations),
+    where('songId', '==', songId),
+    orderBy('createdAt', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => doc.data() as GenerationDocument);
+}
+
 
