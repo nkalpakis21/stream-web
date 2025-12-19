@@ -39,6 +39,7 @@ export async function createMusicGPTSong(payload: {
   lyrics?: string;
   music_style?: string;
   isInstrumental?: boolean;
+  webhook_url?: string;
 }) {
   const { MUSICGPT_BASE_URL, MUSICGPT_API_KEY } = getMusicGPTConfig();
   
@@ -48,8 +49,17 @@ export async function createMusicGPTSong(payload: {
 
   const url = `${MUSICGPT_BASE_URL}/MusicAI`;
   
+  // Include webhook_url in payload if provided
+  const requestPayload: Record<string, unknown> = {
+    prompt: payload.prompt,
+    ...(payload.lyrics && { lyrics: payload.lyrics }),
+    ...(payload.music_style && { music_style: payload.music_style }),
+    ...(payload.isInstrumental !== undefined && { isInstrumental: payload.isInstrumental }),
+    ...(payload.webhook_url && { webhook_url: payload.webhook_url }),
+  };
+  
   console.log('[MusicGPT] Making request to:', url);
-  console.log('[MusicGPT] Payload:', JSON.stringify(payload, null, 2));
+  console.log('[MusicGPT] Payload:', JSON.stringify(requestPayload, null, 2));
   
   try {
     const res = await fetch(url, {
@@ -58,7 +68,7 @@ export async function createMusicGPTSong(payload: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${MUSICGPT_API_KEY}`,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(requestPayload),
     });
 
     console.log('[MusicGPT] Response status:', res.status);

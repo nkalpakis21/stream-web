@@ -17,10 +17,34 @@ export async function POST(request: Request) {
       );
     }
 
+    // Construct webhook URL - use environment variable or construct from request
+    const webhookBaseUrl =
+      process.env.WEBHOOK_BASE_URL ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : (() => {
+            // Fallback: try to construct from request headers
+            const host = request.headers.get('host');
+            const protocol = request.headers.get('x-forwarded-proto') || 'https';
+            return host ? `${protocol}://${host}` : null;
+          })();
+
+    if (!webhookBaseUrl) {
+      console.warn(
+        '[MusicGPT API Route] Warning: Could not determine webhook base URL. Webhook may not work correctly.'
+      );
+    }
+
+    const webhookUrl = webhookBaseUrl
+      ? `${webhookBaseUrl}/api/webhooks/musicgpt`
+      : undefined;
+
     const response = await createMusicGPTSong({
       prompt,
       music_style,
       isInstrumental,
+      webhook_url: webhookUrl,
     });
 
     return NextResponse.json({

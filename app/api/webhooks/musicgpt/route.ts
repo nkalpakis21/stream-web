@@ -11,25 +11,24 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { COLLECTIONS } from '@/lib/firebase/collections';
-import { getGeneration } from '@/lib/services/generations';
 import { getSong, getSongVersions, setPrimarySongVersion } from '@/lib/services/songs';
-import type { SongVersionDocument } from '@/types/firestore';
+import type { SongVersionDocument, GenerationDocument } from '@/types/firestore';
 import { createSongReadyNotification } from '@/lib/services/notifications';
 
-interface MusicGPTVariationPayload {
-  audioUrl: string;
-  providerOutputId: string;
-  label?: string;
-}
-
+/**
+ * MusicGPT webhook payload structure as documented.
+ * See: https://musicgpt.com/docs/webhooks
+ */
 interface MusicGPTWebhookPayload {
-  /**
-   * Our internal generation identifier. In practice this may be passed
-   * through MusicGPT as metadata or looked up via their task ID.
-   */
-  generationId: string;
-  providerTaskId?: string;
-  variations: MusicGPTVariationPayload[];
+  task_id: string;
+  status: 'COMPLETED' | 'FAILED' | 'PENDING';
+  status_msg: string;
+  conversion_type: string;
+  audio_url: string;
+  title?: string;
+  conversion_cost?: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 function verifySignature(rawBody: string, signature: string | null): boolean {
@@ -63,16 +62,50 @@ export async function POST(request: Request) {
 
     const body = JSON.parse(rawBody) as MusicGPTWebhookPayload;
 
-    if (!body.generationId || !Array.isArray(body.variations) || body.variations.length === 0) {
+    // Validate payload structure
+    if (!body.task_id || !body.status || !body.audio_url) {
+      console.error('[MusicGPT Webhook] Invalid payload structure:', body);
       return NextResponse.json(
-        { error: 'Invalid payload' },
+        { error: 'Invalid payload: missing required fields' },
         { status: 400 }
       );
     }
 
-    const generation = await getGeneration(body.generationId);
-    if (!generation) {
-      // Unknown generation – acknowledge to avoid retries but do nothing.
+    // Find generation by providerTaskId (which should match task_id)
+    const generationsQuery = query(
+      collection(db, COLLECTIONS.generations),
+      where('providerTaskId', '==', body.task_id),
+      where('status', '==', 'pending')
+    );
+    const generationsSnapshot = await getDocs(generationsQuery);
+
+    if (generationsSnapshot.empty) {
+      // Unknown task – acknowledge to avoid retries but do nothing.
+      console.warn(`[MusicGPT Webhook] No pending generation found for task_id: ${body.task_id}`);
+      return NextResponse.json({ ok: true });
+    }
+
+    // Get the first matching generation (should only be one)
+    const generationDoc = generationsSnapshot.docs[0];
+    const generation = generationDoc.data() as GenerationDocument;
+
+    // Handle different statuses
+    if (body.status === 'FAILED') {
+      // Mark generation as failed
+      await setDoc(
+        doc(db, COLLECTIONS.generations, generation.id),
+        {
+          status: 'failed',
+          error: body.status_msg || 'MusicGPT generation failed',
+          completedAt: Timestamp.now(),
+        },
+        { merge: true }
+      );
+      return NextResponse.json({ ok: true });
+    }
+
+    if (body.status !== 'COMPLETED') {
+      // Still processing - acknowledge but don't update
       return NextResponse.json({ ok: true });
     }
 
@@ -97,68 +130,61 @@ export async function POST(request: Request) {
         .filter((id): id is string => !!id)
     );
 
-    let maxVersionNumber =
+    // Use task_id as providerOutputId for idempotency
+    const providerOutputId = body.task_id;
+
+    // Skip if we've already processed this output
+    if (existingProviderOutputIds.has(providerOutputId)) {
+      console.log(`[MusicGPT Webhook] Output ${providerOutputId} already processed. Skipping.`);
+      return NextResponse.json({ ok: true });
+    }
+
+    const maxVersionNumber =
       existingVersions.reduce(
         (max, v) => (v.versionNumber > max ? v.versionNumber : max),
         0
       ) || 0;
 
     const now = Timestamp.now();
-    const newVersions: SongVersionDocument[] = [];
+    const versionRef = doc(collection(db, COLLECTIONS.songVersions));
+    const versionId = versionRef.id;
 
-    for (const variation of body.variations) {
-      if (!variation.audioUrl || !variation.providerOutputId) {
-        // Skip invalid variations but continue processing others.
-        continue;
-      }
+    const version: SongVersionDocument = {
+      id: versionId,
+      songId: song.id,
+      versionNumber: maxVersionNumber + 1,
+      title: body.title || song.title,
+      createdBy: song.ownerId,
+      createdAt: now,
+      parentVersionId: song.currentVersionId,
+      audioURL: body.audio_url,
+      providerOutputId: providerOutputId,
+      isPrimary: existingVersions.length === 0, // First version is primary
+    };
 
-      // Idempotency per variation: skip if we've already seen this output ID.
-      if (existingProviderOutputIds.has(variation.providerOutputId)) {
-        continue;
-      }
+    await setDoc(versionRef, version);
 
-      maxVersionNumber += 1;
-
-      const versionRef = doc(collection(db, COLLECTIONS.songVersions));
-      const versionId = versionRef.id;
-
-      const version: SongVersionDocument = {
-        id: versionId,
-        songId: song.id,
-        versionNumber: maxVersionNumber,
-        title: song.title,
-        createdBy: song.ownerId,
-        createdAt: now,
-        parentVersionId: song.currentVersionId,
-        audioURL: variation.audioUrl,
-        providerOutputId: variation.providerOutputId,
-        isPrimary: false,
-      };
-
-      await setDoc(versionRef, version);
-      newVersions.push(version);
-      existingProviderOutputIds.add(variation.providerOutputId);
+    // If this is the first version, mark it as primary
+    if (existingVersions.length === 0) {
+      await setPrimarySongVersion(song.id, versionId);
     }
 
-    // If we created at least one new version, optionally mark the first as primary.
-    if (newVersions.length > 0) {
-      const primaryVersion = newVersions[0];
-      await setPrimarySongVersion(song.id, primaryVersion.id);
-    }
-
-    // Mark generation as completed. We do not attempt to populate the legacy
-    // single-output fields beyond a basic representation.
-    const generationRef = doc(
-      db,
-      COLLECTIONS.generations,
-      generation.id
-    );
+    // Mark generation as completed
     await setDoc(
-      generationRef,
+      doc(db, COLLECTIONS.generations, generation.id),
       {
         status: 'completed',
-        providerTaskId: body.providerTaskId ?? generation.providerTaskId,
+        providerTaskId: body.task_id,
         completedAt: now,
+        output: {
+          audioURL: body.audio_url,
+          stems: null,
+          metadata: {
+            title: body.title,
+            conversion_cost: body.conversion_cost,
+            conversion_type: body.conversion_type,
+          },
+        },
       },
       { merge: true }
     );
