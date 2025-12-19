@@ -47,7 +47,13 @@ export async function createMusicGPTSong(payload: {
     throw new Error('MusicGPT configuration is missing');
   }
 
-  const url = `${MUSICGPT_BASE_URL}/MusicAI`;
+  // Construct base URL - handle case where BASE_URL might already include /api/public/v1
+  let baseUrl = MUSICGPT_BASE_URL;
+  if (!baseUrl.includes('/api/public/v1')) {
+    baseUrl = `${baseUrl}/api/public/v1`;
+  }
+  
+  const url = `${baseUrl}/MusicAI`;
   
   // Include webhook_url in payload if provided
   const requestPayload: Record<string, unknown> = {
