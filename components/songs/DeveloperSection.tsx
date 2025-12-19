@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/components/providers/AuthProvider';
 import type { GenerationDocument } from '@/types/firestore';
 
 interface DeveloperSectionProps {
@@ -11,16 +12,23 @@ interface DeveloperSectionProps {
   songId: string;
 }
 
+// Admin user ID for production testing
+const ADMIN_USER_ID = 'MuXWPDQ9iDeFOv5N6mCzCJA1QCH2';
+
 export function DeveloperSection({ generations, songId }: DeveloperSectionProps) {
   const [simulating, setSimulating] = useState(false);
   const [simulationResults, setSimulationResults] = useState<string[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLocalhost, setIsLocalhost] = useState(false);
+  const { user } = useAuth();
 
   // Check if we're on localhost (client-side only)
   useEffect(() => {
     setIsLocalhost(window.location.hostname.includes('localhost'));
   }, []);
+
+  // Check if user is admin or we're in dev
+  const shouldShow = isLocalhost || user?.uid === ADMIN_USER_ID;
 
   const musicGPTGenerations = generations.filter(g => g.provider === 'musicgpt');
 
@@ -199,8 +207,8 @@ export function DeveloperSection({ generations, songId }: DeveloperSectionProps)
     }
   };
 
-  // Only show in localhost
-  if (!isLocalhost || musicGPTGenerations.length === 0) {
+  // Only show in localhost or for admin user
+  if (!shouldShow || musicGPTGenerations.length === 0) {
     return null;
   }
 
