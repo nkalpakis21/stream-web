@@ -50,7 +50,7 @@ export default function DiscoverPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <a href="/" className="text-2xl font-bold">
-              Stream
+              Stream ⭐
             </a>
             <div className="flex gap-4 items-center">
               <a href="/discover">Discover</a>
