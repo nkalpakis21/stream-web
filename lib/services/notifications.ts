@@ -59,6 +59,7 @@ export async function createSongReadyNotification(params: {
     type: 'song_ready',
     read: false,
     createdAt: Timestamp.now(),
+    deletedAt: null,
   };
 
   await setDoc(notificationRef, notification);
@@ -79,7 +80,27 @@ export async function getUnreadNotifications(
   );
 
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => doc.data() as NotificationDocument);
+  return snapshot.docs
+    .map(doc => doc.data() as NotificationDocument)
+    .filter(notif => notif.deletedAt === null);
+}
+
+/**
+ * Get all notifications for a song (used for deletion)
+ */
+export async function getNotificationsBySong(
+  songId: string
+): Promise<NotificationDocument[]> {
+  const q = query(
+    collection(db, COLLECTIONS.notifications),
+    where('songId', '==', songId),
+    orderBy('createdAt', 'desc')
+  );
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs
+    .map(doc => doc.data() as NotificationDocument)
+    .filter(notif => notif.deletedAt === null);
 }
 
 /**

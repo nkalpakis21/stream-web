@@ -217,6 +217,7 @@ export interface NotificationDocument {
   generationId: string;
   read: boolean;
   createdAt: Timestamp;
+  deletedAt: Timestamp | null; // Soft delete
 }
 
 // ============================================================================

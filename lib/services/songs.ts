@@ -31,6 +31,7 @@ import type {
   AIArtistDocument,
 } from '@/types/firestore';
 import { getArtist } from './artists';
+import { getNotificationsBySong } from './notifications';
 
 /**
  * Create a new song
@@ -417,6 +418,70 @@ export async function getArtistNamesForSongs(
   });
   
   return songArtistMap;
+}
+
+/**
+ * Delete a song and all related notifications (soft delete)
+ * 
+ * Only deletes:
+ * - Song document itself
+ * - All notifications referencing this song
+ * 
+ * Does NOT delete:
+ * - Song Versions (only accessed through parent, effectively hidden)
+ * - Generations (only accessed through parent, effectively hidden)
+ * - Collaborations (historical records, handle gracefully in UI)
+ * 
+ * @param songId - The song ID to delete
+ * @param userId - The user ID requesting deletion (must be owner)
+ * @returns Promise<void>
+ * @throws Error if user is not owner or song not found
+ */
+export async function deleteSong(
+  songId: string,
+  userId: string
+): Promise<void> {
+  // Validate ownership
+  const song = await getSong(songId);
+  if (!song) {
+    throw new Error('Song not found');
+  }
+  if (song.ownerId !== userId) {
+    throw new Error('Only the owner can delete this song');
+  }
+  if (song.deletedAt !== null) {
+    throw new Error('Song is already deleted');
+  }
+
+  const now = Timestamp.now();
+  
+  // Get all notifications for this song
+  const notifications = await getNotificationsBySong(songId);
+  
+  // Use batch for atomicity (max 500 operations per batch)
+  const batch = writeBatch(db);
+  let operationCount = 0;
+  
+  // Soft delete notifications
+  notifications.forEach(notif => {
+    if (operationCount >= 500) {
+      throw new Error('Too many operations for single batch');
+    }
+    const notifRef = doc(db, COLLECTIONS.notifications, notif.id);
+    batch.update(notifRef, { deletedAt: now });
+    operationCount++;
+  });
+  
+  // Soft delete the song
+  const songRef = doc(db, getSongPath(songId));
+  batch.update(songRef, {
+    deletedAt: now,
+    updatedAt: serverTimestamp(),
+  });
+  operationCount++;
+  
+  // Commit all deletions atomically
+  await batch.commit();
 }
 
 

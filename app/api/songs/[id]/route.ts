@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { getSongPath } from '@/lib/firebase/collections';
+import { deleteSong } from '@/lib/services/songs';
 
 export async function PATCH(
   request: NextRequest,
@@ -50,6 +51,52 @@ export async function PATCH(
     console.error('Error updating song:', error);
     return NextResponse.json(
       { error: 'Failed to update song' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const songId = params.id;
+    const body = await request.json();
+    
+    // Get userId from request body (client will send this)
+    const userId = body.userId;
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'User ID is required' },
+        { status: 400 }
+      );
+    }
+    
+    // Delete the song (includes ownership validation)
+    await deleteSong(songId, userId);
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting song:', error);
+    
+    if (error instanceof Error) {
+      if (error.message.includes('not found') || error.message.includes('already deleted')) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: 404 }
+        );
+      }
+      if (error.message.includes('owner')) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: 403 }
+        );
+      }
+    }
+    
+    return NextResponse.json(
+      { error: 'Failed to delete song' },
       { status: 500 }
     );
   }

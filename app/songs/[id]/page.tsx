@@ -11,6 +11,7 @@ import { VersionCards } from '@/components/songs/VersionCards';
 import { DeveloperSection } from '@/components/songs/DeveloperSection';
 import { SongPlayCardClient } from '@/components/songs/SongPlayCardClient';
 import { ShareButton } from '@/components/songs/ShareButton';
+import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
 import { Nav } from '@/components/navigation/Nav';
 import Link from 'next/link';
 
@@ -159,6 +160,11 @@ export default async function SongPage({ params }: SongPageProps) {
                 artistName={artist?.name}
               />
             </div>
+            <SongOwnerActions
+              songId={song.id}
+              songTitle={songVersion.title}
+              ownerId={song.ownerId}
+            />
             <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3">
               Created {timeAgo}
             </p>

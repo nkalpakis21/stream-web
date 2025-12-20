@@ -25,7 +25,9 @@ export function NotificationsBell() {
     );
 
     const unsubscribe = onSnapshot(q, snapshot => {
-      const items = snapshot.docs.map(doc => doc.data() as NotificationDocument);
+      const items = snapshot.docs
+        .map(doc => doc.data() as NotificationDocument)
+        .filter(notif => notif.deletedAt === null);
       setNotifications(items);
     });
 

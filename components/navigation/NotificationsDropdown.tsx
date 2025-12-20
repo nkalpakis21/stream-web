@@ -42,13 +42,15 @@ export function NotificationsDropdown({ isOpen, onClose }: NotificationsDropdown
     );
 
     const unsubscribe = onSnapshot(q, snapshot => {
-      const items = snapshot.docs.map(doc => {
-        const data = doc.data() as NotificationDocument;
-        return {
-          ...data,
-          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toMillis() : data.createdAt,
-        };
-      });
+      const items = snapshot.docs
+        .map(doc => {
+          const data = doc.data() as NotificationDocument;
+          return {
+            ...data,
+            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toMillis() : data.createdAt,
+          };
+        })
+        .filter(notif => notif.deletedAt === null);
       setNotifications(items);
       setLoading(false);
     });
