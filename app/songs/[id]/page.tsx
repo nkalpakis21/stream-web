@@ -10,6 +10,7 @@ import { getSongVersions } from '@/lib/services/songs';
 import { VersionCards } from '@/components/songs/VersionCards';
 import { DeveloperSection } from '@/components/songs/DeveloperSection';
 import { SongPlayCardClient } from '@/components/songs/SongPlayCardClient';
+import { ShareButton } from '@/components/songs/ShareButton';
 import { Nav } from '@/components/navigation/Nav';
 import Link from 'next/link';
 
@@ -143,14 +144,21 @@ export default async function SongPage({ params }: SongPageProps) {
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-1 sm:mb-2 text-foreground">
               {songVersion.title}
             </h1>
-            {artist && (
-              <Link
-                href={`/artists/${artist.id}`}
-                className="text-base sm:text-lg text-muted-foreground hover:text-accent transition-colors"
-              >
-                by {artist.name}
-              </Link>
-            )}
+            <div className="flex flex-col items-center gap-3">
+              {artist && (
+                <Link
+                  href={`/artists/${artist.id}`}
+                  className="text-base sm:text-lg text-muted-foreground hover:text-accent transition-colors"
+                >
+                  by {artist.name}
+                </Link>
+              )}
+              <ShareButton 
+                url={`${process.env.NEXT_PUBLIC_APP_URL || 'https://stream.app'}/songs/${song.id}`}
+                title={songVersion.title}
+                artistName={artist?.name}
+              />
+            </div>
             <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3">
               Created {timeAgo}
             </p>
