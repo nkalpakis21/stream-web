@@ -65,6 +65,17 @@ export function CreateSongForm() {
       return;
     }
 
+    // Validate prompt length
+    if (formData.prompt.length > 300) {
+      alert('Prompt cannot exceed 300 characters. Please shorten your description.');
+      return;
+    }
+
+    if (formData.prompt.trim().length === 0) {
+      alert('Please enter a generation prompt.');
+      return;
+    }
+
     setLoading(true);
     try {
 
@@ -170,24 +181,59 @@ export function CreateSongForm() {
       </div>
 
       <div>
-        <label htmlFor="prompt" className="block text-sm font-medium mb-2 text-foreground">
-          Generation Prompt *
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label htmlFor="prompt" className="block text-sm font-medium text-foreground">
+            Generation Prompt *
+          </label>
+          <span
+            className={`text-xs font-medium transition-colors ${
+              formData.prompt.length > 300
+                ? 'text-red-500'
+                : formData.prompt.length > 250
+                ? 'text-yellow-500'
+                : 'text-muted-foreground'
+            }`}
+          >
+            {formData.prompt.length} / 300
+          </span>
+        </div>
         <textarea
           id="prompt"
           required
           rows={5}
+          maxLength={300}
           value={formData.prompt}
-          onChange={e => setFormData({ ...formData, prompt: e.target.value })}
+          onChange={e => {
+            const value = e.target.value;
+            if (value.length <= 300) {
+              setFormData({ ...formData, prompt: value });
+            }
+          }}
           placeholder="Describe the song you want to generate..."
-          className="w-full px-4 py-3 border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all resize-none"
+          className={`w-full px-4 py-3 border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all resize-none ${
+            formData.prompt.length > 300
+              ? 'border-red-500 focus:ring-red-500'
+              : formData.prompt.length > 250
+              ? 'border-yellow-500 focus:ring-yellow-500'
+              : 'border-border'
+          }`}
         />
+        {formData.prompt.length > 300 && (
+          <p className="mt-1.5 text-xs text-red-500">
+            Prompt cannot exceed 300 characters. Please shorten your description.
+          </p>
+        )}
+        {formData.prompt.length > 250 && formData.prompt.length <= 300 && (
+          <p className="mt-1.5 text-xs text-yellow-500">
+            You're approaching the character limit.
+          </p>
+        )}
       </div>
 
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || formData.prompt.length > 300 || formData.prompt.trim().length === 0}
         className="w-full px-6 py-3 bg-accent text-accent-foreground rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-soft"
       >
         {loading ? 'Generating...' : 'Generate Song'}
