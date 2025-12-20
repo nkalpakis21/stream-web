@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { searchSongsByPrompt, getRecentSongs } from '@/lib/services/discovery';
+import { getArtistNamesForSongs } from '@/lib/services/songs';
 import { SongCard } from '@/components/songs/SongCard';
 import { Nav } from '@/components/navigation/Nav';
 import type { SongDocument } from '@/types/firestore';
 
 export default function DiscoverPage() {
   const [songs, setSongs] = useState<SongDocument[]>([]);
+  const [artistNames, setArtistNames] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -20,6 +22,9 @@ export default function DiscoverPage() {
     try {
       const recent = await getRecentSongs(20);
       setSongs(recent);
+      // Fetch artist names for the songs
+      const names = await getArtistNamesForSongs(recent);
+      setArtistNames(names);
     } catch (error) {
       console.error('Failed to load songs:', error);
     } finally {
@@ -38,6 +43,9 @@ export default function DiscoverPage() {
     try {
       const results = await searchSongsByPrompt(searchQuery, 20);
       setSongs(results);
+      // Fetch artist names for the search results
+      const names = await getArtistNamesForSongs(results);
+      setArtistNames(names);
     } catch (error) {
       console.error('Search failed:', error);
     } finally {
@@ -106,7 +114,11 @@ export default function DiscoverPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {songs.map(song => (
-              <SongCard key={song.id} song={song} />
+              <SongCard 
+                key={song.id} 
+                song={song} 
+                artistName={artistNames.get(song.id)}
+              />
             ))}
           </div>
         )}
