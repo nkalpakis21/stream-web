@@ -23,9 +23,9 @@ export function markPlayedInSession(songId: string): void {
 }
 
 /**
- * Debounce function
+ * Debounce function - handles both sync and async functions
  */
-function debounce<T extends (...args: unknown[]) => void>(
+function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
