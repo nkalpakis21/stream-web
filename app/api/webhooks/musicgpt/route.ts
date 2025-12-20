@@ -29,7 +29,7 @@ interface MusicGPTWebhookPayload {
   conversion_type: string;
   task_id: string;
   conversion_id: string;
-  conversion_path: string;
+  conversion_path?: string; // Optional - not present in lyrics update webhooks
   conversion_path_wav?: string;
   conversion_duration?: number;
   is_flagged: boolean;
@@ -37,6 +37,7 @@ interface MusicGPTWebhookPayload {
   lyrics?: string;
   lyrics_timestamped?: unknown;
   title?: string;
+  subtype?: string; // For lyrics_timestamped and other subtype webhooks
 }
 
 function verifySignature(rawBody: string, signature: string | null): boolean {
@@ -72,11 +73,98 @@ export async function POST(request: Request) {
 
     const body = JSON.parse(rawBody) as MusicGPTWebhookPayload;
 
-    // Validate payload structure
-    if (!body.task_id || !body.conversion_id || !body.conversion_path) {
+    // Validate payload structure - task_id and conversion_id are always required
+    if (!body.task_id || !body.conversion_id) {
       console.error('[MusicGPT Webhook] Invalid payload structure:', body);
       return NextResponse.json(
-        { error: 'Invalid payload: missing required fields (task_id, conversion_id, conversion_path)' },
+        { error: 'Invalid payload: missing required fields (task_id, conversion_id)' },
+        { status: 400 }
+      );
+    }
+
+    // Handle lyrics update webhooks separately (they don't have conversion_path)
+    if (body.subtype === 'lyrics_timestamped' || body.subtype === 'lyrics') {
+      console.log(`[MusicGPT Webhook] Received lyrics update webhook for conversion ${body.conversion_id}`);
+      
+      // Find generation by conversion_id
+      const generationsQuery = query(
+        collection(db, COLLECTIONS.generations),
+        where('providerConversionIds', 'array-contains', body.conversion_id)
+      );
+      const generationsSnapshot = await getDocs(generationsQuery);
+      
+      if (generationsSnapshot.empty) {
+        // Try finding by task_id as fallback
+        const taskQuery = query(
+          collection(db, COLLECTIONS.generations),
+          where('providerTaskId', '==', body.task_id)
+        );
+        const taskSnapshot = await getDocs(taskQuery);
+        
+        if (taskSnapshot.empty) {
+          console.warn(`[MusicGPT Webhook] No generation found for lyrics update: task_id=${body.task_id}, conversion_id=${body.conversion_id}`);
+          return NextResponse.json({ ok: true }); // Acknowledge to avoid retries
+        }
+        
+        // Use the generation found by task_id
+        const generationDoc = taskSnapshot.docs[0];
+        const generation = generationDoc.data() as GenerationDocument;
+        
+        // Update generation metadata with lyrics_timestamped data
+        await setDoc(
+          doc(db, COLLECTIONS.generations, generation.id),
+          {
+            output: {
+              ...(generation.output || { audioURL: null, stems: null, metadata: {} }),
+              metadata: {
+                ...(generation.output?.metadata || {}),
+                [`conversion_${body.conversion_id}_lyrics`]: {
+                  lyrics_timestamped: body.lyrics_timestamped,
+                  lyrics: body.lyrics,
+                  subtype: body.subtype,
+                  updatedAt: Timestamp.now(),
+                },
+              },
+            },
+          },
+          { merge: true }
+        );
+        console.log(`[MusicGPT Webhook] Updated lyrics for generation ${generation.id}`);
+        return NextResponse.json({ ok: true });
+      }
+      
+      // Found by conversion_id
+      const generationDoc = generationsSnapshot.docs[0];
+      const generation = generationDoc.data() as GenerationDocument;
+      
+      // Update generation metadata with lyrics_timestamped data
+      await setDoc(
+        doc(db, COLLECTIONS.generations, generation.id),
+        {
+          output: {
+            ...(generation.output || { audioURL: null, stems: null, metadata: {} }),
+            metadata: {
+              ...(generation.output?.metadata || {}),
+              [`conversion_${body.conversion_id}_lyrics`]: {
+                lyrics_timestamped: body.lyrics_timestamped,
+                lyrics: body.lyrics,
+                subtype: body.subtype,
+                updatedAt: Timestamp.now(),
+              },
+            },
+          },
+        },
+        { merge: true }
+      );
+      console.log(`[MusicGPT Webhook] Updated lyrics for generation ${generation.id}`);
+      return NextResponse.json({ ok: true });
+    }
+
+    // For main conversion completion webhooks, conversion_path is required
+    if (!body.conversion_path) {
+      console.error('[MusicGPT Webhook] Invalid payload structure: conversion_path required for conversion completion webhook:', body);
+      return NextResponse.json(
+        { error: 'Invalid payload: conversion_path is required for conversion completion webhooks' },
         { status: 400 }
       );
     }
