@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { Timestamp } from 'firebase/firestore';
 import { getSong } from '@/lib/services/songs';
 import { getSongVersion } from '@/lib/services/songVersions';
@@ -18,6 +19,58 @@ export const dynamic = 'force-dynamic';
 interface SongPageProps {
   params: {
     id: string;
+  };
+}
+
+export async function generateMetadata({ params }: SongPageProps): Promise<Metadata> {
+  const song = await getSong(params.id);
+  
+  if (!song || song.deletedAt) {
+    return {
+      title: 'Song Not Found | Stream ⭐',
+    };
+  }
+
+  const [songVersion, artist] = await Promise.all([
+    getSongVersion(song.currentVersionId),
+    getArtist(song.artistId),
+  ]);
+
+  const coverImageUrl = song.albumCoverThumbnail || song.albumCoverPath;
+  
+  // Ensure the image URL is absolute for Open Graph
+  const ogImageUrl = coverImageUrl 
+    ? (coverImageUrl.startsWith('http') 
+        ? coverImageUrl 
+        : `${process.env.NEXT_PUBLIC_APP_URL || 'https://stream.app'}${coverImageUrl}`)
+    : undefined;
+
+  const title = songVersion?.title || song.title;
+  const artistName = artist?.name || 'Unknown Artist';
+  const description = `Listen to ${title} by ${artistName} on Stream ⭐`;
+
+  return {
+    title: `${title} | Stream ⭐`,
+    description,
+    openGraph: {
+      title,
+      description: `by ${artistName}`,
+      type: 'music.song',
+      images: ogImageUrl ? [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 1200,
+          alt: title,
+        },
+      ] : [],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description: `by ${artistName}`,
+      images: ogImageUrl ? [ogImageUrl] : [],
+    },
   };
 }
 
