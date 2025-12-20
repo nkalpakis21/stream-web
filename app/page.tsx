@@ -1,4 +1,4 @@
-import { getPublicSongs, getTopSongs } from '@/lib/services/songs';
+import { getPublicSongs, getTopSongs, getArtistNamesForSongs } from '@/lib/services/songs';
 import { getPublicArtists } from '@/lib/services/artists';
 import { SongCard } from '@/components/songs/SongCard';
 import { ArtistCard } from '@/components/artists/ArtistCard';
@@ -14,6 +14,12 @@ export default async function HomePage() {
     getPublicSongs(12),
     getPublicArtists(8),
     getTopSongs(12),
+  ]);
+
+  // Fetch artist names for songs
+  const [songArtistMap, topSongArtistMap] = await Promise.all([
+    getArtistNamesForSongs(songs),
+    getArtistNamesForSongs(topSongs),
   ]);
 
   return (
@@ -53,7 +59,11 @@ export default async function HomePage() {
           {songs.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {songs.map(song => (
-                <SongCard key={song.id} song={song} />
+                <SongCard 
+                  key={song.id} 
+                  song={song} 
+                  artistName={songArtistMap.get(song.id)}
+                />
               ))}
             </div>
           ) : (
@@ -93,7 +103,11 @@ export default async function HomePage() {
           {topSongs.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {topSongs.map(song => (
-                <SongCard key={song.id} song={song} />
+                <SongCard 
+                  key={song.id} 
+                  song={song} 
+                  artistName={topSongArtistMap.get(song.id)}
+                />
               ))}
             </div>
           ) : (

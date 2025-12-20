@@ -5,9 +5,10 @@ import { formatDistanceToNow } from 'date-fns';
 
 interface SongCardProps {
   song: SongDocument;
+  artistName?: string;
 }
 
-export function SongCard({ song }: SongCardProps) {
+export function SongCard({ song, artistName }: SongCardProps) {
   const timeAgo = formatDistanceToNow(song.createdAt.toDate(), {
     addSuffix: true,
   });
@@ -71,6 +72,11 @@ export function SongCard({ song }: SongCardProps) {
         <h3 className="text-sm font-semibold mb-1 line-clamp-2 text-card-foreground group-hover:text-accent transition-colors">
           {song.title}
         </h3>
+        {artistName && (
+          <p className="text-xs text-muted-foreground/70 mb-1 line-clamp-1">
+            {artistName}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground">
           {timeAgo}
         </p>

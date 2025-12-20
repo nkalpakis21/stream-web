@@ -30,6 +30,7 @@ import type {
   CollaborationType,
   AIArtistDocument,
 } from '@/types/firestore';
+import { getArtist } from './artists';
 
 /**
  * Create a new song
@@ -382,6 +383,40 @@ export async function setPrimarySongVersion(
   });
 
   await batch.commit();
+}
+
+/**
+ * Helper function to fetch artist names for a list of songs
+ * Returns a map of songId -> artistName
+ */
+export async function getArtistNamesForSongs(
+  songs: SongDocument[]
+): Promise<Map<string, string>> {
+  // Get unique artist IDs
+  const uniqueArtistIds = [...new Set(songs.map(song => song.artistId))];
+  
+  // Fetch all artists in parallel
+  const artistPromises = uniqueArtistIds.map(artistId => getArtist(artistId));
+  const artists = await Promise.all(artistPromises);
+  
+  // Create a map of artistId -> artistName
+  const artistMap = new Map<string, string>();
+  artists.forEach((artist, index) => {
+    if (artist) {
+      artistMap.set(uniqueArtistIds[index], artist.name);
+    }
+  });
+  
+  // Create a map of songId -> artistName
+  const songArtistMap = new Map<string, string>();
+  songs.forEach(song => {
+    const artistName = artistMap.get(song.artistId);
+    if (artistName) {
+      songArtistMap.set(song.id, artistName);
+    }
+  });
+  
+  return songArtistMap;
 }
 
 
