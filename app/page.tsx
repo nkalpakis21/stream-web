@@ -1,8 +1,8 @@
-import Link from 'next/link';
 import { getPublicSongs } from '@/lib/services/songs';
 import { getPublicArtists } from '@/lib/services/artists';
 import { SongCard } from '@/components/songs/SongCard';
 import { ArtistCard } from '@/components/artists/ArtistCard';
+import { Nav } from '@/components/navigation/Nav';
 
 // Force dynamic rendering to always fetch fresh data from Firestore
 export const dynamic = 'force-dynamic';
@@ -15,53 +15,62 @@ export default async function HomePage() {
   ]);
 
   return (
-    <div className="min-h-screen">
-      <nav className="border-b border-gray-200 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <Link href="/" className="text-2xl font-bold">
-              Stream ⭐
-            </Link>
-            <div className="flex gap-4 items-center">
-              <Link href="/discover">Discover</Link>
-              <Link href="/artists">Artists</Link>
-              <Link href="/create">Create</Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-background">
+      <Nav />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <section className="mb-12">
-          <h1 className="text-4xl font-bold mb-4">
-            AI-Native Music Platform
-          </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-400 mb-8">
-            Generate, collaborate, and discover music powered by AI
-          </p>
+      <main className="max-w-7xl mx-auto px-6 lg:px-8 py-12 lg:py-16">
+        {/* Hero Section */}
+        <section className="mb-16 lg:mb-24">
+          <div className="max-w-3xl">
+            <h1 className="text-5xl lg:text-6xl font-bold tracking-tight mb-6 text-foreground">
+              AI-Native Music
+              <br />
+              <span className="text-muted-foreground">Platform</span>
+            </h1>
+            <p className="text-xl lg:text-2xl text-muted-foreground leading-relaxed">
+              Generate, collaborate, and discover music powered by AI. 
+              Create unique compositions with your AI artists.
+            </p>
+          </div>
         </section>
 
-        <section className="mb-12">
-          <h2 className="text-2xl font-semibold mb-6">Latest Songs</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {songs.map(song => (
-              <SongCard key={song.id} song={song} />
-            ))}
+        {/* Latest Songs */}
+        <section className="mb-20">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-3xl font-bold tracking-tight">Latest Songs</h2>
           </div>
-          {songs.length === 0 && (
-            <p className="text-gray-500">No songs yet. Be the first to create one!</p>
+          {songs.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {songs.map(song => (
+                <SongCard key={song.id} song={song} />
+              ))}
+            </div>
+          ) : (
+            <div className="py-16 text-center">
+              <p className="text-muted-foreground text-lg">
+                No songs yet. Be the first to create one!
+              </p>
+            </div>
           )}
         </section>
 
+        {/* Featured Artists */}
         <section>
-          <h2 className="text-2xl font-semibold mb-6">Featured Artists</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-            {artists.map(artist => (
-              <ArtistCard key={artist.id} artist={artist} />
-            ))}
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-3xl font-bold tracking-tight">Featured Artists</h2>
           </div>
-          {artists.length === 0 && (
-            <p className="text-gray-500">No artists yet. Create your first AI artist!</p>
+          {artists.length > 0 ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-6">
+              {artists.map(artist => (
+                <ArtistCard key={artist.id} artist={artist} />
+              ))}
+            </div>
+          ) : (
+            <div className="py-16 text-center">
+              <p className="text-muted-foreground text-lg">
+                No artists yet. Create your first AI artist!
+              </p>
+            </div>
           )}
         </section>
       </main>

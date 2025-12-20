@@ -1,60 +1,84 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { NotificationsBell } from '@/components/navigation/NotificationsBell';
 
 export function Nav() {
   const { user, signOut } = useAuth();
+  const pathname = usePathname();
+
+  const navLinks = [
+    { href: '/discover', label: 'Discover' },
+    { href: '/artists', label: 'Artists' },
+  ];
+
+  const isActive = (href: string) => pathname === href;
 
   return (
-    <nav className="border-b border-gray-200 dark:border-gray-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 items-center">
-          <Link href="/" className="text-2xl font-bold">
+    <nav className="sticky top-0 z-50 glass border-b border-border/40 backdrop-blur-2xl">
+      <div className="max-w-7xl mx-auto px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          <Link 
+            href="/" 
+            className="text-2xl font-semibold tracking-tight hover:opacity-80 transition-opacity"
+          >
             Stream ⭐
           </Link>
-          <div className="flex gap-4 items-center">
-            <Link
-              href="/discover"
-              className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              Discover
-            </Link>
-            <Link
-              href="/artists"
-              className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              Artists
-            </Link>
+          
+          <div className="flex items-center gap-1">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                  isActive(link.href)
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+            
             {user ? (
               <>
+                <div className="w-px h-6 bg-border mx-2" />
                 <NotificationsBell />
                 <Link
                   href="/create"
-                  className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  className={`px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                    isActive('/create')
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
                 >
                   Create
                 </Link>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                <div className="w-px h-6 bg-border mx-2" />
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground hidden sm:block max-w-[120px] truncate">
                     {user.email}
                   </span>
                   <button
                     onClick={signOut}
-                    className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-all duration-200"
                   >
                     Sign Out
                   </button>
                 </div>
               </>
             ) : (
-              <Link
-                href="/create"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Sign In
-              </Link>
+              <>
+                <div className="w-px h-6 bg-border mx-2" />
+                <Link
+                  href="/create"
+                  className="px-5 py-2 text-sm font-medium bg-accent text-accent-foreground rounded-full hover:opacity-90 transition-opacity shadow-soft"
+                >
+                  Sign In
+                </Link>
+              </>
             )}
           </div>
         </div>

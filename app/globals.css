@@ -3,26 +3,54 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fafafa;
+  --foreground: #1d1d1f;
+  --card: #ffffff;
+  --card-foreground: #1d1d1f;
+  --border: #e5e5e7;
+  --muted: #f5f5f7;
+  --muted-foreground: #86868b;
+  --accent: #007aff;
+  --accent-foreground: #ffffff;
+  --radius: 12px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #000000;
+    --foreground: #f5f5f7;
+    --card: #1d1d1f;
+    --card-foreground: #f5f5f7;
+    --border: #2c2c2e;
+    --muted: #1d1d1f;
+    --muted-foreground: #86868b;
+    --accent: #0a84ff;
+    --accent-foreground: #ffffff;
   }
 }
 
+* {
+  @apply border-border;
+}
+
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  @apply bg-background text-foreground;
+  font-feature-settings: "rlig" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  
+  .glass {
+    @apply bg-white/80 dark:bg-black/80 backdrop-blur-xl;
+  }
+  
+  .card-hover {
+    @apply transition-all duration-300 hover:scale-[1.02] hover:shadow-xl;
   }
 }
 

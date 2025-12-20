@@ -1,9 +1,10 @@
 import { notFound } from 'next/navigation';
 import { getArtist } from '@/lib/services/artists';
 import { getArtistSongs } from '@/lib/services/songs';
-import { ArtistCard } from '@/components/artists/ArtistCard';
 import { SongCard } from '@/components/songs/SongCard';
+import { Nav } from '@/components/navigation/Nav';
 import { formatDistanceToNow } from 'date-fns';
+import Image from 'next/image';
 
 // Force dynamic rendering to always fetch fresh data from Firestore
 export const dynamic = 'force-dynamic';
@@ -30,77 +31,83 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
   });
 
   return (
-    <div className="min-h-screen">
-      <nav className="border-b border-gray-200 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <a href="/" className="text-2xl font-bold">
-              Stream ⭐
-            </a>
-            <div className="flex gap-4 items-center">
-              <a href="/discover">Discover</a>
-              <a href="/artists">Artists</a>
-              <a href="/create">Create</a>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-background">
+      <Nav />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <div className="flex items-start gap-6">
-            <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-800 flex-shrink-0">
+      <main className="max-w-7xl mx-auto px-6 lg:px-8 py-8 lg:py-12">
+        {/* Artist Header */}
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12">
+          <div className="flex-shrink-0">
+            <div className="relative w-32 h-32 lg:w-40 lg:h-40 rounded-full overflow-hidden bg-muted ring-4 ring-border shadow-medium">
               {artist.avatarURL ? (
-                <img
+                <Image
                   src={artist.avatarURL}
                   alt={artist.name}
-                  className="w-full h-full object-cover"
+                  fill
+                  className="object-cover"
+                  sizes="160px"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-5xl">
+                <div className="w-full h-full flex items-center justify-center text-5xl lg:text-6xl font-semibold text-muted-foreground/60">
                   {artist.name.charAt(0).toUpperCase()}
                 </div>
               )}
             </div>
-            <div>
-              <h1 className="text-4xl font-bold mb-2">{artist.name}</h1>
-              <p className="text-gray-500 mb-4">Created {timeAgo}</p>
-              <p className="text-lg mb-4">{artist.lore}</p>
-              
-              <div className="space-y-2">
-                <div>
-                  <span className="font-medium">Genres:</span>{' '}
-                  {artist.styleDNA.genres.join(', ') || 'None'}
-                </div>
-                <div>
-                  <span className="font-medium">Moods:</span>{' '}
-                  {artist.styleDNA.moods.join(', ') || 'None'}
-                </div>
-                <div>
-                  <span className="font-medium">Tempo Range:</span>{' '}
-                  {artist.styleDNA.tempoRange.min} - {artist.styleDNA.tempoRange.max} BPM
-                </div>
-                {artist.styleDNA.influences.length > 0 && (
-                  <div>
-                    <span className="font-medium">Influences:</span>{' '}
-                    {artist.styleDNA.influences.join(', ')}
-                  </div>
-                )}
+          </div>
+          
+          <div className="flex-1">
+            <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-3">{artist.name}</h1>
+            <p className="text-sm text-muted-foreground mb-6">Created {timeAgo}</p>
+            <p className="text-lg text-foreground/80 mb-8 leading-relaxed max-w-2xl">{artist.lore}</p>
+            
+            {/* Style DNA */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-border">
+              <div>
+                <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Genres</span>
+                <p className="text-sm font-medium">
+                  {artist.styleDNA.genres.length > 0 ? artist.styleDNA.genres.join(', ') : 'None'}
+                </p>
               </div>
+              <div>
+                <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Moods</span>
+                <p className="text-sm font-medium">
+                  {artist.styleDNA.moods.length > 0 ? artist.styleDNA.moods.join(', ') : 'None'}
+                </p>
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Tempo Range</span>
+                <p className="text-sm font-medium">
+                  {artist.styleDNA.tempoRange.min} - {artist.styleDNA.tempoRange.max} BPM
+                </p>
+              </div>
+              {artist.styleDNA.influences.length > 0 && (
+                <div>
+                  <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Influences</span>
+                  <p className="text-sm font-medium">{artist.styleDNA.influences.join(', ')}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
+        {/* Songs Section */}
         <section>
-          <h2 className="text-2xl font-semibold mb-6">Songs</h2>
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-3xl font-bold tracking-tight">Songs</h2>
+            {songs.length > 0 && (
+              <span className="text-sm text-muted-foreground">{songs.length} {songs.length === 1 ? 'song' : 'songs'}</span>
+            )}
+          </div>
           {songs.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {songs.map(song => (
                 <SongCard key={song.id} song={song} />
               ))}
             </div>
           ) : (
-            <p className="text-gray-500">No songs yet.</p>
+            <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
+              <p className="text-muted-foreground">No songs yet.</p>
+            </div>
           )}
         </section>
       </main>

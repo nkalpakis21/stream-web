@@ -56,7 +56,7 @@ export function CreateArtistForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div>
-        <label htmlFor="name" className="block text-sm font-medium mb-2">
+        <label htmlFor="name" className="block text-sm font-medium mb-2 text-foreground">
           Artist Name *
         </label>
         <input
@@ -65,26 +65,26 @@ export function CreateArtistForm() {
           required
           value={formData.name}
           onChange={e => setFormData({ ...formData, name: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900"
+          className="w-full px-4 py-3 border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
         />
       </div>
 
       <div>
-        <label htmlFor="lore" className="block text-sm font-medium mb-2">
+        <label htmlFor="lore" className="block text-sm font-medium mb-2 text-foreground">
           Bio / Lore *
         </label>
         <textarea
           id="lore"
           required
-          rows={4}
+          rows={5}
           value={formData.lore}
           onChange={e => setFormData({ ...formData, lore: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900"
+          className="w-full px-4 py-3 border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all resize-none"
         />
       </div>
 
       <div>
-        <label htmlFor="genres" className="block text-sm font-medium mb-2">
+        <label htmlFor="genres" className="block text-sm font-medium mb-2 text-foreground">
           Genres (comma-separated)
         </label>
         <input
@@ -93,12 +93,12 @@ export function CreateArtistForm() {
           value={formData.genres}
           onChange={e => setFormData({ ...formData, genres: e.target.value })}
           placeholder="jazz, electronic, cyberpunk"
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900"
+          className="w-full px-4 py-3 border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
         />
       </div>
 
       <div>
-        <label htmlFor="moods" className="block text-sm font-medium mb-2">
+        <label htmlFor="moods" className="block text-sm font-medium mb-2 text-foreground">
           Moods (comma-separated)
         </label>
         <input
@@ -107,13 +107,13 @@ export function CreateArtistForm() {
           value={formData.moods}
           onChange={e => setFormData({ ...formData, moods: e.target.value })}
           placeholder="melancholic, energetic, dreamy"
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900"
+          className="w-full px-4 py-3 border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label htmlFor="tempoMin" className="block text-sm font-medium mb-2">
+          <label htmlFor="tempoMin" className="block text-sm font-medium mb-2 text-foreground">
             Min Tempo (BPM)
           </label>
           <input
@@ -123,11 +123,11 @@ export function CreateArtistForm() {
             max="200"
             value={formData.tempoMin}
             onChange={e => setFormData({ ...formData, tempoMin: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900"
+            className="w-full px-4 py-3 border border-border rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
           />
         </div>
         <div>
-          <label htmlFor="tempoMax" className="block text-sm font-medium mb-2">
+          <label htmlFor="tempoMax" className="block text-sm font-medium mb-2 text-foreground">
             Max Tempo (BPM)
           </label>
           <input
@@ -137,13 +137,13 @@ export function CreateArtistForm() {
             max="200"
             value={formData.tempoMax}
             onChange={e => setFormData({ ...formData, tempoMax: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900"
+            className="w-full px-4 py-3 border border-border rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
           />
         </div>
       </div>
 
       <div>
-        <label htmlFor="influences" className="block text-sm font-medium mb-2">
+        <label htmlFor="influences" className="block text-sm font-medium mb-2 text-foreground">
           Influences (comma-separated)
         </label>
         <input
@@ -152,19 +152,19 @@ export function CreateArtistForm() {
           value={formData.influences}
           onChange={e => setFormData({ ...formData, influences: e.target.value })}
           placeholder="Miles Davis, Daft Punk"
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900"
+          className="w-full px-4 py-3 border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
         />
       </div>
 
-      <div className="flex items-center">
+      <div className="flex items-center gap-3 pt-2">
         <input
           id="isPublic"
           type="checkbox"
           checked={formData.isPublic}
           onChange={e => setFormData({ ...formData, isPublic: e.target.checked })}
-          className="mr-2"
+          className="w-4 h-4 rounded border-border text-accent focus:ring-2 focus:ring-accent focus:ring-offset-0"
         />
-        <label htmlFor="isPublic" className="text-sm">
+        <label htmlFor="isPublic" className="text-sm text-foreground cursor-pointer">
           Make this artist public
         </label>
       </div>
@@ -172,7 +172,7 @@ export function CreateArtistForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full px-6 py-3 bg-accent text-accent-foreground rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-soft"
       >
         {loading ? 'Creating...' : 'Create Artist'}
       </button>

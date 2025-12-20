@@ -1,5 +1,6 @@
 import { getPublicArtists } from '@/lib/services/artists';
 import { ArtistCard } from '@/components/artists/ArtistCard';
+import { Nav } from '@/components/navigation/Nav';
 
 // Force dynamic rendering to always fetch fresh data from Firestore
 export const dynamic = 'force-dynamic';
@@ -8,36 +9,29 @@ export default async function ArtistsPage() {
   const artists = await getPublicArtists(50);
 
   return (
-    <div className="min-h-screen">
-      <nav className="border-b border-gray-200 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <a href="/" className="text-2xl font-bold">
-              Stream ⭐
-            </a>
-            <div className="flex gap-4 items-center">
-              <a href="/discover">Discover</a>
-              <a href="/artists">Artists</a>
-              <a href="/create">Create</a>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-background">
+      <Nav />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-3xl font-bold mb-8">All Artists</h1>
+      <main className="max-w-7xl mx-auto px-6 lg:px-8 py-8 lg:py-12">
+        <div className="flex items-center justify-between mb-12">
+          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight">All Artists</h1>
+          {artists.length > 0 && (
+            <span className="text-sm text-muted-foreground">{artists.length} {artists.length === 1 ? 'artist' : 'artists'}</span>
+          )}
+        </div>
 
         {artists.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-6">
             {artists.map(artist => (
               <ArtistCard key={artist.id} artist={artist} />
             ))}
           </div>
         ) : (
-          <p className="text-gray-500">No artists yet. Be the first to create one!</p>
+          <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
+            <p className="text-muted-foreground text-lg">No artists yet. Create your first AI artist!</p>
+          </div>
         )}
       </main>
     </div>
   );
 }
-

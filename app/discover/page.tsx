@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { searchSongsByPrompt, getRecentSongs } from '@/lib/services/discovery';
 import { SongCard } from '@/components/songs/SongCard';
+import { Nav } from '@/components/navigation/Nav';
 import type { SongDocument } from '@/types/firestore';
 
 export default function DiscoverPage() {
@@ -45,48 +46,35 @@ export default function DiscoverPage() {
   };
 
   return (
-    <div className="min-h-screen">
-      <nav className="border-b border-gray-200 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <a href="/" className="text-2xl font-bold">
-              Stream ⭐
-            </a>
-            <div className="flex gap-4 items-center">
-              <a href="/discover">Discover</a>
-              <a href="/artists">Artists</a>
-              <a href="/create">Create</a>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-background">
+      <Nav />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <section className="mb-8">
-          <h1 className="text-3xl font-bold mb-6">Discover Music</h1>
+      <main className="max-w-7xl mx-auto px-6 lg:px-8 py-8 lg:py-12">
+        <section className="mb-12">
+          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-8">Discover Music</h1>
           
           <form onSubmit={handleSearch} className="mb-6">
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search by prompt, genre, mood, or description..."
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900"
+                className="flex-1 px-5 py-3 border border-border rounded-full bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
               />
               <button
                 type="submit"
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-6 py-3 bg-accent text-accent-foreground rounded-full hover:opacity-90 transition-opacity font-medium shadow-soft"
               >
                 Search
               </button>
             </div>
           </form>
 
-          <div className="flex gap-2 mb-6">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={loadRecentSongs}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="px-4 py-2 rounded-full border border-border hover:bg-muted hover:border-accent/20 transition-all duration-200 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               Recent
             </button>
@@ -95,7 +83,7 @@ export default function DiscoverPage() {
                 setSearchQuery('cyberpunk');
                 handleSearch({ preventDefault: () => {} } as React.FormEvent);
               }}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="px-4 py-2 rounded-full border border-border hover:bg-muted hover:border-accent/20 transition-all duration-200 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               Cyberpunk
             </button>
@@ -104,7 +92,7 @@ export default function DiscoverPage() {
                 setSearchQuery('jazz');
                 handleSearch({ preventDefault: () => {} } as React.FormEvent);
               }}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="px-4 py-2 rounded-full border border-border hover:bg-muted hover:border-accent/20 transition-all duration-200 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               Jazz
             </button>
@@ -112,9 +100,11 @@ export default function DiscoverPage() {
         </section>
 
         {loading ? (
-          <p>Loading...</p>
+          <div className="py-16 text-center">
+            <div className="inline-block w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {songs.map(song => (
               <SongCard key={song.id} song={song} />
             ))}
@@ -122,9 +112,11 @@ export default function DiscoverPage() {
         )}
 
         {!loading && songs.length === 0 && (
-          <p className="text-gray-500 text-center py-12">
-            No songs found. Try a different search or create your own!
-          </p>
+          <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
+            <p className="text-muted-foreground text-lg">
+              No songs found. Try a different search or create your own!
+            </p>
+          </div>
         )}
       </main>
     </div>

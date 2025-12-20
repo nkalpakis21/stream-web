@@ -8,7 +8,10 @@ import { formatDistanceToNow } from 'date-fns';
 import { getSongVersions } from '@/lib/services/songs';
 import { SongVersionsSection } from '@/components/songs/SongVersionsSection';
 import { DeveloperSection } from '@/components/songs/DeveloperSection';
+import { Nav } from '@/components/navigation/Nav';
 import type { SongDocument } from '@/types/firestore';
+import Image from 'next/image';
+import Link from 'next/link';
 
 // Force dynamic rendering to always fetch fresh data from Firestore
 export const dynamic = 'force-dynamic';
@@ -70,58 +73,89 @@ export default async function SongPage({ params }: SongPageProps) {
     completedAt: gen.completedAt ? gen.completedAt.toMillis() : null,
   }));
 
+  const coverImageUrl = song.albumCoverThumbnail || song.albumCoverPath;
+
   return (
-    <div className="min-h-screen">
-      <nav className="border-b border-gray-200 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <a href="/" className="text-2xl font-bold">
-              Stream ⭐
-            </a>
+    <div className="min-h-screen bg-background">
+      <Nav />
+
+      <main className="max-w-6xl mx-auto px-6 lg:px-8 py-8 lg:py-12">
+        {/* Hero Section with Album Cover */}
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12">
+          {/* Album Cover */}
+          <div className="flex-shrink-0">
+            <div className="relative w-full max-w-[320px] aspect-square rounded-2xl overflow-hidden shadow-large bg-muted">
+              {coverImageUrl ? (
+                <Image
+                  src={coverImageUrl}
+                  alt={songVersion.title}
+                  fill
+                  className="object-cover"
+                  sizes="320px"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
+                  <svg
+                    className="w-20 h-20 text-muted-foreground/40"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                    />
+                  </svg>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Song Info */}
+          <div className="flex-1 flex flex-col justify-center">
+            <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-4 text-foreground">
+              {songVersion.title}
+            </h1>
+            {artist && (
+              <Link
+                href={`/artists/${artist.id}`}
+                className="text-xl text-muted-foreground hover:text-accent transition-colors mb-3"
+              >
+                by {artist.name}
+              </Link>
+            )}
+            <p className="text-sm text-muted-foreground mb-6">
+              Created {timeAgo}
+            </p>
+            
+            {/* Metadata */}
+            <div className="flex flex-wrap gap-4 pt-4 border-t border-border">
+              <div>
+                <span className="text-xs text-muted-foreground uppercase tracking-wide">Version</span>
+                <p className="text-sm font-medium mt-1">{songVersion.versionNumber}</p>
+              </div>
+              {latestGeneration?.contentHash && (
+                <div>
+                  <span className="text-xs text-muted-foreground uppercase tracking-wide">Content Hash</span>
+                  <p className="text-xs font-mono text-muted-foreground mt-1 break-all max-w-xs">
+                    {latestGeneration.contentHash}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </nav>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">{songVersion.title}</h1>
-          {artist && (
-            <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">
-              by <a href={`/artists/${artist.id}`} className="hover:underline">{artist.name}</a>
-            </p>
-          )}
-          <p className="text-sm text-gray-500">Created {timeAgo}</p>
-        </div>
-
+        {/* Audio Versions */}
         <SongVersionsSection
           song={serializedSong}
           initialVersions={serializedVersions}
           hasPendingGeneration={hasPendingGeneration}
         />
 
-        <section className="border-t border-gray-200 dark:border-gray-800 pt-8 mt-8">
-          <h2 className="text-2xl font-semibold mb-4">Ownership & Metadata</h2>
-          <div className="space-y-2 text-sm">
-            <div>
-              <span className="font-medium">Song ID:</span>{' '}
-              <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
-                {song.id}
-              </code>
-            </div>
-            <div>
-              <span className="font-medium">Version:</span> {songVersion.versionNumber}
-            </div>
-            {latestGeneration?.contentHash && (
-              <div>
-                <span className="font-medium">Content Hash:</span>{' '}
-                <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs">
-                  {latestGeneration.contentHash}
-                </code>
-              </div>
-            )}
-          </div>
-        </section>
-
+        {/* Developer Section */}
         <DeveloperSection generations={serializedGenerations} songId={song.id} />
       </main>
     </div>

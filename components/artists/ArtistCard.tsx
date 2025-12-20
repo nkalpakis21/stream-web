@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import type { AIArtistDocument } from '@/types/firestore';
 
 interface ArtistCardProps {
@@ -11,20 +12,24 @@ export function ArtistCard({ artist }: ArtistCardProps) {
       href={`/artists/${artist.id}`}
       className="block text-center group"
     >
-      <div className="w-full aspect-square rounded-full overflow-hidden bg-gray-200 dark:bg-gray-800 mb-2 group-hover:opacity-80 transition-opacity">
+      <div className="relative w-full aspect-square rounded-full overflow-hidden bg-muted mb-3 ring-2 ring-transparent group-hover:ring-accent/20 transition-all duration-300 group-hover:scale-105">
         {artist.avatarURL ? (
-          <img
+          <Image
             src={artist.avatarURL}
             alt={artist.name}
-            className="w-full h-full object-cover"
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 80px, 120px"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-4xl">
+          <div className="w-full h-full flex items-center justify-center text-3xl lg:text-4xl font-semibold text-muted-foreground/60">
             {artist.name.charAt(0).toUpperCase()}
           </div>
         )}
       </div>
-      <h3 className="font-medium text-sm">{artist.name}</h3>
+      <h3 className="font-medium text-sm text-foreground group-hover:text-accent transition-colors line-clamp-1">
+        {artist.name}
+      </h3>
     </Link>
   );
 }
