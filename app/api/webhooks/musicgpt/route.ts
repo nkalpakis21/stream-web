@@ -111,6 +111,21 @@ export async function POST(request: Request) {
         const generation = generationDoc.data() as GenerationDocument;
         
         // Update generation metadata with lyrics_timestamped data
+        // Build metadata object conditionally to avoid undefined values (Firestore doesn't accept undefined)
+        const lyricsMetadata: Record<string, unknown> = {
+          updatedAt: Timestamp.now(),
+        };
+        
+        if (body.lyrics_timestamped !== undefined) {
+          lyricsMetadata.lyrics_timestamped = body.lyrics_timestamped;
+        }
+        if (body.lyrics !== undefined) {
+          lyricsMetadata.lyrics = body.lyrics;
+        }
+        if (body.subtype !== undefined) {
+          lyricsMetadata.subtype = body.subtype;
+        }
+        
         await setDoc(
           doc(db, COLLECTIONS.generations, generation.id),
           {
@@ -118,12 +133,7 @@ export async function POST(request: Request) {
               ...(generation.output || { audioURL: null, stems: null, metadata: {} }),
               metadata: {
                 ...(generation.output?.metadata || {}),
-                [`conversion_${body.conversion_id}_lyrics`]: {
-                  lyrics_timestamped: body.lyrics_timestamped,
-                  lyrics: body.lyrics,
-                  subtype: body.subtype,
-                  updatedAt: Timestamp.now(),
-                },
+                [`conversion_${body.conversion_id}_lyrics`]: lyricsMetadata,
               },
             },
           },
@@ -138,6 +148,21 @@ export async function POST(request: Request) {
       const generation = generationDoc.data() as GenerationDocument;
       
       // Update generation metadata with lyrics_timestamped data
+      // Build metadata object conditionally to avoid undefined values (Firestore doesn't accept undefined)
+      const lyricsMetadata: Record<string, unknown> = {
+        updatedAt: Timestamp.now(),
+      };
+      
+      if (body.lyrics_timestamped !== undefined) {
+        lyricsMetadata.lyrics_timestamped = body.lyrics_timestamped;
+      }
+      if (body.lyrics !== undefined) {
+        lyricsMetadata.lyrics = body.lyrics;
+      }
+      if (body.subtype !== undefined) {
+        lyricsMetadata.subtype = body.subtype;
+      }
+      
       await setDoc(
         doc(db, COLLECTIONS.generations, generation.id),
         {
@@ -145,12 +170,7 @@ export async function POST(request: Request) {
             ...(generation.output || { audioURL: null, stems: null, metadata: {} }),
             metadata: {
               ...(generation.output?.metadata || {}),
-              [`conversion_${body.conversion_id}_lyrics`]: {
-                lyrics_timestamped: body.lyrics_timestamped,
-                lyrics: body.lyrics,
-                subtype: body.subtype,
-                updatedAt: Timestamp.now(),
-              },
+              [`conversion_${body.conversion_id}_lyrics`]: lyricsMetadata,
             },
           },
         },
