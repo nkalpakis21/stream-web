@@ -48,14 +48,9 @@ export function SongCard({ song }: SongCardProps) {
       </div>
       <div className="p-4">
         <h3 className="text-xl font-semibold mb-1 line-clamp-2">{song.title}</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           Created {timeAgo}
         </p>
-        {song.collaborationType && (
-          <span className="inline-block px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded">
-            {song.collaborationType}
-          </span>
-        )}
       </div>
     </Link>
   );

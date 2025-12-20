@@ -4,7 +4,6 @@ import { getSong } from '@/lib/services/songs';
 import { getSongVersion } from '@/lib/services/songVersions';
 import { getSongGenerations } from '@/lib/services/generations';
 import { getArtist } from '@/lib/services/artists';
-import { SongActions } from '@/components/songs/SongActions';
 import { formatDistanceToNow } from 'date-fns';
 import { getSongVersions } from '@/lib/services/songs';
 import { SongVersionsSection } from '@/components/songs/SongVersionsSection';
@@ -100,11 +99,7 @@ export default async function SongPage({ params }: SongPageProps) {
           hasPendingGeneration={hasPendingGeneration}
         />
 
-        <div className="mb-8 mt-8">
-          <SongActions song={serializedSong} />
-        </div>
-
-        <section className="border-t border-gray-200 dark:border-gray-800 pt-8">
+        <section className="border-t border-gray-200 dark:border-gray-800 pt-8 mt-8">
           <h2 className="text-2xl font-semibold mb-4">Ownership & Metadata</h2>
           <div className="space-y-2 text-sm">
             <div>
@@ -122,17 +117,6 @@ export default async function SongPage({ params }: SongPageProps) {
                 <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs">
                   {latestGeneration.contentHash}
                 </code>
-              </div>
-            )}
-            {song.parentSongId && (
-              <div>
-                <span className="font-medium">Based on:</span>{' '}
-                <a
-                  href={`/songs/${song.parentSongId}`}
-                  className="text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  View original
-                </a>
               </div>
             )}
           </div>
