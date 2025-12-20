@@ -329,6 +329,27 @@ export async function getArtistSongs(
 }
 
 /**
+ * Get top songs ranked by play count
+ */
+export async function getTopSongs(
+  limit: number = 12
+): Promise<SongDocument[]> {
+  const q = query(
+    collection(db, COLLECTIONS.songs),
+    where('isPublic', '==', true)
+  );
+  const snapshot = await getDocs(q);
+  
+  // Filter out deleted songs and sort by play count in memory
+  // Since playCount is optional, default to 0 for songs without it
+  return snapshot.docs
+    .map(doc => doc.data() as SongDocument)
+    .filter(song => song.deletedAt === null)
+    .sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0))
+    .slice(0, limit);
+}
+
+/**
  * Set the primary version for a song.
  *
  * This updates:

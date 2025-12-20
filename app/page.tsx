@@ -1,4 +1,4 @@
-import { getPublicSongs } from '@/lib/services/songs';
+import { getPublicSongs, getTopSongs } from '@/lib/services/songs';
 import { getPublicArtists } from '@/lib/services/artists';
 import { SongCard } from '@/components/songs/SongCard';
 import { ArtistCard } from '@/components/artists/ArtistCard';
@@ -9,9 +9,10 @@ export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   // Fetch public content for discovery feed
-  const [songs, artists] = await Promise.all([
+  const [songs, artists, topSongs] = await Promise.all([
     getPublicSongs(12),
     getPublicArtists(8),
+    getTopSongs(12),
   ]);
 
   return (
@@ -55,7 +56,7 @@ export default async function HomePage() {
         </section>
 
         {/* Featured Artists */}
-        <section>
+        <section className="mb-20">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-3xl font-bold tracking-tight">Featured Artists</h2>
           </div>
@@ -69,6 +70,26 @@ export default async function HomePage() {
             <div className="py-16 text-center">
               <p className="text-muted-foreground text-lg">
                 No artists yet. Create your first AI artist!
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* Top Songs */}
+        <section>
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-3xl font-bold tracking-tight">Top Songs</h2>
+          </div>
+          {topSongs.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {topSongs.map(song => (
+                <SongCard key={song.id} song={song} />
+              ))}
+            </div>
+          ) : (
+            <div className="py-16 text-center">
+              <p className="text-muted-foreground text-lg">
+                No songs yet. Be the first to create one!
               </p>
             </div>
           )}
