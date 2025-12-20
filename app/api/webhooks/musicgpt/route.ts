@@ -294,10 +294,10 @@ export async function POST(request: Request) {
         status: shouldMarkCompleted ? 'completed' : generation.status,
         completedAt: shouldMarkCompleted ? now : generation.completedAt,
         output: {
-          audioURL: shouldMarkCompleted ? body.conversion_path : generation.output.audioURL,
+          audioURL: shouldMarkCompleted ? body.conversion_path : (generation.output?.audioURL || null),
           stems: body.conversion_path_wav ? [body.conversion_path_wav] : null,
           metadata: {
-            ...generation.output.metadata,
+            ...(generation.output?.metadata || {}),
             [`conversion_${body.conversion_id}`]: conversionMetadata,
           },
         },
