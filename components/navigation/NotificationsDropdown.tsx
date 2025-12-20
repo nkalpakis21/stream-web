@@ -6,8 +6,13 @@ import { db } from '@/lib/firebase/config';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { markNotificationRead } from '@/lib/services/notifications';
 import { useRouter } from 'next/navigation';
-import type { NotificationDocument } from '@/types/firestore';
+import type { NotificationDocument, NotificationType } from '@/types/firestore';
 import { formatDistanceToNow } from 'date-fns';
+
+// Serialized notification for client components
+type SerializedNotificationDocument = Omit<NotificationDocument, 'createdAt'> & {
+  createdAt: number;
+};
 
 interface NotificationsDropdownProps {
   isOpen: boolean;
@@ -17,7 +22,7 @@ interface NotificationsDropdownProps {
 export function NotificationsDropdown({ isOpen, onClose }: NotificationsDropdownProps) {
   const { user } = useAuth();
   const router = useRouter();
-  const [notifications, setNotifications] = useState<NotificationDocument[]>([]);
+  const [notifications, setNotifications] = useState<SerializedNotificationDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -65,7 +70,7 @@ export function NotificationsDropdown({ isOpen, onClose }: NotificationsDropdown
     }
   }, [isOpen, onClose]);
 
-  const handleNotificationClick = async (notification: NotificationDocument) => {
+  const handleNotificationClick = async (notification: SerializedNotificationDocument) => {
     // Mark as read
     await markNotificationRead(notification.id);
     
