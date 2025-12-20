@@ -5,6 +5,7 @@ import { SongCard } from '@/components/songs/SongCard';
 import { Nav } from '@/components/navigation/Nav';
 import { formatDistanceToNow } from 'date-fns';
 import Image from 'next/image';
+import { getAvatarGradient, getInitials } from '@/lib/utils/avatar';
 
 // Force dynamic rendering to always fetch fresh data from Firestore
 export const dynamic = 'force-dynamic';
@@ -48,8 +49,22 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                   sizes="160px"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-5xl lg:text-6xl font-semibold text-muted-foreground/60">
-                  {artist.name.charAt(0).toUpperCase()}
+                <div 
+                  className="w-full h-full flex items-center justify-center relative"
+                  style={{ background: getAvatarGradient(artist.name) }}
+                >
+                  {/* Subtle pattern overlay */}
+                  <div 
+                    className="absolute inset-0 opacity-10"
+                    style={{ 
+                      backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', 
+                      backgroundSize: '20px 20px' 
+                    }} 
+                  />
+                  {/* Initials */}
+                  <span className="relative text-white font-bold text-5xl lg:text-6xl drop-shadow-lg">
+                    {getInitials(artist.name)}
+                  </span>
                 </div>
               )}
             </div>
