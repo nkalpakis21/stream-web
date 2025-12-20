@@ -18,7 +18,7 @@ export function CreateSongForm() {
     title: '',
     artistId: '',
     prompt: '',
-    provider: 'stub', // Default to stub provider
+    provider: 'musicgpt', // Default to MusicGPT
   });
 
   useEffect(() => {
@@ -175,20 +175,6 @@ export function CreateSongForm() {
         />
       </div>
 
-      <div>
-        <label htmlFor="provider" className="block text-sm font-medium mb-2 text-foreground">
-          AI Provider
-        </label>
-        <select
-          id="provider"
-          value={formData.provider}
-          onChange={e => setFormData({ ...formData, provider: e.target.value })}
-          className="w-full px-4 py-3 border border-border rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
-        >
-          <option value="stub">Stub Provider (Development)</option>
-          <option value="musicgpt">MusicGPT (Production)</option>
-        </select>
-      </div>
 
       <button
         type="submit"
