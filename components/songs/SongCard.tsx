@@ -17,7 +17,7 @@ export function SongCard({ song }: SongCardProps) {
   return (
     <Link
       href={`/songs/${song.id}`}
-      className="group block bg-card rounded-2xl overflow-hidden shadow-soft hover:shadow-medium transition-all duration-300 card-hover"
+      className="group block bg-card rounded-xl overflow-hidden shadow-soft hover:shadow-medium transition-all duration-300 card-hover"
     >
       <div className="relative w-full aspect-square bg-muted overflow-hidden">
         {coverImageUrl ? (
@@ -58,20 +58,20 @@ export function SongCard({ song }: SongCardProps) {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         {/* Play Count Overlay */}
-        <div className="absolute top-3 right-3 bg-black/70 backdrop-blur-sm rounded-full px-2.5 py-1.5 flex items-center gap-1.5">
-          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24">
+        <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
+          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
           </svg>
-          <span className="text-xs font-medium text-white">
+          <span className="text-[10px] font-medium text-white">
             {(song.playCount ?? 0).toLocaleString()}
           </span>
         </div>
       </div>
-      <div className="p-5">
-        <h3 className="text-lg font-semibold mb-1.5 line-clamp-2 text-card-foreground group-hover:text-accent transition-colors">
+      <div className="p-3">
+        <h3 className="text-sm font-semibold mb-1 line-clamp-2 text-card-foreground group-hover:text-accent transition-colors">
           {song.title}
         </h3>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           {timeAgo}
         </p>
       </div>

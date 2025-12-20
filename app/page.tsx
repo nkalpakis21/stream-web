@@ -51,7 +51,7 @@ export default async function HomePage() {
             <h2 className="text-3xl font-bold tracking-tight">Latest Songs</h2>
           </div>
           {songs.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {songs.map(song => (
                 <SongCard key={song.id} song={song} />
               ))}
@@ -91,7 +91,7 @@ export default async function HomePage() {
             <h2 className="text-3xl font-bold tracking-tight">Top Songs</h2>
           </div>
           {topSongs.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {topSongs.map(song => (
                 <SongCard key={song.id} song={song} />
               ))}
