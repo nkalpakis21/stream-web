@@ -98,13 +98,24 @@ export function SongPlayCardClient({
       className="relative w-full max-w-[280px] sm:max-w-[320px] md:max-w-[400px] aspect-square rounded-xl sm:rounded-2xl overflow-hidden shadow-large bg-muted cursor-pointer group hover:scale-[1.02] transition-transform duration-200"
     >
       {albumCoverUrl ? (
-        <Image
-          src={albumCoverUrl}
-          alt={songTitle}
-          fill
-          className="object-cover group-hover:brightness-75 transition-all duration-200"
-          sizes="(max-width: 640px) 280px, (max-width: 768px) 320px, 400px"
-        />
+        <>
+          <Image
+            src={albumCoverUrl}
+            alt={songTitle}
+            fill
+            className="object-cover group-hover:brightness-75 transition-all duration-200"
+            sizes="(max-width: 640px) 280px, (max-width: 768px) 320px, 400px"
+          />
+          {/* Multi-layer overlay for polish */}
+          <div className="absolute inset-0 bg-gradient-to-br from-black/5 via-transparent to-black/15 pointer-events-none" />
+          <div 
+            className="absolute inset-0 pointer-events-none"
+            style={{ 
+              background: 'radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.25) 100%)' 
+            }}
+          />
+          <div className="absolute inset-0 bg-accent/3 mix-blend-soft-light pointer-events-none" />
+        </>
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
           <svg
