@@ -23,7 +23,7 @@ export default function TermsOfServicePage() {
             <section>
               <h2 className="text-2xl font-semibold mb-4">1. Acceptance of Terms</h2>
               <p className="text-muted-foreground leading-relaxed">
-                By accessing or using Stream ⭐ ("the Service"), you agree to be bound by these Terms of Service ("Terms"). If you disagree with any part of these terms, then you may not access the Service.
+                By accessing or using Stream ⭐ (&quot;the Service&quot;), you agree to be bound by these Terms of Service (&quot;Terms&quot;). If you disagree with any part of these terms, then you may not access the Service.
               </p>
             </section>
 
@@ -56,7 +56,7 @@ export default function TermsOfServicePage() {
                 <div>
                   <h3 className="text-xl font-medium mb-2 text-foreground">4.1 Ownership</h3>
                   <p className="leading-relaxed">
-                    You retain ownership of any content you create, upload, or share on the Service ("User Content"). However, by using the Service, you grant us a worldwide, non-exclusive, royalty-free license to use, reproduce, modify, and distribute your User Content for the purpose of operating and improving the Service.
+                    You retain ownership of any content you create, upload, or share on the Service (&quot;User Content&quot;). However, by using the Service, you grant us a worldwide, non-exclusive, royalty-free license to use, reproduce, modify, and distribute your User Content for the purpose of operating and improving the Service.
                   </p>
                 </div>
                 <div>
@@ -120,7 +120,7 @@ export default function TermsOfServicePage() {
             <section>
               <h2 className="text-2xl font-semibold mb-4">9. Disclaimer of Warranties</h2>
               <p className="text-muted-foreground leading-relaxed">
-                THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, SECURE, OR ERROR-FREE.
+                THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, SECURE, OR ERROR-FREE.
               </p>
             </section>
 
@@ -134,7 +134,7 @@ export default function TermsOfServicePage() {
             <section>
               <h2 className="text-2xl font-semibold mb-4">11. Indemnification</h2>
               <p className="text-muted-foreground leading-relaxed">
-                You agree to indemnify, defend, and hold harmless Stream ⭐ and its affiliates from any claims, damages, losses, liabilities, and expenses (including attorneys' fees) arising out of or relating to your use of the Service, your User Content, or your violation of these Terms.
+                You agree to indemnify, defend, and hold harmless Stream ⭐ and its affiliates from any claims, damages, losses, liabilities, and expenses (including attorneys&apos; fees) arising out of or relating to your use of the Service, your User Content, or your violation of these Terms.
               </p>
             </section>
 
