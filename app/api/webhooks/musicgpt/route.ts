@@ -28,16 +28,21 @@ interface MusicGPTWebhookPayload {
   success: boolean;
   conversion_type: string;
   task_id: string;
-  conversion_id: string;
-  conversion_path?: string; // Optional - not present in lyrics update webhooks
+  conversion_id?: string; // Optional - album cover webhooks don't have it
+  conversion_id_1?: string; // For album cover webhooks
+  conversion_id_2?: string; // For album cover webhooks
+  conversion_path?: string; // Optional - not present in lyrics/album cover webhooks
   conversion_path_wav?: string;
   conversion_duration?: number;
-  is_flagged: boolean;
+  is_flagged?: boolean; // Optional - not present in all webhook types
   reason?: string;
   lyrics?: string;
   lyrics_timestamped?: unknown;
   title?: string;
-  subtype?: string; // For lyrics_timestamped and other subtype webhooks
+  subtype?: string; // For lyrics_timestamped, album_cover_generation, etc.
+  image_path?: string; // For album cover webhooks
+  thumbnail_path?: string; // For album cover webhooks
+  album_cover_generator_output?: boolean; // For album cover webhooks
 }
 
 function verifySignature(rawBody: string, signature: string | null): boolean {
@@ -73,13 +78,98 @@ export async function POST(request: Request) {
 
     const body = JSON.parse(rawBody) as MusicGPTWebhookPayload;
 
-    // Validate payload structure - task_id and conversion_id are always required
-    if (!body.task_id || !body.conversion_id) {
+    // Validate payload structure - task_id is always required
+    if (!body.task_id) {
       console.error('[MusicGPT Webhook] Invalid payload structure:', body);
       return NextResponse.json(
-        { error: 'Invalid payload: missing required fields (task_id, conversion_id)' },
+        { error: 'Invalid payload: missing required field (task_id)' },
         { status: 400 }
       );
+    }
+
+    // Handle album cover generation webhooks
+    if (body.subtype === 'album_cover_generation') {
+      console.log(`[MusicGPT Webhook] Received album cover generation webhook for task ${body.task_id}`);
+      
+      // Find generation by task_id
+      const generationsQuery = query(
+        collection(db, COLLECTIONS.generations),
+        where('providerTaskId', '==', body.task_id)
+      );
+      const generationsSnapshot = await getDocs(generationsQuery);
+      
+      if (generationsSnapshot.empty) {
+        console.warn(`[MusicGPT Webhook] No generation found for album cover: task_id=${body.task_id}`);
+        return NextResponse.json({ ok: true }); // Acknowledge to avoid retries
+      }
+      
+      const generationDoc = generationsSnapshot.docs[0];
+      const generation = generationDoc.data() as GenerationDocument;
+      const song = await getSong(generation.songId);
+      
+      if (!song) {
+        console.warn(`[MusicGPT Webhook] Song not found for generation ${generation.id}`);
+        return NextResponse.json({ ok: true });
+      }
+      
+      // Update song with album cover URLs
+      const songUpdates: Partial<SongDocument> = {};
+      if (body.image_path && !song.albumCoverPath) {
+        songUpdates.albumCoverPath = body.image_path;
+      }
+      if (body.thumbnail_path && !song.albumCoverThumbnail) {
+        songUpdates.albumCoverThumbnail = body.thumbnail_path;
+      }
+      
+      if (Object.keys(songUpdates).length > 0) {
+        await setDoc(
+          doc(db, COLLECTIONS.songs, song.id),
+          {
+            ...songUpdates,
+            updatedAt: Timestamp.now(),
+          },
+          { merge: true }
+        );
+        console.log(`[MusicGPT Webhook] Updated album cover for song ${song.id}`);
+      }
+      
+      // Also store in generation metadata
+      const albumCoverMetadata: Record<string, unknown> = {
+        updatedAt: Timestamp.now(),
+        subtype: body.subtype,
+      };
+      
+      if (body.image_path !== undefined) {
+        albumCoverMetadata.image_path = body.image_path;
+      }
+      if (body.thumbnail_path !== undefined) {
+        albumCoverMetadata.thumbnail_path = body.thumbnail_path;
+      }
+      if (body.album_cover_generator_output !== undefined) {
+        albumCoverMetadata.album_cover_generator_output = body.album_cover_generator_output;
+      }
+      if (body.conversion_id_1 !== undefined) {
+        albumCoverMetadata.conversion_id_1 = body.conversion_id_1;
+      }
+      if (body.conversion_id_2 !== undefined) {
+        albumCoverMetadata.conversion_id_2 = body.conversion_id_2;
+      }
+      
+      await setDoc(
+        doc(db, COLLECTIONS.generations, generation.id),
+        {
+          output: {
+            ...(generation.output || { audioURL: null, stems: null, metadata: {} }),
+            metadata: {
+              ...(generation.output?.metadata || {}),
+              album_cover_generation: albumCoverMetadata,
+            },
+          },
+        },
+        { merge: true }
+      );
+      
+      return NextResponse.json({ ok: true });
     }
 
     // Handle lyrics update webhooks separately (they don't have conversion_path)
@@ -180,7 +270,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // For main conversion completion webhooks, conversion_path is required
+    // For main conversion completion webhooks, conversion_id and conversion_path are required
+    if (!body.conversion_id) {
+      console.error('[MusicGPT Webhook] Invalid payload structure: conversion_id required for conversion completion webhook:', body);
+      return NextResponse.json(
+        { error: 'Invalid payload: conversion_id is required for conversion completion webhooks' },
+        { status: 400 }
+      );
+    }
+    
     if (!body.conversion_path) {
       console.error('[MusicGPT Webhook] Invalid payload structure: conversion_path required for conversion completion webhook:', body);
       return NextResponse.json(
@@ -220,7 +318,7 @@ export async function POST(request: Request) {
       
       const matchingDoc = allDocs.find(doc => {
         const gen = doc.data() as GenerationDocument;
-        return gen.providerConversionIds?.includes(body.conversion_id);
+        return body.conversion_id && gen.providerConversionIds?.includes(body.conversion_id);
       });
 
       if (matchingDoc) {
