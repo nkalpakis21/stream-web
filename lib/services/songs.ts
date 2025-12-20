@@ -101,6 +101,7 @@ export async function createSong(
     collaborationType: data.collaborationType || null,
     albumCoverPath: null,
     albumCoverThumbnail: null,
+    playCount: 0,
   };
 
   // Write both documents

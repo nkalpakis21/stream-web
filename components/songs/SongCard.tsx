@@ -46,6 +46,15 @@ export function SongCard({ song }: SongCardProps) {
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        {/* Play Count Overlay */}
+        <div className="absolute top-3 right-3 bg-black/70 backdrop-blur-sm rounded-full px-2.5 py-1.5 flex items-center gap-1.5">
+          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
+          <span className="text-xs font-medium text-white">
+            {(song.playCount ?? 0).toLocaleString()}
+          </span>
+        </div>
       </div>
       <div className="p-5">
         <h3 className="text-lg font-semibold mb-1.5 line-clamp-2 text-card-foreground group-hover:text-accent transition-colors">

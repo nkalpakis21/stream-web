@@ -108,6 +108,7 @@ export function VersionCards({
                 artistName={artistName}
                 albumCoverUrl={albumCoverUrl}
                 audioUrl={version.audioURL}
+                songId={songId}
               />
               <div className="mt-2 sm:mt-3 text-center">
                 <span className="text-xs sm:text-sm font-medium text-foreground">Version {label}</span>

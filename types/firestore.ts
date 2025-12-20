@@ -93,6 +93,12 @@ export interface SongDocument {
    * Shared across all conversions for a single song generation.
    */
   albumCoverThumbnail: string | null;
+  /**
+   * Total number of times this song has been played.
+   * Incremented atomically when users play the song.
+   * Optional for backward compatibility with existing songs.
+   */
+  playCount?: number;
 }
 
 export interface SongVersionDocument {

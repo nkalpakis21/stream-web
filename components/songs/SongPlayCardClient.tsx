@@ -1,13 +1,16 @@
 'use client';
 
+import { useMemo } from 'react';
 import Image from 'next/image';
 import { useSongPlayer } from './SongPlayerProvider';
+import { createDebouncedPlayTracker } from '@/lib/utils/playTracking';
 
 interface SongPlayCardClientProps {
   songTitle: string;
   artistName: string;
   albumCoverUrl: string | null;
   audioUrl: string | null;
+  songId?: string; // Song ID for play tracking (optional)
 }
 
 export function SongPlayCardClient({
@@ -15,8 +18,15 @@ export function SongPlayCardClient({
   artistName,
   albumCoverUrl,
   audioUrl,
+  songId,
 }: SongPlayCardClientProps) {
   const { play, nowPlaying, isPlaying, togglePlayPause } = useSongPlayer();
+  
+  // Create debounced play tracker (500ms debounce)
+  const debouncedTrackPlay = useMemo(
+    () => createDebouncedPlayTracker(500),
+    []
+  );
   
   const isCurrentSong = nowPlaying?.audioUrl === audioUrl;
   const showPlayingState = isCurrentSong && isPlaying;
@@ -40,6 +50,10 @@ export function SongPlayCardClient({
         albumCoverUrl,
         audioUrl,
       });
+      // Track play with debounce (only if songId is provided)
+      if (songId) {
+        debouncedTrackPlay(songId);
+      }
     }
   };
 

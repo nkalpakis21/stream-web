@@ -82,6 +82,7 @@ export default async function SongPage({ params }: SongPageProps) {
             artistName={artist?.name || 'Unknown Artist'}
             albumCoverUrl={coverImageUrl}
             audioUrl={primaryAudioUrl}
+            songId={song.id}
           />
           
           {/* Song Info Below Card */}
