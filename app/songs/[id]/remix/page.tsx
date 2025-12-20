@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getSong } from '@/lib/services/songs';
@@ -21,15 +21,7 @@ export default function RemixSongPage() {
   const [selectedArtistId, setSelectedArtistId] = useState('');
   const [newTitle, setNewTitle] = useState('');
 
-  useEffect(() => {
-    if (user && !authLoading) {
-      loadData();
-    } else if (!authLoading && !user) {
-      router.push('/');
-    }
-  }, [user, authLoading]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!user) return;
     try {
       const [song, userArtists] = await Promise.all([
@@ -58,7 +50,15 @@ export default function RemixSongPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, songId, router]);
+
+  useEffect(() => {
+    if (user && !authLoading) {
+      loadData();
+    } else if (!authLoading && !user) {
+      router.push('/');
+    }
+  }, [user, authLoading, loadData, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

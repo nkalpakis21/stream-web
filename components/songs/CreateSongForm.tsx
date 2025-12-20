@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getUserArtists } from '@/lib/services/artists';
@@ -21,13 +21,7 @@ export function CreateSongForm() {
     provider: 'musicgpt', // Default to MusicGPT
   });
 
-  useEffect(() => {
-    if (user) {
-      loadArtists();
-    }
-  }, [user]);
-
-  const loadArtists = async () => {
+  const loadArtists = useCallback(async () => {
     if (!user) return;
     try {
       const userArtists = await getUserArtists(user.uid);
@@ -41,7 +35,13 @@ export function CreateSongForm() {
     } finally {
       setLoadingArtists(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      loadArtists();
+    }
+  }, [user, loadArtists]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -225,7 +225,7 @@ export function CreateSongForm() {
         )}
         {formData.prompt.length > 250 && formData.prompt.length <= 300 && (
           <p className="mt-1.5 text-xs text-yellow-500">
-            You're approaching the character limit.
+            You&apos;re approaching the character limit.
           </p>
         )}
       </div>
