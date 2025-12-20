@@ -3,6 +3,7 @@ import { Inter, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { SongPlayerProvider } from '@/components/songs/SongPlayerProvider';
+import { Footer } from '@/components/layout/Footer';
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -29,9 +30,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
-      <body className="antialiased">
+      <body className="antialiased flex flex-col min-h-screen">
         <AuthProvider>
-          <SongPlayerProvider>{children}</SongPlayerProvider>
+          <SongPlayerProvider>
+            {children}
+            <Footer />
+          </SongPlayerProvider>
         </AuthProvider>
       </body>
     </html>
