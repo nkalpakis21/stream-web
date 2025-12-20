@@ -25,7 +25,7 @@ export function markPlayedInSession(songId: string): void {
 /**
  * Debounce function - handles both sync and async functions
  */
-function debounce<T extends (...args: unknown[]) => unknown>(
+function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
@@ -77,7 +77,7 @@ export async function trackPlay(songId: string): Promise<void> {
 /**
  * Create a debounced play tracking function
  */
-export function createDebouncedPlayTracker(waitMs: number = 500) {
+export function createDebouncedPlayTracker(waitMs: number = 500): (songId: string) => void {
   return debounce(trackPlay, waitMs);
 }
 
