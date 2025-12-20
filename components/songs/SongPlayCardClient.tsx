@@ -134,6 +134,17 @@ export function SongPlayCardClient({
         </div>
       )}
       
+      {/* Subtle Play Icon Hint - Always Visible */}
+      {!showPlayingState && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="bg-white/30 rounded-full p-3 sm:p-4 opacity-50 group-hover:opacity-0 transition-opacity duration-200">
+            <svg className="w-8 h-8 sm:w-12 sm:h-12 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+        </div>
+      )}
+
       {/* Play/Pause Button Overlay */}
       <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
         showPlayingState ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
