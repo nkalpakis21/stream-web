@@ -22,15 +22,18 @@ import {
   COLLECTIONS,
   getSongPath,
   getSongVersionPath,
+  getArtistPath,
 } from '@/lib/firebase/collections';
 import type {
   SongDocument,
   SongVersionDocument,
   CollaborationType,
+  AIArtistDocument,
 } from '@/types/firestore';
 
 /**
  * Create a new song
+ * Validates that the artist belongs to the user before creating the song.
  */
 export async function createSong(
   ownerId: string,
@@ -43,6 +46,23 @@ export async function createSong(
     collaborationType?: CollaborationType | null;
   }
 ): Promise<SongDocument> {
+  // Validate that the artist belongs to the user
+  const artistRef = doc(db, getArtistPath(data.artistId));
+  const artistSnapshot = await getDoc(artistRef);
+  
+  if (!artistSnapshot.exists()) {
+    throw new Error('Artist not found');
+  }
+  
+  const artist = artistSnapshot.data() as AIArtistDocument;
+  
+  if (artist.ownerId !== ownerId) {
+    throw new Error('You can only create songs for your own artists');
+  }
+  
+  if (artist.deletedAt !== null) {
+    throw new Error('Cannot create songs for deleted artists');
+  }
   const songRef = doc(collection(db, COLLECTIONS.songs));
   const songId = songRef.id;
 

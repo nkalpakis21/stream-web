@@ -52,12 +52,21 @@ export function CreateSongForm() {
       return;
     }
 
+    // Validate that the selected artist belongs to the user
+    const selectedArtist = artists.find(a => a.id === formData.artistId);
+    if (!selectedArtist) {
+      alert('Please select a valid artist that belongs to you');
+      return;
+    }
+
+    // Double-check ownership (client-side validation)
+    if (selectedArtist.ownerId !== user.uid) {
+      alert('You can only create songs for your own artists');
+      return;
+    }
+
     setLoading(true);
     try {
-      const selectedArtist = artists.find(a => a.id === formData.artistId);
-      if (!selectedArtist) {
-        throw new Error('Artist not found');
-      }
 
       // Create song
       const song = await createSong(user.uid, {
