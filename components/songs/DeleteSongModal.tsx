@@ -64,7 +64,7 @@ export function DeleteSongModal({
               Delete Song?
             </h2>
             <p className="text-sm text-muted-foreground mb-4">
-              This action cannot be undone. The song <strong>"{songTitle}"</strong> will be removed from your profile and public listings.
+              This action cannot be undone. The song <strong>&ldquo;{songTitle}&rdquo;</strong> will be removed from your profile and public listings.
             </p>
           </div>
         </div>
