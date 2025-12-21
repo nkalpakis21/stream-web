@@ -2,6 +2,7 @@ import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { getAnalytics, Analytics, isSupported } from 'firebase/analytics';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
@@ -10,6 +11,7 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || '',
 };
 
 // Initialize Firebase app with error handling
@@ -50,6 +52,7 @@ function getApp(): FirebaseApp {
 let _auth: Auth | null = null;
 let _db: Firestore | null = null;
 let _storage: FirebaseStorage | null = null;
+let _analytics: Analytics | null = null;
 
 function getAuthInstance(): Auth {
   if (!_auth) {
@@ -88,12 +91,25 @@ function getStorageInstance(): FirebaseStorage {
   return _storage;
 }
 
+function getAnalyticsInstance(): Analytics | null {
+  // Analytics only works in browser
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  // Analytics initialization is handled in AnalyticsProvider component
+  // This export is kept for potential direct usage, but initialization
+  // should happen in the provider to ensure proper async handling
+  return _analytics;
+}
+
 // Export services - they will initialize on first access
 // During initial deployment/build, if env vars aren't set yet, 
 // the placeholder config will be used and Firebase will initialize properly at runtime
 export const auth: Auth = getAuthInstance();
 export const db: Firestore = getDbInstance();
 export const storage: FirebaseStorage = getStorageInstance();
+export const analytics: Analytics | null = getAnalyticsInstance();
 
 export default getApp();
 
