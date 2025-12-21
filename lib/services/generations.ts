@@ -58,6 +58,7 @@ export async function createGeneration(
       };
       lore: string;
     };
+    lyrics?: string;
   } & {
     /**
      * Optional provider task/job identifier for async providers.
@@ -85,6 +86,7 @@ export async function createGeneration(
           isInstrumental: data.artistContext?.lore
             ? data.artistContext.lore.toLowerCase().includes('instrumental')
             : false,
+          ...(data.lyrics && { lyrics: data.lyrics }),
         }),
       });
 

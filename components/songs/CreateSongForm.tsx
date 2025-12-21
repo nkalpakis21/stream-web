@@ -18,6 +18,7 @@ export function CreateSongForm() {
     title: '',
     artistId: '',
     prompt: '',
+    lyrics: '',
     provider: 'musicgpt', // Default to MusicGPT
   });
 
@@ -76,6 +77,12 @@ export function CreateSongForm() {
       return;
     }
 
+    // Validate lyrics length
+    if (formData.lyrics.length > 2000) {
+      alert('Lyrics cannot exceed 2000 characters. Please shorten your lyrics.');
+      return;
+    }
+
     setLoading(true);
     try {
 
@@ -112,6 +119,7 @@ export function CreateSongForm() {
           styleDNA: artistVersion.styleDNA,
           lore: artistVersion.lore,
         },
+        lyrics: formData.lyrics.trim() || undefined,
       });
 
       router.push(`/songs/${song.id}`);
@@ -230,10 +238,58 @@ export function CreateSongForm() {
         )}
       </div>
 
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label htmlFor="lyrics" className="block text-sm font-medium text-foreground">
+            Lyrics (Optional)
+          </label>
+          <span
+            className={`text-xs font-medium transition-colors ${
+              formData.lyrics.length > 2000
+                ? 'text-red-500'
+                : formData.lyrics.length > 1800
+                ? 'text-yellow-500'
+                : 'text-muted-foreground'
+            }`}
+          >
+            {formData.lyrics.length} / 2000
+          </span>
+        </div>
+        <textarea
+          id="lyrics"
+          rows={12}
+          maxLength={2000}
+          value={formData.lyrics}
+          onChange={e => {
+            const value = e.target.value;
+            if (value.length <= 2000) {
+              setFormData({ ...formData, lyrics: value });
+            }
+          }}
+          placeholder="Enter song lyrics here"
+          className={`w-full px-4 py-3 border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all resize-none font-mono text-sm ${
+            formData.lyrics.length > 2000
+              ? 'border-red-500 focus:ring-red-500'
+              : formData.lyrics.length > 1800
+              ? 'border-yellow-500 focus:ring-yellow-500'
+              : 'border-border'
+          }`}
+        />
+        {formData.lyrics.length > 2000 && (
+          <p className="mt-1.5 text-xs text-red-500">
+            Lyrics cannot exceed 2000 characters. Please shorten your lyrics.
+          </p>
+        )}
+        {formData.lyrics.length > 1800 && formData.lyrics.length <= 2000 && (
+          <p className="mt-1.5 text-xs text-yellow-500">
+            You&apos;re approaching the character limit.
+          </p>
+        )}
+      </div>
 
       <button
         type="submit"
-        disabled={loading || formData.prompt.length > 300 || formData.prompt.trim().length === 0}
+        disabled={loading || formData.prompt.length > 300 || formData.prompt.trim().length === 0 || formData.lyrics.length > 2000}
         className="w-full px-6 py-3 bg-accent text-accent-foreground rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-soft"
       >
         {loading ? 'Generating...' : 'Generate Song'}

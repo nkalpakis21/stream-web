@@ -8,7 +8,7 @@ import { createMusicGPTSong } from '@/lib/ai/providers/musicgpt';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { prompt, music_style, isInstrumental } = body;
+    const { prompt, music_style, isInstrumental, lyrics } = body;
 
     if (!prompt) {
       return NextResponse.json(
@@ -27,6 +27,7 @@ export async function POST(request: Request) {
       prompt,
       music_style,
       isInstrumental,
+      lyrics,
       webhook_url: webhookUrl,
     });
 
