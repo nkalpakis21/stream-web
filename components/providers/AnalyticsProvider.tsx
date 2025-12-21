@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { getAnalytics, isSupported, logEvent, Analytics } from 'firebase/analytics';
 import { usePathname } from 'next/navigation';
-import { getApp } from '@/lib/firebase/config';
+import { getApps } from 'firebase/app';
+import firebaseApp from '@/lib/firebase/config';
 
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -17,7 +18,9 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
       try {
         const supported = await isSupported();
         if (supported) {
-          const app = getApp();
+          // Get Firebase app instance (already initialized by config)
+          const apps = getApps();
+          const app = apps.length > 0 ? apps[0] : firebaseApp;
           const analytics = getAnalytics(app);
           setAnalyticsInstance(analytics);
         }
