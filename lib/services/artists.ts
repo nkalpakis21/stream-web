@@ -13,6 +13,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   Timestamp,
   serverTimestamp,
 } from 'firebase/firestore';
@@ -196,14 +197,16 @@ export async function createArtistVersion(
  * Get all artists owned by a user
  */
 export async function getUserArtists(
-  userId: string
+  userId: string,
+  limitCount: number = 100
 ): Promise<AIArtistDocument[]> {
   try {
     // Try with orderBy first (requires index)
     const q = query(
       collection(db, COLLECTIONS.artists),
       where('ownerId', '==', userId),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
     );
     const snapshot = await getDocs(q);
     // Filter out deleted artists in memory (Firestore doesn't handle null comparisons well)
@@ -218,7 +221,8 @@ export async function getUserArtists(
     if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
       const q = query(
         collection(db, COLLECTIONS.artists),
-        where('ownerId', '==', userId)
+        where('ownerId', '==', userId),
+        limit(limitCount)
       );
       const snapshot = await getDocs(q);
       const artists = snapshot.docs
@@ -237,19 +241,19 @@ export async function getUserArtists(
  * Get public artists
  */
 export async function getPublicArtists(
-  limit: number = 20
+  limitCount: number = 20
 ): Promise<AIArtistDocument[]> {
   const q = query(
     collection(db, COLLECTIONS.artists),
     where('isPublic', '==', true),
-    orderBy('createdAt', 'desc')
+    orderBy('createdAt', 'desc'),
+    limit(limitCount)
   );
   const snapshot = await getDocs(q);
   // Filter out deleted artists in memory (Firestore doesn't handle null comparisons well)
   // Handle both null and undefined (for older documents without deletedAt field)
   return snapshot.docs
     .map(doc => doc.data() as AIArtistDocument)
-    .filter(artist => !artist.deletedAt)
-    .slice(0, limit);
+    .filter(artist => !artist.deletedAt);
 }
 

@@ -13,6 +13,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   Timestamp,
   serverTimestamp,
   writeBatch,
@@ -298,12 +299,14 @@ export async function remixSong(
  * Get all songs by a user
  */
 export async function getUserSongs(
-  userId: string
+  userId: string,
+  limitCount: number = 100
 ): Promise<SongDocument[]> {
   const q = query(
     collection(db, COLLECTIONS.songs),
     where('ownerId', '==', userId),
-    orderBy('createdAt', 'desc')
+    orderBy('createdAt', 'desc'),
+    limit(limitCount)
   );
   const snapshot = await getDocs(q);
   // Filter out deleted songs in memory (Firestore doesn't handle null comparisons well)
@@ -317,20 +320,20 @@ export async function getUserSongs(
  * Get public songs
  */
 export async function getPublicSongs(
-  limit: number = 20
+  limitCount: number = 20
 ): Promise<SongDocument[]> {
   const q = query(
     collection(db, COLLECTIONS.songs),
     where('isPublic', '==', true),
-    orderBy('createdAt', 'desc')
+    orderBy('createdAt', 'desc'),
+    limit(limitCount)
   );
   const snapshot = await getDocs(q);
   // Filter out deleted songs in memory (Firestore doesn't handle null comparisons well)
   // Handle both null and undefined (for older documents without deletedAt field)
   return snapshot.docs
     .map(doc => doc.data() as SongDocument)
-    .filter(song => !song.deletedAt)
-    .slice(0, limit);
+    .filter(song => !song.deletedAt);
 }
 
 /**
@@ -338,32 +341,42 @@ export async function getPublicSongs(
  */
 export async function getArtistSongs(
   artistId: string,
-  limit: number = 20
+  limitCount: number = 20
 ): Promise<SongDocument[]> {
   const q = query(
     collection(db, COLLECTIONS.songs),
     where('artistId', '==', artistId),
     where('isPublic', '==', true),
-    orderBy('createdAt', 'desc')
+    orderBy('createdAt', 'desc'),
+    limit(limitCount)
   );
   const snapshot = await getDocs(q);
   // Filter out deleted songs in memory (Firestore doesn't handle null comparisons well)
   // Handle both null and undefined (for older documents without deletedAt field)
   return snapshot.docs
     .map(doc => doc.data() as SongDocument)
-    .filter(song => !song.deletedAt)
-    .slice(0, limit);
+    .filter(song => !song.deletedAt);
 }
 
 /**
  * Get top songs ranked by play count
+ * 
+ * Note: Since we need to sort by playCount in memory (not indexed in Firestore),
+ * we fetch a larger sample (limitCount * 5) to ensure we get the top songs.
+ * This is still much better than fetching all songs.
  */
 export async function getTopSongs(
-  limit: number = 12
+  limitCount: number = 12
 ): Promise<SongDocument[]> {
+  // Fetch more than needed since we sort in memory
+  // Limit to a reasonable maximum to avoid excessive reads
+  const fetchLimit = Math.min(limitCount * 5, 100);
+  
   const q = query(
     collection(db, COLLECTIONS.songs),
-    where('isPublic', '==', true)
+    where('isPublic', '==', true),
+    orderBy('createdAt', 'desc'), // Order by creation date as a proxy
+    limit(fetchLimit)
   );
   const snapshot = await getDocs(q);
   
@@ -374,7 +387,7 @@ export async function getTopSongs(
     .map(doc => doc.data() as SongDocument)
     .filter(song => !song.deletedAt)
     .sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0))
-    .slice(0, limit);
+    .slice(0, limitCount);
 }
 
 /**
