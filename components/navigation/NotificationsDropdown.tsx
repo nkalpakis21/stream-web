@@ -1,12 +1,10 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { collection, onSnapshot, query, where, orderBy, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { markNotificationRead } from '@/lib/services/notifications';
+import { markNotificationRead, getUnreadNotifications } from '@/lib/services/notifications';
 import { useRouter } from 'next/navigation';
-import type { NotificationDocument, NotificationType } from '@/types/firestore';
+import type { NotificationDocument } from '@/types/firestore';
 import { formatDistanceToNow } from 'date-fns';
 
 // Serialized notification for client components
@@ -33,29 +31,25 @@ export function NotificationsDropdown({ isOpen, onClose }: NotificationsDropdown
       return;
     }
 
-    setLoading(true);
-    const q = query(
-      collection(db, 'notifications'),
-      where('userId', '==', user.uid),
-      where('read', '==', false),
-      orderBy('createdAt', 'desc')
-    );
+    // Use getDocs instead of onSnapshot to avoid duplicate listeners
+    const loadNotifications = async () => {
+      setLoading(true);
+      try {
+        const unread = await getUnreadNotifications(user.uid);
+        setNotifications(
+          unread.map(notif => ({
+            ...notif,
+            createdAt: notif.createdAt.toMillis(),
+          }))
+        );
+      } catch (error) {
+        console.error('Failed to load notifications:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const unsubscribe = onSnapshot(q, snapshot => {
-      const items = snapshot.docs
-        .map(doc => {
-          const data = doc.data() as NotificationDocument;
-          return {
-            ...data,
-            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toMillis() : data.createdAt,
-          };
-        })
-        .filter(notif => notif.deletedAt === null);
-      setNotifications(items);
-      setLoading(false);
-    });
-
-    return unsubscribe;
+    loadNotifications();
   }, [user, isOpen]);
 
   // Close dropdown when clicking outside

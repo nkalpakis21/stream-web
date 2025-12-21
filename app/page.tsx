@@ -5,8 +5,8 @@ import { ArtistCard } from '@/components/artists/ArtistCard';
 import { Nav } from '@/components/navigation/Nav';
 import Link from 'next/link';
 
-// Force dynamic rendering to always fetch fresh data from Firestore
-export const dynamic = 'force-dynamic';
+// ISR: Revalidate every 2 minutes (120 seconds)
+export const revalidate = 120;
 
 export default async function HomePage() {
   // Fetch public content for discovery feed

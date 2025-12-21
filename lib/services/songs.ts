@@ -110,6 +110,28 @@ export async function createSong(
   await setDoc(songRef, song);
   await setDoc(versionRef, version);
 
+  // Revalidate homepage if song is public
+  // Note: This runs client-side, so we call the revalidation API
+  if (data.isPublic ?? true) {
+    try {
+      const revalidateUrl = typeof window !== 'undefined'
+        ? '/api/revalidate'
+        : (process.env.NEXT_PUBLIC_APP_URL 
+            ? `${process.env.NEXT_PUBLIC_APP_URL}/api/revalidate`
+            : 'https://www.streamstar.xyz/api/revalidate');
+      
+      await fetch(revalidateUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch (error) {
+      // Don't fail song creation if revalidation fails
+      console.error('Failed to revalidate homepage:', error);
+    }
+  }
+
   return song;
 }
 

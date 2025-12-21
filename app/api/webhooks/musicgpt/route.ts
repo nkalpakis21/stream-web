@@ -519,6 +519,23 @@ export async function POST(request: Request) {
         songId: song.id,
         generationId: generation.id,
       });
+
+      // Revalidate homepage so new song appears
+      try {
+        const revalidateUrl = process.env.NEXT_PUBLIC_APP_URL 
+          ? `${process.env.NEXT_PUBLIC_APP_URL}/api/revalidate`
+          : 'https://www.streamstar.xyz/api/revalidate';
+        
+        await fetch(revalidateUrl, {
+          method: 'POST',
+          headers: {
+            'x-revalidate-secret': process.env.REVALIDATE_SECRET || '',
+          },
+        });
+      } catch (error) {
+        // Don't fail webhook if revalidation fails
+        console.error('Failed to revalidate homepage:', error);
+      }
     }
 
     return NextResponse.json({ ok: true });

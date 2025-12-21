@@ -187,7 +187,7 @@ export function UserMenu() {
       {/* Notifications Dropdown */}
       <NotificationsDropdown 
         isOpen={notificationsOpen} 
-        onClose={() => setNotificationsOpen(false)} 
+        onClose={() => setNotificationsOpen(false)}
       />
     </div>
   );
