@@ -318,22 +318,69 @@ export async function getUserSongs(
 
 /**
  * Get public songs
+ * 
+ * @param limitCount - Maximum number of songs to return
+ * @param options - Query options
+ * @param options.excludeDeleted - If true, exclude deleted songs in Firestore query (default: true)
+ *                                 If false, fetch all songs and filter deleted in memory
  */
 export async function getPublicSongs(
-  limitCount: number = 20
+  limitCount: number = 20,
+  options: { excludeDeleted?: boolean } = {}
 ): Promise<SongDocument[]> {
-  const q = query(
-    collection(db, COLLECTIONS.songs),
-    where('isPublic', '==', true),
-    orderBy('createdAt', 'desc'),
-    limit(limitCount)
-  );
-  const snapshot = await getDocs(q);
-  // Filter out deleted songs in memory (Firestore doesn't handle null comparisons well)
-  // Handle both null and undefined (for older documents without deletedAt field)
-  return snapshot.docs
-    .map(doc => doc.data() as SongDocument)
-    .filter(song => !song.deletedAt);
+  const { excludeDeleted = true } = options;
+
+  if (excludeDeleted) {
+    // Query excludes deleted songs at the database level
+    // Firestore's == null matches documents where deletedAt is null or doesn't exist
+    // This requires a composite index: (isPublic, deletedAt, createdAt)
+    try {
+      const q = query(
+        collection(db, COLLECTIONS.songs),
+        where('isPublic', '==', true),
+        where('deletedAt', '==', null),
+        orderBy('createdAt', 'desc'),
+        limit(limitCount)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as SongDocument);
+    } catch (error: any) {
+      // If composite index doesn't exist, fall back to filtering in memory
+      if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
+        console.warn('[getPublicSongs] Composite index missing, falling back to memory filtering. Create index: (isPublic, deletedAt, createdAt)');
+        // Fall back to query without deletedAt filter
+        const q = query(
+          collection(db, COLLECTIONS.songs),
+          where('isPublic', '==', true),
+          orderBy('createdAt', 'desc'),
+          limit(limitCount * 2) // Fetch more to account for deleted songs
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs
+          .map(doc => doc.data() as SongDocument)
+          .filter(song => !song.deletedAt)
+          .slice(0, limitCount);
+      }
+      throw error;
+    }
+  } else {
+    // Legacy behavior: fetch all and filter in memory (for backward compatibility)
+    // Fetch extra to account for deleted songs that will be filtered out
+    const fetchLimit = Math.ceil(limitCount * 1.5);
+    
+    const q = query(
+      collection(db, COLLECTIONS.songs),
+      where('isPublic', '==', true),
+      orderBy('createdAt', 'desc'),
+      limit(fetchLimit)
+    );
+    const snapshot = await getDocs(q);
+    // Filter out deleted songs in memory
+    return snapshot.docs
+      .map(doc => doc.data() as SongDocument)
+      .filter(song => !song.deletedAt)
+      .slice(0, limitCount);
+  }
 }
 
 /**
