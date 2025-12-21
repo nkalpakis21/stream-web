@@ -38,10 +38,11 @@ export async function searchSongsByPrompt(
   
   const snapshot = await getDocs(q);
   // Filter out deleted songs and by search query (case-insensitive)
+  // Handle both null and undefined (for older documents without deletedAt field)
   const queryLower = searchQuery.toLowerCase();
   const allSongs = snapshot.docs
     .map(doc => doc.data() as SongDocument)
-    .filter(song => song.deletedAt === null && song.title.toLowerCase().includes(queryLower));
+    .filter(song => !song.deletedAt && song.title.toLowerCase().includes(queryLower));
   
   return allSongs.slice(0, limitCount);
 }
@@ -64,9 +65,10 @@ export async function getSongsByGenres(
   
   const snapshot = await getDocs(q);
   // Filter out deleted songs in memory (Firestore doesn't handle null comparisons well)
+  // Handle both null and undefined (for older documents without deletedAt field)
   return snapshot.docs
     .map(doc => doc.data() as SongDocument)
-    .filter(song => song.deletedAt === null);
+    .filter(song => !song.deletedAt);
 }
 
 /**
@@ -86,9 +88,10 @@ export async function getSongsByArtist(
   
   const snapshot = await getDocs(q);
   // Filter out deleted songs in memory (Firestore doesn't handle null comparisons well)
+  // Handle both null and undefined (for older documents without deletedAt field)
   return snapshot.docs
     .map(doc => doc.data() as SongDocument)
-    .filter(song => song.deletedAt === null);
+    .filter(song => !song.deletedAt);
 }
 
 /**
@@ -106,9 +109,10 @@ export async function getRecentSongs(
   
   const snapshot = await getDocs(q);
   // Filter out deleted songs in memory (Firestore doesn't handle null comparisons well)
+  // Handle both null and undefined (for older documents without deletedAt field)
   return snapshot.docs
     .map(doc => doc.data() as SongDocument)
-    .filter(song => song.deletedAt === null);
+    .filter(song => !song.deletedAt);
 }
 
 /**

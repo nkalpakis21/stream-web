@@ -285,9 +285,10 @@ export async function getUserSongs(
   );
   const snapshot = await getDocs(q);
   // Filter out deleted songs in memory (Firestore doesn't handle null comparisons well)
+  // Handle both null and undefined (for older documents without deletedAt field)
   return snapshot.docs
     .map(doc => doc.data() as SongDocument)
-    .filter(song => song.deletedAt === null);
+    .filter(song => !song.deletedAt);
 }
 
 /**
@@ -303,9 +304,10 @@ export async function getPublicSongs(
   );
   const snapshot = await getDocs(q);
   // Filter out deleted songs in memory (Firestore doesn't handle null comparisons well)
+  // Handle both null and undefined (for older documents without deletedAt field)
   return snapshot.docs
     .map(doc => doc.data() as SongDocument)
-    .filter(song => song.deletedAt === null)
+    .filter(song => !song.deletedAt)
     .slice(0, limit);
 }
 
@@ -324,9 +326,10 @@ export async function getArtistSongs(
   );
   const snapshot = await getDocs(q);
   // Filter out deleted songs in memory (Firestore doesn't handle null comparisons well)
+  // Handle both null and undefined (for older documents without deletedAt field)
   return snapshot.docs
     .map(doc => doc.data() as SongDocument)
-    .filter(song => song.deletedAt === null)
+    .filter(song => !song.deletedAt)
     .slice(0, limit);
 }
 
@@ -344,9 +347,10 @@ export async function getTopSongs(
   
   // Filter out deleted songs and sort by play count in memory
   // Since playCount is optional, default to 0 for songs without it
+  // Handle both null and undefined (for older documents without deletedAt field)
   return snapshot.docs
     .map(doc => doc.data() as SongDocument)
-    .filter(song => song.deletedAt === null)
+    .filter(song => !song.deletedAt)
     .sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0))
     .slice(0, limit);
 }

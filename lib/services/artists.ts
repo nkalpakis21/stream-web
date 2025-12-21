@@ -207,9 +207,10 @@ export async function getUserArtists(
     );
     const snapshot = await getDocs(q);
     // Filter out deleted artists in memory (Firestore doesn't handle null comparisons well)
+    // Handle both null and undefined (for older documents without deletedAt field)
     const artists = snapshot.docs
       .map(doc => doc.data() as AIArtistDocument)
-      .filter(artist => artist.deletedAt === null);
+      .filter(artist => !artist.deletedAt);
     
     return artists;
   } catch (error: any) {
@@ -222,7 +223,7 @@ export async function getUserArtists(
       const snapshot = await getDocs(q);
       const artists = snapshot.docs
         .map(doc => doc.data() as AIArtistDocument)
-        .filter(artist => artist.deletedAt === null)
+        .filter(artist => !artist.deletedAt)
         .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
       
       return artists;
@@ -245,9 +246,10 @@ export async function getPublicArtists(
   );
   const snapshot = await getDocs(q);
   // Filter out deleted artists in memory (Firestore doesn't handle null comparisons well)
+  // Handle both null and undefined (for older documents without deletedAt field)
   return snapshot.docs
     .map(doc => doc.data() as AIArtistDocument)
-    .filter(artist => artist.deletedAt === null)
+    .filter(artist => !artist.deletedAt)
     .slice(0, limit);
 }
 

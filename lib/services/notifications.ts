@@ -80,9 +80,10 @@ export async function getUnreadNotifications(
   );
 
   const snapshot = await getDocs(q);
+  // Handle both null and undefined (for older documents without deletedAt field)
   return snapshot.docs
     .map(doc => doc.data() as NotificationDocument)
-    .filter(notif => notif.deletedAt === null);
+    .filter(notif => !notif.deletedAt);
 }
 
 /**
@@ -98,9 +99,10 @@ export async function getNotificationsBySong(
   );
 
   const snapshot = await getDocs(q);
+  // Handle both null and undefined (for older documents without deletedAt field)
   return snapshot.docs
     .map(doc => doc.data() as NotificationDocument)
-    .filter(notif => notif.deletedAt === null);
+    .filter(notif => !notif.deletedAt);
 }
 
 /**

@@ -4,10 +4,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { NotificationsBell } from '@/components/navigation/NotificationsBell';
+import { UserMenu } from '@/components/navigation/UserMenu';
 
 export function Nav() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -19,27 +19,27 @@ export function Nav() {
   const isActive = (href: string) => pathname === href;
 
   return (
-    <nav className="sticky top-0 z-50 glass border-b border-border/40 backdrop-blur-2xl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-14 sm:h-16">
+    <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40">
+      <div className="max-w-7xl mx-auto px-6 lg:px-8">
+        <div className="flex justify-between items-center h-14">
           {/* Logo */}
           <Link 
             href="/" 
-            className="text-xl sm:text-2xl font-space-grotesk font-semibold tracking-tight hover:opacity-80 transition-opacity flex-shrink-0"
+            className="text-lg font-semibold tracking-tight text-foreground hover:opacity-70 transition-opacity duration-200 flex-shrink-0"
           >
             Stream ⭐
           </Link>
           
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden md:flex items-center gap-6">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                className={`text-sm font-medium transition-colors duration-200 ${
                   isActive(link.href)
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    ? 'text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {link.label}
@@ -48,56 +48,36 @@ export function Nav() {
             
             {user ? (
               <>
-                <div className="w-px h-6 bg-border mx-2" />
-                <NotificationsBell />
                 <Link
                   href="/create"
-                  className={`px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                  className={`text-sm font-medium transition-colors duration-200 ${
                     isActive('/create')
-                      ? 'bg-accent text-accent-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                      ? 'text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   Create
                 </Link>
-                <div className="w-px h-6 bg-border mx-2" />
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-muted-foreground max-w-[140px] truncate">
-                    {user.email}
-                  </span>
-                  <button
-                    onClick={signOut}
-                    className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground rounded-full hover:bg-muted/50 transition-all duration-200"
-                  >
-                    Sign Out
-                  </button>
-                </div>
+                <div className="w-px h-4 bg-border/50 mx-1" />
+                <UserMenu />
               </>
             ) : (
-              <>
-                <div className="w-px h-6 bg-border mx-2" />
-                <Link
-                  href="/create"
-                  className="px-5 py-2 text-sm font-medium bg-accent text-accent-foreground rounded-full hover:opacity-90 transition-opacity shadow-soft"
-                >
-                  Sign In
-                </Link>
-              </>
+              <Link
+                href="/create"
+                className="text-sm font-medium text-accent hover:opacity-80 transition-opacity duration-200"
+              >
+                Sign In
+              </Link>
             )}
           </div>
 
           {/* Mobile Navigation */}
-          <div className="md:hidden flex items-center gap-2">
-            {user && (
-              <>
-                <NotificationsBell />
-                <div className="w-px h-6 bg-border" />
-              </>
-            )}
+          <div className="md:hidden flex items-center gap-3">
+            {user && <UserMenu />}
             
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-muted/50 transition-colors"
+              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted/50 transition-colors duration-200"
               aria-label="Menu"
             >
               {mobileMenuOpen ? (
@@ -115,17 +95,17 @@ export function Nav() {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-border/50 py-4 animate-in slide-in-from-top-2 duration-200">
+          <div className="md:hidden border-t border-border/40 py-3 animate-in slide-in-from-top-2 duration-200">
             <div className="flex flex-col gap-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`px-4 py-3 text-base font-medium rounded-xl transition-all duration-200 ${
+                  className={`px-4 py-2.5 text-base font-medium rounded-lg transition-colors duration-200 ${
                     isActive(link.href)
-                      ? 'bg-accent text-accent-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                      ? 'text-foreground bg-muted/50'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
                   }`}
                 >
                   {link.label}
@@ -133,38 +113,22 @@ export function Nav() {
               ))}
               
               {user ? (
-                <>
-                  <Link
-                    href="/create"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`px-4 py-3 text-base font-medium rounded-xl transition-all duration-200 ${
-                      isActive('/create')
-                        ? 'bg-accent text-accent-foreground'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                    }`}
-                  >
-                    Create
-                  </Link>
-                  <div className="px-4 py-2 border-t border-border/50 mt-2">
-                    <p className="text-xs text-muted-foreground mb-2 truncate">
-                      {user.email}
-                    </p>
-                    <button
-                      onClick={() => {
-                        signOut();
-                        setMobileMenuOpen(false);
-                      }}
-                      className="w-full px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted/50 transition-all duration-200 text-left"
-                    >
-                      Sign Out
-                    </button>
-                  </div>
-                </>
+                <Link
+                  href="/create"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`px-4 py-2.5 text-base font-medium rounded-lg transition-colors duration-200 ${
+                    isActive('/create')
+                      ? 'text-foreground bg-muted/50'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                  }`}
+                >
+                  Create
+                </Link>
               ) : (
                 <Link
                   href="/create"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="px-4 py-3 text-base font-medium bg-accent text-accent-foreground rounded-xl hover:opacity-90 transition-opacity shadow-soft text-center"
+                  className="px-4 py-2.5 text-base font-medium text-accent hover:opacity-80 transition-opacity duration-200"
                 >
                   Sign In
                 </Link>

@@ -6,6 +6,7 @@ const nextConfig = {
       'firebasestorage.googleapis.com',
       'lalals.s3.amazonaws.com',
       'lalals.s3.us-east-1.amazonaws.com',
+      'lh3.googleusercontent.com',
     ],
   },
 }
