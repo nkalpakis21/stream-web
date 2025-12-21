@@ -217,7 +217,7 @@ export function CreateSongForm() {
               setFormData({ ...formData, prompt: value });
             }
           }}
-          placeholder="Describe the song you want to generate..."
+          placeholder="Enter your song generation prompt..."
           className={`w-full px-4 py-3 border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all resize-none ${
             formData.prompt.length > 300
               ? 'border-red-500 focus:ring-red-500'
@@ -266,8 +266,8 @@ export function CreateSongForm() {
               setFormData({ ...formData, lyrics: value });
             }
           }}
-          placeholder="Enter song lyrics here"
-          className={`w-full px-4 py-3 border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all resize-none font-mono text-sm ${
+          placeholder="Enter your song lyrics..."
+          className={`w-full px-4 py-3 border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all resize-none ${
             formData.lyrics.length > 2000
               ? 'border-red-500 focus:ring-red-500'
               : formData.lyrics.length > 1800
