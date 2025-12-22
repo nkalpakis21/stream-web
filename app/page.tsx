@@ -31,13 +31,12 @@ export default async function HomePage() {
         <section className="mb-16 lg:mb-24">
           <div className="max-w-3xl">
             <h1 className="text-5xl lg:text-6xl font-bold tracking-tight mb-6 text-foreground">
-              AI-Native Music
+              Create real music with AI
               <br />
-              <span className="text-muted-foreground">Platform</span>
+              <span className="text-muted-foreground">in seconds.</span>
             </h1>
             <p className="text-xl lg:text-2xl text-muted-foreground leading-relaxed mb-8">
-              Generate, collaborate, and discover music powered by AI. 
-              Create unique compositions with your AI artists.
+              From first idea to finished track, create your own music and collaborate with your AI artists. You own everything you create.
             </p>
             <Link
               href="/create"
