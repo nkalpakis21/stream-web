@@ -88,11 +88,12 @@ export function LyricsViewer({
           (tl, i) => i === index || tl.text.includes(line)
         );
 
-        const isActive =
+        const isActive = Boolean(
           isPlaying &&
           activeLineIndex === index &&
           lyrics.timestamped &&
-          lyrics.timestamped.length > 0;
+          lyrics.timestamped.length > 0
+        );
 
         return (
           <LyricsLine
