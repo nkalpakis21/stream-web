@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Space_Grotesk } from 'next/font/google';
+import { Inter, Space_Grotesk, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { SongPlayerProvider } from '@/components/songs/SongPlayerProvider';
@@ -19,6 +19,13 @@ const spaceGrotesk = Space_Grotesk({
   weight: ['400', '500', '600', '700'],
 });
 
+const playfairDisplay = Playfair_Display({
+  subsets: ['latin'],
+  variable: '--font-playfair',
+  display: 'swap',
+  weight: ['400', '500', '600', '700'],
+});
+
 export const metadata: Metadata = {
   title: 'Stream ⭐ — AI-Native Music Platform',
   description: 'Generate, collaborate, and discover music powered by AI',
@@ -30,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
+    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${playfairDisplay.variable}`}>
       <body className="antialiased flex flex-col min-h-screen">
         <AnalyticsProvider>
           <AuthProvider>

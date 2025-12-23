@@ -13,6 +13,8 @@ import { SongPlayCardClient } from '@/components/songs/SongPlayCardClient';
 import { ShareButton } from '@/components/songs/ShareButton';
 import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
 import { Nav } from '@/components/navigation/Nav';
+import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
+import { getLyricsForSong } from '@/lib/services/lyrics';
 import Link from 'next/link';
 
 // Force dynamic rendering to always fetch fresh data from Firestore
@@ -125,6 +127,9 @@ export default async function SongPage({ params }: SongPageProps) {
                          null;
   const primaryAudioUrl = primaryVersion?.audioURL || null;
 
+  // Get lyrics from generations
+  const lyrics = getLyricsForSong(generations);
+
   return (
     <div className="min-h-screen bg-background">
       <Nav />
@@ -186,6 +191,19 @@ export default async function SongPage({ params }: SongPageProps) {
             </div>
           </div>
         </div>
+
+        {/* Lyrics Section - Prominently displayed */}
+        {lyrics && (
+          <div className="mb-16">
+            <LyricsSectionWrapper
+              lyrics={lyrics}
+              songTitle={songVersion.title}
+              artistName={artist?.name || 'Unknown Artist'}
+              albumCoverUrl={coverImageUrl}
+              audioUrl={primaryAudioUrl}
+            />
+          </div>
+        )}
 
         {/* Version Cards */}
         <VersionCards

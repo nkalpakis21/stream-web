@@ -40,6 +40,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.font-playfair {
+  font-family: var(--font-playfair), serif;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

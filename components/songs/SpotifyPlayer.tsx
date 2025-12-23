@@ -33,21 +33,41 @@ export function SpotifyPlayer({
     const audio = audioRef.current;
     if (!audio) return;
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateTime = () => {
+      const time = audio.currentTime;
+      setCurrentTime(time);
+      // Dispatch custom event for lyrics synchronization
+      window.dispatchEvent(
+        new CustomEvent('audio-timeupdate', {
+          detail: { currentTime: time },
+        })
+      );
+    };
     const updateDuration = () => setDuration(audio.duration);
     const handleEnded = () => {
       setCurrentTime(0);
       onPlayPause();
     };
 
+    // Listen for seek events from lyrics
+    const handleLyricsSeek = (e: Event) => {
+      const customEvent = e as CustomEvent<{ timestamp: number }>;
+      if (audio && !isNaN(customEvent.detail.timestamp)) {
+        audio.currentTime = customEvent.detail.timestamp;
+        setCurrentTime(customEvent.detail.timestamp);
+      }
+    };
+
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
     audio.addEventListener('ended', handleEnded);
+    window.addEventListener('lyrics-seek', handleLyricsSeek);
 
     return () => {
       audio.removeEventListener('timeupdate', updateTime);
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', handleEnded);
+      window.removeEventListener('lyrics-seek', handleLyricsSeek);
     };
   }, [audioUrl, onPlayPause]);
 
