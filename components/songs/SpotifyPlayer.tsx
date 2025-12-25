@@ -139,6 +139,7 @@ export function SpotifyPlayer({
                   src={albumCoverUrl}
                   alt={songTitle}
                   fill
+                  unoptimized={true}
                   className="object-cover rounded"
                   sizes="56px"
                 />

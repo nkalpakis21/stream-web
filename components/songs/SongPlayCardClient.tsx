@@ -65,6 +65,7 @@ export function SongPlayCardClient({
             src={albumCoverUrl}
             alt={songTitle}
             fill
+            unoptimized={true}
             className="object-cover"
             sizes="(max-width: 640px) 280px, (max-width: 768px) 320px, 400px"
           />
@@ -103,6 +104,7 @@ export function SongPlayCardClient({
             src={albumCoverUrl}
             alt={songTitle}
             fill
+            unoptimized={true}
             className="object-cover group-hover:brightness-75 transition-all duration-200"
             sizes="(max-width: 640px) 280px, (max-width: 768px) 320px, 400px"
           />
