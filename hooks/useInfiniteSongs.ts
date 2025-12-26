@@ -53,9 +53,10 @@ export function useInfiniteSongs(
   const [cursor, setCursor] = useState<string | null>(null);
   
   // Track current query to prevent stale updates
-  const currentQueryRef = useRef(query);
+  const currentQueryRef = useRef<string | null>(null); // Start as null to trigger initial load
   const requestIdRef = useRef(0);
   const isLoadingRef = useRef(false);
+  const hasLoadedInitialRef = useRef(false);
 
   // Convert serialized songs back to SongDocument format
   const deserializeSong = useCallback((song: PaginatedResponse['songs'][0]): SongDocument => {
@@ -97,10 +98,24 @@ export function useInfiniteSongs(
       }
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch songs: ${response.statusText}`);
+        const errorText = await response.text();
+        let errorMessage = `Failed to fetch songs: ${response.statusText}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // Use default error message
+        }
+        throw new Error(errorMessage);
       }
 
       const data: PaginatedResponse = await response.json();
+      
+      // Validate response structure
+      if (!data || !Array.isArray(data.songs)) {
+        throw new Error('Invalid response format from API');
+      }
+      
       return data;
     } catch (err) {
       if (requestId === requestIdRef.current && currentQueryRef.current === query) {
@@ -142,6 +157,7 @@ export function useInfiniteSongs(
         setArtistNames(names);
       }
     } catch (err) {
+      console.error('[useInfiniteSongs] Error loading initial songs:', err);
       if (currentQueryRef.current === query) {
         setError(err instanceof Error ? err : new Error('Failed to load songs'));
       }
@@ -208,13 +224,16 @@ export function useInfiniteSongs(
     setHasMore(true);
     setError(null);
     currentQueryRef.current = query; // Update ref before loading
+    hasLoadedInitialRef.current = false; // Allow reload
     loadInitial();
   }, [query, loadInitial]);
 
-  // Load initial songs when query changes
+  // Load initial songs on mount or when query changes
   useEffect(() => {
-    // Only load if query actually changed
-    if (currentQueryRef.current !== query) {
+    // Load on initial mount or if query changed
+    if (!hasLoadedInitialRef.current || currentQueryRef.current !== query) {
+      hasLoadedInitialRef.current = true;
+      currentQueryRef.current = query;
       loadInitial();
     }
   }, [query, loadInitial]);
