@@ -1,57 +1,45 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { searchSongsByPrompt, getRecentSongs } from '@/lib/services/discovery';
-import { getArtistNamesForSongs } from '@/lib/services/songs';
+import { useState, useCallback } from 'react';
 import { SongCard } from '@/components/songs/SongCard';
 import { Nav } from '@/components/navigation/Nav';
-import type { SongDocument } from '@/types/firestore';
+import { InfiniteScrollSentinel } from '@/components/discover/InfiniteScrollSentinel';
+import { SongCardSkeleton } from '@/components/discover/SongCardSkeleton';
+import { useInfiniteSongs } from '@/hooks/useInfiniteSongs';
 
 export default function DiscoverPage() {
-  const [songs, setSongs] = useState<SongDocument[]>([]);
-  const [artistNames, setArtistNames] = useState<Map<string, string>>(new Map());
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeQuery, setActiveQuery] = useState('');
 
-  useEffect(() => {
-    loadRecentSongs();
-  }, []);
+  const {
+    songs,
+    artistNames,
+    loading,
+    loadingMore,
+    hasMore,
+    error,
+    loadMore,
+    reset,
+  } = useInfiniteSongs({ query: activeQuery });
 
-  const loadRecentSongs = async () => {
-    setLoading(true);
-    try {
-      const recent = await getRecentSongs(20);
-      setSongs(recent);
-      // Fetch artist names for the songs
-      const names = await getArtistNamesForSongs(recent);
-      setArtistNames(names);
-    } catch (error) {
-      console.error('Failed to load songs:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) {
-      loadRecentSongs();
-      return;
-    }
+    const trimmedQuery = searchQuery.trim();
+    setActiveQuery(trimmedQuery);
+    reset(); // Reset will trigger new load with updated query
+  }, [searchQuery, reset]);
 
-    setLoading(true);
-    try {
-      const results = await searchSongsByPrompt(searchQuery, 20);
-      setSongs(results);
-      // Fetch artist names for the search results
-      const names = await getArtistNamesForSongs(results);
-      setArtistNames(names);
-    } catch (error) {
-      console.error('Search failed:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleQuickFilter = useCallback((query: string) => {
+    setSearchQuery(query);
+    setActiveQuery(query);
+    reset();
+  }, [reset]);
+
+  const handleLoadRecent = useCallback(() => {
+    setSearchQuery('');
+    setActiveQuery('');
+    reset();
+  }, [reset]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -81,25 +69,19 @@ export default function DiscoverPage() {
 
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={loadRecentSongs}
+              onClick={handleLoadRecent}
               className="px-4 py-2 rounded-full border border-border hover:bg-muted hover:border-accent/20 transition-all duration-200 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               Recent
             </button>
             <button
-              onClick={() => {
-                setSearchQuery('cyberpunk');
-                handleSearch({ preventDefault: () => {} } as React.FormEvent);
-              }}
+              onClick={() => handleQuickFilter('cyberpunk')}
               className="px-4 py-2 rounded-full border border-border hover:bg-muted hover:border-accent/20 transition-all duration-200 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               Cyberpunk
             </button>
             <button
-              onClick={() => {
-                setSearchQuery('jazz');
-                handleSearch({ preventDefault: () => {} } as React.FormEvent);
-              }}
+              onClick={() => handleQuickFilter('jazz')}
               className="px-4 py-2 rounded-full border border-border hover:bg-muted hover:border-accent/20 transition-all duration-200 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               Jazz
@@ -107,28 +89,95 @@ export default function DiscoverPage() {
           </div>
         </section>
 
+        {/* Initial Loading State */}
         {loading ? (
-          <div className="py-16 text-center">
-            <div className="inline-block w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {songs.map(song => (
-              <SongCard 
-                key={song.id} 
-                song={song} 
-                artistName={artistNames.get(song.id)}
-              />
+            {Array.from({ length: 12 }).map((_, i) => (
+              <SongCardSkeleton key={i} />
             ))}
           </div>
-        )}
-
-        {!loading && songs.length === 0 && (
+        ) : error ? (
+          <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
+            <p className="text-muted-foreground text-lg mb-4">
+              {error.message || 'Failed to load songs'}
+            </p>
+            <button
+              onClick={reset}
+              className="px-6 py-2 bg-accent text-accent-foreground rounded-full hover:opacity-90 transition-opacity font-medium"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : songs.length === 0 ? (
           <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
             <p className="text-muted-foreground text-lg">
               No songs found. Try a different search or create your own!
             </p>
           </div>
+        ) : (
+          <>
+            {/* Songs Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {songs.map((song, index) => (
+                <div
+                  key={song.id}
+                  className="animate-in fade-in slide-in-from-bottom-4"
+                  style={{
+                    animationDelay: `${Math.min(index * 50, 500)}ms`,
+                    animationFillMode: 'both',
+                  }}
+                >
+                  <SongCard 
+                    song={song} 
+                    artistName={artistNames.get(song.id)}
+                  />
+                </div>
+              ))}
+              
+              {/* Loading More Skeletons */}
+              {loadingMore && (
+                <>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <SongCardSkeleton key={`skeleton-${i}`} />
+                  ))}
+                </>
+              )}
+            </div>
+
+            {/* Infinite Scroll Sentinel */}
+            {hasMore && !loadingMore && (
+              <InfiniteScrollSentinel
+                onIntersect={loadMore}
+                enabled={!loading && !loadingMore}
+              />
+            )}
+
+            {/* Loading More Indicator */}
+            {loadingMore && (
+              <div className="py-8 text-center">
+                <div className="inline-flex items-center gap-3 text-muted-foreground">
+                  <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm font-medium">Loading more songs...</span>
+                </div>
+              </div>
+            )}
+
+            {/* End of Results */}
+            {!hasMore && songs.length > 0 && (
+              <div className="py-12 text-center">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative">
+                    <span className="px-4 bg-background text-sm text-muted-foreground">
+                      You've reached the end
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>
