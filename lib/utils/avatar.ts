@@ -39,3 +39,4 @@ export function getInitials(name: string): string {
   return trimmed.substring(0, 2).toUpperCase();
 }
 
+

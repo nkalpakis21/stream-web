@@ -166,7 +166,7 @@ export function useInfiniteSongs(
         setLoading(false);
       }
     }
-  }, [query, fetchSongs]);
+  }, [query, fetchSongs, deserializeSong]);
 
   // Load more songs (pagination)
   const loadMore = useCallback(async () => {
@@ -230,7 +230,7 @@ export function useInfiniteSongs(
 
   // Load initial songs on mount or when query changes
   useEffect(() => {
-    // Load on initial mount or if query changed
+    // Always load on mount, or if query changed
     if (!hasLoadedInitialRef.current || currentQueryRef.current !== query) {
       hasLoadedInitialRef.current = true;
       currentQueryRef.current = query;

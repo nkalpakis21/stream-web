@@ -171,7 +171,7 @@ export default function DiscoverPage() {
                   </div>
                   <div className="relative">
                     <span className="px-4 bg-background text-sm text-muted-foreground">
-                      You've reached the end
+                      You&apos;ve reached the end
                     </span>
                   </div>
                 </div>

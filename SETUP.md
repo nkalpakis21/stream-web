@@ -138,3 +138,4 @@ npm run dev
 - **Permission errors**: Check Firestore security rules
 - **Import errors**: Run `npm install` to ensure all dependencies are installed
 
+

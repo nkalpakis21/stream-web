@@ -100,3 +100,4 @@ public/
 └── site.webmanifest      # PWA manifest (already created)
 ```
 
+

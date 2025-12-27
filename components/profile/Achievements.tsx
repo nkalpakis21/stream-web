@@ -145,3 +145,4 @@ export function Achievements({ songsCount, artistsCount, totalPlays }: Achieveme
   );
 }
 
+
