@@ -408,33 +408,49 @@ export async function getArtistSongs(
 /**
  * Get top songs ranked by play count
  * 
- * Note: Since we need to sort by playCount in memory (not indexed in Firestore),
- * we fetch a larger sample (limitCount * 5) to ensure we get the top songs.
- * This is still much better than fetching all songs.
+ * Uses composite index: (isPublic, deletedAt, playCount)
+ * This allows direct querying by playCount for accurate top songs.
  */
 export async function getTopSongs(
   limitCount: number = 12
 ): Promise<SongDocument[]> {
-  // Fetch more than needed since we sort in memory
-  // Limit to a reasonable maximum to avoid excessive reads
-  const fetchLimit = Math.min(limitCount * 5, 100);
-  
-  const q = query(
-    collection(db, COLLECTIONS.songs),
-    where('isPublic', '==', true),
-    orderBy('createdAt', 'desc'), // Order by creation date as a proxy
-    limit(fetchLimit)
-  );
-  const snapshot = await getDocs(q);
-  
-  // Filter out deleted songs and sort by play count in memory
-  // Since playCount is optional, default to 0 for songs without it
-  // Handle both null and undefined (for older documents without deletedAt field)
-  return snapshot.docs
-    .map(doc => doc.data() as SongDocument)
-    .filter(song => !song.deletedAt)
-    .sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0))
-    .slice(0, limitCount);
+  try {
+    // Query directly by playCount using the composite index
+    const q = query(
+      collection(db, COLLECTIONS.songs),
+      where('isPublic', '==', true),
+      where('deletedAt', '==', null),
+      orderBy('playCount', 'desc'),
+      limit(limitCount)
+    );
+    const snapshot = await getDocs(q);
+    
+    return snapshot.docs
+      .map(doc => doc.data() as SongDocument)
+      .filter(song => !song.deletedAt); // Double-check filter for safety
+  } catch (error: any) {
+    // Fallback if composite index doesn't exist yet
+    if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
+      console.warn('[getTopSongs] Composite index missing, using fallback');
+      
+      // Fallback: fetch more songs and sort in memory
+      const fetchLimit = Math.min(limitCount * 10, 500);
+      const q = query(
+        collection(db, COLLECTIONS.songs),
+        where('isPublic', '==', true),
+        orderBy('createdAt', 'desc'),
+        limit(fetchLimit)
+      );
+      const snapshot = await getDocs(q);
+      
+      return snapshot.docs
+        .map(doc => doc.data() as SongDocument)
+        .filter(song => !song.deletedAt)
+        .sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0))
+        .slice(0, limitCount);
+    }
+    throw error;
+  }
 }
 
 /**
