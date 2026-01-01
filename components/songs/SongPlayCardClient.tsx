@@ -136,11 +136,11 @@ export function SongPlayCardClient({
         </div>
       )}
       
-      {/* Subtle Play Icon Hint - Always Visible */}
+      {/* Prominent Play Icon - Always Visible, More Noticeable */}
       {!showPlayingState && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="bg-white/30 rounded-full p-3 sm:p-4 opacity-50 group-hover:opacity-0 transition-opacity duration-200">
-            <svg className="w-8 h-8 sm:w-12 sm:h-12 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+          <div className="bg-white/80 rounded-full p-4 sm:p-5 opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-300 shadow-xl ring-2 ring-white/50">
+            <svg className="w-10 h-10 sm:w-14 sm:h-14 text-black ml-1" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />
             </svg>
           </div>
@@ -151,13 +151,13 @@ export function SongPlayCardClient({
       <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
         showPlayingState ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
       }`}>
-        <div className="bg-white/90 rounded-full p-3 sm:p-4 shadow-lg">
+        <div className="bg-white rounded-full p-4 sm:p-5 shadow-xl ring-2 ring-white/50">
           {showPlayingState ? (
-            <svg className="w-8 h-8 sm:w-12 sm:h-12 text-black" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="w-10 h-10 sm:w-14 sm:h-14 text-black" fill="currentColor" viewBox="0 0 24 24">
               <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
             </svg>
           ) : (
-            <svg className="w-8 h-8 sm:w-12 sm:h-12 text-black ml-1" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="w-10 h-10 sm:w-14 sm:h-14 text-black ml-1" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />
             </svg>
           )}
