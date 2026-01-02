@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { X, Play, Pause, Volume2 } from 'lucide-react';
@@ -26,12 +27,15 @@ export function SpotifyPlayer({
 }: SpotifyPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [playerBottom, setPlayerBottom] = useState<string>('0px');
   const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const rafRef = useRef<number | null>(null);
+  const previousBottomRef = useRef<string>('0px');
+  const viewportResizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -110,7 +114,11 @@ export function SpotifyPlayer({
       
       if (!isMobile) {
         // Desktop: always at bottom
-        setPlayerBottom('0px');
+        const newBottom = '0px';
+        if (previousBottomRef.current !== newBottom) {
+          previousBottomRef.current = newBottom;
+          setPlayerBottom(newBottom);
+        }
         return;
       }
 
@@ -118,35 +126,65 @@ export function SpotifyPlayer({
       const navBar = document.querySelector('[data-mobile-nav]') as HTMLElement | null;
       
       if (navBar) {
-        // Measure actual nav bar height including safe area
+        // Measure actual nav bar height - it already includes safe-area in its padding
         const navRect = navBar.getBoundingClientRect();
         const navHeight = navRect.height;
         
-        // Get safe area inset (Chrome fallback)
+        // Nav bar height already includes safe-area-inset-bottom in its paddingBottom
+        // So we just use the measured height directly
+        const newBottom = `${navHeight}px`;
+        
+        // Only update if position actually changed to prevent flicker
+        if (previousBottomRef.current !== newBottom) {
+          previousBottomRef.current = newBottom;
+          setPlayerBottom(newBottom);
+        }
+      } else {
+        // No nav bar: use safe area only (if supported)
         const safeAreaBottom = typeof CSS !== 'undefined' && CSS.supports('padding-bottom', 'env(safe-area-inset-bottom)')
           ? 'env(safe-area-inset-bottom)'
+          : '0px';
+        const newBottom = safeAreaBottom === 'env(safe-area-inset-bottom)' 
+          ? 'max(0px, env(safe-area-inset-bottom))'
           : '0px';
         
-        // Calculate bottom position: nav height + safe area
-        // Use CSS calc for better browser support
-        const bottomValue = `calc(${navHeight}px + ${safeAreaBottom})`;
-        setPlayerBottom(bottomValue);
-      } else {
-        // No nav bar: just use safe area
-        const safeAreaBottom = typeof CSS !== 'undefined' && CSS.supports('padding-bottom', 'env(safe-area-inset-bottom)')
-          ? 'env(safe-area-inset-bottom)'
-          : '0px';
-        setPlayerBottom(safeAreaBottom);
+        // Only update if position actually changed
+        if (previousBottomRef.current !== newBottom) {
+          previousBottomRef.current = newBottom;
+          setPlayerBottom(newBottom);
+        }
       }
     });
   }, []);
 
-  useEffect(() => {
-    // Initial check with delay to ensure DOM is ready
-    checkTimeoutRef.current = setTimeout(() => {
-      checkNavBar();
-    }, 100);
+  // Initial synchronous check using useLayoutEffect (runs before paint)
+  useLayoutEffect(() => {
+    // Immediate check for initial render
+    checkNavBar();
+    
+    // Retry with exponential backoff if nav bar not found
+    let attempts = 0;
+    const maxAttempts = 5;
+    const checkWithRetry = () => {
+      const navBar = document.querySelector('[data-mobile-nav]');
+      if (!navBar && attempts < maxAttempts) {
+        attempts++;
+        setTimeout(checkWithRetry, Math.min(50 * Math.pow(2, attempts), 200));
+      } else {
+        checkNavBar();
+      }
+    };
+    
+    // Start retry sequence if needed
+    setTimeout(checkWithRetry, 50);
+  }, [checkNavBar]);
 
+  // Listen to Next.js pathname changes for client-side navigation
+  useEffect(() => {
+    checkNavBar();
+  }, [pathname, checkNavBar]);
+
+  useEffect(() => {
     // Debounced resize handler (Chrome can fire many resize events)
     let resizeTimeout: NodeJS.Timeout;
     const handleResize = () => {
@@ -156,7 +194,21 @@ export function SpotifyPlayer({
 
     window.addEventListener('resize', handleResize, { passive: true });
 
-    // Optimized MutationObserver - only watch for nav bar changes
+    // Handle Chrome mobile viewport changes (address bar show/hide)
+    const handleViewportResize = () => {
+      if (viewportResizeTimeoutRef.current) {
+        clearTimeout(viewportResizeTimeoutRef.current);
+      }
+      viewportResizeTimeoutRef.current = setTimeout(checkNavBar, 100);
+    };
+
+    // Use visualViewport API for Chrome mobile
+    if (typeof window !== 'undefined' && window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportResize);
+      window.visualViewport.addEventListener('scroll', handleViewportResize);
+    }
+
+    // Optimized MutationObserver - watch for nav bar changes with subtree: true
     let previousNavBarState = !!document.querySelector('[data-mobile-nav]');
     const observer = new MutationObserver(() => {
       // Check if nav bar was added/removed
@@ -172,13 +224,15 @@ export function SpotifyPlayer({
       }
     });
 
-    // Only observe body for nav bar additions/removals
+    // Observe body with subtree: true to detect nested nav bar
     observer.observe(document.body, {
       childList: true,
-      subtree: false, // Don't go deep, just watch for nav bar
+      subtree: true, // Changed to true to detect nested nav bar
+      attributes: true,
+      attributeFilter: ['data-mobile-nav'], // Only watch for this attribute
     });
 
-    // Also check on route changes (Next.js navigation)
+    // Also check on browser back/forward navigation
     const handleRouteChange = () => {
       if (checkTimeoutRef.current) {
         clearTimeout(checkTimeoutRef.current);
@@ -194,9 +248,16 @@ export function SpotifyPlayer({
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
       }
+      if (viewportResizeTimeoutRef.current) {
+        clearTimeout(viewportResizeTimeoutRef.current);
+      }
       clearTimeout(resizeTimeout);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('popstate', handleRouteChange);
+      if (typeof window !== 'undefined' && window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportResize);
+        window.visualViewport.removeEventListener('scroll', handleViewportResize);
+      }
       observer.disconnect();
     };
   }, [checkNavBar]);
@@ -228,9 +289,9 @@ export function SpotifyPlayer({
   return (
     <div 
       ref={playerRef}
-      className="fixed left-0 right-0 bg-card border-t border-border z-[60] shadow-lg transition-[bottom] duration-200 ease-out md:!bottom-0" 
+      className="fixed left-0 right-0 bg-card border-t border-border z-[60] shadow-lg transition-[bottom] duration-200 ease-out" 
       style={{ 
-        bottom: playerBottom,
+        bottom: playerBottom, // checkNavBar already handles desktop detection
         paddingBottom: 'max(0px, env(safe-area-inset-bottom))'
       }}
     >
