@@ -140,13 +140,9 @@ export function SpotifyPlayer({
           setPlayerBottom(newBottom);
         }
       } else {
-        // No nav bar: use safe area only (if supported)
-        const safeAreaBottom = typeof CSS !== 'undefined' && CSS.supports('padding-bottom', 'env(safe-area-inset-bottom)')
-          ? 'env(safe-area-inset-bottom)'
-          : '0px';
-        const newBottom = safeAreaBottom === 'env(safe-area-inset-bottom)' 
-          ? 'max(0px, env(safe-area-inset-bottom))'
-          : '0px';
+        // No nav bar: pin to bottom (0px)
+        // Safe-area is handled by paddingBottom in the style prop
+        const newBottom = '0px';
         
         // Only update if position actually changed
         if (previousBottomRef.current !== newBottom) {
