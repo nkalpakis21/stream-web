@@ -6,7 +6,11 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { createArtist } from '@/lib/services/artists';
 import type { StyleDNA } from '@/types/firestore';
 
-export function CreateArtistForm() {
+interface CreateArtistFormProps {
+  onSuccess?: (artistId: string) => void;
+}
+
+export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
   const { user } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -44,7 +48,13 @@ export function CreateArtistForm() {
         isPublic: formData.isPublic,
       });
 
-      router.push(`/artists/${artist.id}`);
+      // If onSuccess callback provided, use it (for multi-step flow)
+      // Otherwise, redirect to artist page (backward compatible)
+      if (onSuccess) {
+        onSuccess(artist.id);
+      } else {
+        router.push(`/artists/${artist.id}`);
+      }
     } catch (error) {
       console.error('Failed to create artist:', error);
       alert('Failed to create artist. Please try again.');

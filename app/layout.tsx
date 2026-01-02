@@ -1,20 +1,14 @@
 import type { Metadata } from 'next';
-import { Inter, Space_Grotesk, Playfair_Display } from 'next/font/google';
+import { Figtree, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { SongPlayerProvider } from '@/components/songs/SongPlayerProvider';
 import { AnalyticsProvider } from '@/components/providers/AnalyticsProvider';
 import { Footer } from '@/components/layout/Footer';
 
-const inter = Inter({ 
+const figtree = Figtree({
   subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
-
-const spaceGrotesk = Space_Grotesk({
-  subsets: ['latin'],
-  variable: '--font-space-grotesk',
+  variable: '--font-figtree',
   display: 'swap',
   weight: ['400', '500', '600', '700'],
 });
@@ -37,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${playfairDisplay.variable}`}>
+    <html lang="en" className={`dark ${figtree.variable} ${playfairDisplay.variable}`}>
       <body className="antialiased flex flex-col min-h-screen">
         <AnalyticsProvider>
           <AuthProvider>

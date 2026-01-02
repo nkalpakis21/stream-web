@@ -24,7 +24,7 @@ export function UserArtistsSection({ artists }: UserArtistsSectionProps) {
             Create your first AI artist to start making music
           </p>
           <Link
-            href="/create"
+            href="/dashboard?tab=artists"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity font-medium text-sm"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

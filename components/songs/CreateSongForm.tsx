@@ -8,7 +8,12 @@ import { createSong } from '@/lib/services/songs';
 import { createGeneration } from '@/lib/services/generations';
 import type { AIArtistDocument } from '@/types/firestore';
 
-export function CreateSongForm() {
+interface CreateSongFormProps {
+  preselectedArtistId?: string;
+  showSuccessMessage?: boolean;
+}
+
+export function CreateSongForm({ preselectedArtistId, showSuccessMessage }: CreateSongFormProps) {
   const { user } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -16,7 +21,7 @@ export function CreateSongForm() {
   const [loadingArtists, setLoadingArtists] = useState(true);
   const [formData, setFormData] = useState({
     title: '',
-    artistId: '',
+    artistId: preselectedArtistId || '',
     prompt: '',
     lyrics: '',
     provider: 'musicgpt', // Default to MusicGPT
@@ -28,7 +33,11 @@ export function CreateSongForm() {
       const userArtists = await getUserArtists(user.uid);
       setArtists(userArtists);
       if (userArtists.length > 0) {
-        setFormData(prev => ({ ...prev, artistId: userArtists[0].id }));
+        // Pre-select artist from URL param if provided, otherwise use first artist
+        const artistToSelect = preselectedArtistId 
+          ? userArtists.find(a => a.id === preselectedArtistId) || userArtists[0]
+          : userArtists[0];
+        setFormData(prev => ({ ...prev, artistId: artistToSelect.id }));
       }
     } catch (error) {
       console.error('Failed to load artists:', error);
@@ -36,7 +45,7 @@ export function CreateSongForm() {
     } finally {
       setLoadingArtists(false);
     }
-  }, [user]);
+  }, [user, preselectedArtistId]);
 
   useEffect(() => {
     if (user) {
@@ -143,18 +152,26 @@ export function CreateSongForm() {
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground mb-4">You need to create an AI artist first.</p>
-        <a
-          href="/create"
+        <button
+          type="button"
+          onClick={() => router.push('/create?step=artist')}
           className="text-accent hover:opacity-80 transition-opacity font-medium"
         >
           Create an artist →
-        </a>
+        </button>
       </div>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {showSuccessMessage && (
+        <div className="mb-6 p-4 bg-accent/10 border border-accent/20 rounded-xl">
+          <p className="text-sm text-foreground">
+            <span className="font-semibold">✓ Artist created!</span> Now create your first song with your new AI artist.
+          </p>
+        </div>
+      )}
       <div>
         <label htmlFor="title" className="block text-sm font-medium mb-2 text-foreground">
           Song Title *

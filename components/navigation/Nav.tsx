@@ -49,21 +49,21 @@ export function Nav() {
             {user ? (
               <>
                 <Link
-                  href="/create"
+                  href="/dashboard"
                   className={`text-sm font-medium transition-colors duration-200 ${
-                    isActive('/create')
+                    pathname?.startsWith('/dashboard')
                       ? 'text-foreground'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  Create
+                  Dashboard
                 </Link>
                 <div className="w-px h-4 bg-border/50 mx-1" />
                 <UserMenu />
               </>
             ) : (
               <Link
-                href="/create"
+                href="/signin"
                 className="text-sm font-medium text-accent hover:opacity-80 transition-opacity duration-200"
               >
                 Sign In
@@ -114,19 +114,19 @@ export function Nav() {
               
               {user ? (
                 <Link
-                  href="/create"
+                  href="/dashboard"
                   onClick={() => setMobileMenuOpen(false)}
                   className={`px-4 py-2.5 text-base font-medium rounded-lg transition-colors duration-200 ${
-                    isActive('/create')
+                    pathname?.startsWith('/dashboard')
                       ? 'text-foreground bg-muted/50'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
                   }`}
                 >
-                  Create
+                  Dashboard
                 </Link>
               ) : (
                 <Link
-                  href="/create"
+                  href="/signin"
                   onClick={() => setMobileMenuOpen(false)}
                   className="px-4 py-2.5 text-base font-medium text-accent hover:opacity-80 transition-opacity duration-200"
                 >

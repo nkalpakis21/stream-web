@@ -3,7 +3,7 @@ import { getPublicArtists } from '@/lib/services/artists';
 import { SongCard } from '@/components/songs/SongCard';
 import { ArtistCard } from '@/components/artists/ArtistCard';
 import { Nav } from '@/components/navigation/Nav';
-import Link from 'next/link';
+import { HeroCTA } from '@/components/homepage/HeroCTA';
 
 // ISR: Revalidate every 2 minutes (120 seconds)
 export const revalidate = 120;
@@ -38,15 +38,7 @@ export default async function HomePage() {
             <p className="text-xl lg:text-2xl text-muted-foreground leading-relaxed mb-8">
               From first idea to finished track, create your own music and collaborate with your AI artists. You own everything you create.
             </p>
-            <Link
-              href="/create"
-              className="inline-flex items-center gap-2 px-6 py-3 lg:px-8 lg:py-4 text-base lg:text-lg font-semibold bg-accent text-accent-foreground rounded-full hover:opacity-90 transition-opacity shadow-soft"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Create Now for Free
-            </Link>
+            <HeroCTA />
           </div>
         </section>
 

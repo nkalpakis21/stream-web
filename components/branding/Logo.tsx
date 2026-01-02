@@ -34,7 +34,7 @@ export function Logo({ variant = 'default', showText = true, className = '' }: L
         />
       </div>
       {showText && (
-        <span className={`font-space-grotesk font-semibold tracking-tight ${
+        <span className={`font-semibold tracking-tight ${
           isCompact ? 'text-lg sm:text-xl' : 
           isFull ? 'text-xl sm:text-2xl' : 
           'text-xl sm:text-2xl'

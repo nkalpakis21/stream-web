@@ -11,7 +11,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Brand */}
           <div className="flex flex-col gap-4">
-            <Link href="/" className="font-space-grotesk font-semibold text-xl sm:text-2xl hover:opacity-80 transition-opacity">
+            <Link href="/" className="font-semibold text-xl sm:text-2xl hover:opacity-80 transition-opacity">
               Stream ⭐
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs">
