@@ -112,7 +112,14 @@
   }
 
   .pb-safe {
-    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  /* Chrome-specific fix for bottom nav */
+  @supports (padding: max(0px)) {
+    .pb-safe {
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
   }
 
   /* Fix for mobile nav bar scroll issues */
