@@ -28,6 +28,7 @@ export function SpotifyPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
+  const [hasMobileNav, setHasMobileNav] = useState(false);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -89,6 +90,29 @@ export function SpotifyPlayer({
     }
   }, [volume]);
 
+  // Detect if mobile nav bar exists
+  useEffect(() => {
+    const checkNavBar = () => {
+      const navBar = document.querySelector('[data-mobile-nav]');
+      setHasMobileNav(!!navBar && window.innerWidth < 768);
+    };
+
+    // Check immediately
+    checkNavBar();
+
+    // Check on resize
+    window.addEventListener('resize', checkNavBar);
+
+    // Check when DOM changes (in case nav is added/removed dynamically)
+    const observer = new MutationObserver(checkNavBar);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      window.removeEventListener('resize', checkNavBar);
+      observer.disconnect();
+    };
+  }, []);
+
   const formatTime = (seconds: number): string => {
     if (isNaN(seconds)) return '0:00';
     const mins = Math.floor(seconds / 60);
@@ -117,7 +141,9 @@ export function SpotifyPlayer({
     <div 
       className="fixed left-0 right-0 bg-card border-t border-border z-[60] shadow-lg md:bottom-0" 
       style={{ 
-        bottom: 'max(64px, calc(64px + env(safe-area-inset-bottom)))',
+        bottom: hasMobileNav 
+          ? 'max(64px, calc(64px + env(safe-area-inset-bottom)))'
+          : 'max(0px, env(safe-area-inset-bottom))',
         paddingBottom: 'max(0px, env(safe-area-inset-bottom))'
       }}
     >

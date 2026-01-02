@@ -41,7 +41,10 @@ const tabs: { id: DashboardTab; label: string; icon: React.ReactNode }[] = [
 
 export function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card/98 md:hidden z-50 border-t border-border shadow-lg supports-[backdrop-filter]:bg-card/95 supports-[backdrop-filter]:backdrop-blur-xl">
+    <nav 
+      data-mobile-nav
+      className="fixed bottom-0 left-0 right-0 bg-card/98 md:hidden z-50 border-t border-border shadow-lg supports-[backdrop-filter]:bg-card/95 supports-[backdrop-filter]:backdrop-blur-xl"
+    >
       <div className="flex items-center justify-around px-2" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))', minHeight: '64px' }}>
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
