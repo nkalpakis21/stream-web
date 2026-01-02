@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { X, Play, Pause, Volume2 } from 'lucide-react';
@@ -25,10 +25,13 @@ export function SpotifyPlayer({
   onClose,
 }: SpotifyPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const playerRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
-  const [hasMobileNav, setHasMobileNav] = useState(false);
+  const [playerBottom, setPlayerBottom] = useState<string>('0px');
+  const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -90,28 +93,113 @@ export function SpotifyPlayer({
     }
   }, [volume]);
 
-  // Detect if mobile nav bar exists
+  // Robust nav bar detection with proper Chrome handling
+  const checkNavBar = useCallback(() => {
+    // Cancel any pending checks
+    if (checkTimeoutRef.current) {
+      clearTimeout(checkTimeoutRef.current);
+    }
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+    }
+
+    // Use requestAnimationFrame for smooth updates
+    rafRef.current = requestAnimationFrame(() => {
+      // Only check on mobile (width < 768px)
+      const isMobile = window.innerWidth < 768;
+      
+      if (!isMobile) {
+        // Desktop: always at bottom
+        setPlayerBottom('0px');
+        return;
+      }
+
+      // Mobile: check if nav bar exists and measure it
+      const navBar = document.querySelector('[data-mobile-nav]') as HTMLElement | null;
+      
+      if (navBar) {
+        // Measure actual nav bar height including safe area
+        const navRect = navBar.getBoundingClientRect();
+        const navHeight = navRect.height;
+        
+        // Get safe area inset (Chrome fallback)
+        const safeAreaBottom = typeof CSS !== 'undefined' && CSS.supports('padding-bottom', 'env(safe-area-inset-bottom)')
+          ? 'env(safe-area-inset-bottom)'
+          : '0px';
+        
+        // Calculate bottom position: nav height + safe area
+        // Use CSS calc for better browser support
+        const bottomValue = `calc(${navHeight}px + ${safeAreaBottom})`;
+        setPlayerBottom(bottomValue);
+      } else {
+        // No nav bar: just use safe area
+        const safeAreaBottom = typeof CSS !== 'undefined' && CSS.supports('padding-bottom', 'env(safe-area-inset-bottom)')
+          ? 'env(safe-area-inset-bottom)'
+          : '0px';
+        setPlayerBottom(safeAreaBottom);
+      }
+    });
+  }, []);
+
   useEffect(() => {
-    const checkNavBar = () => {
-      const navBar = document.querySelector('[data-mobile-nav]');
-      setHasMobileNav(!!navBar && window.innerWidth < 768);
+    // Initial check with delay to ensure DOM is ready
+    checkTimeoutRef.current = setTimeout(() => {
+      checkNavBar();
+    }, 100);
+
+    // Debounced resize handler (Chrome can fire many resize events)
+    let resizeTimeout: NodeJS.Timeout;
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(checkNavBar, 150);
     };
 
-    // Check immediately
-    checkNavBar();
+    window.addEventListener('resize', handleResize, { passive: true });
 
-    // Check on resize
-    window.addEventListener('resize', checkNavBar);
+    // Optimized MutationObserver - only watch for nav bar changes
+    let previousNavBarState = !!document.querySelector('[data-mobile-nav]');
+    const observer = new MutationObserver(() => {
+      // Check if nav bar was added/removed
+      const hasNavBar = !!document.querySelector('[data-mobile-nav]');
+      
+      if (hasNavBar !== previousNavBarState) {
+        previousNavBarState = hasNavBar;
+        // Debounce the check
+        if (checkTimeoutRef.current) {
+          clearTimeout(checkTimeoutRef.current);
+        }
+        checkTimeoutRef.current = setTimeout(checkNavBar, 50);
+      }
+    });
 
-    // Check when DOM changes (in case nav is added/removed dynamically)
-    const observer = new MutationObserver(checkNavBar);
-    observer.observe(document.body, { childList: true, subtree: true });
+    // Only observe body for nav bar additions/removals
+    observer.observe(document.body, {
+      childList: true,
+      subtree: false, // Don't go deep, just watch for nav bar
+    });
+
+    // Also check on route changes (Next.js navigation)
+    const handleRouteChange = () => {
+      if (checkTimeoutRef.current) {
+        clearTimeout(checkTimeoutRef.current);
+      }
+      checkTimeoutRef.current = setTimeout(checkNavBar, 200);
+    };
+    window.addEventListener('popstate', handleRouteChange);
 
     return () => {
-      window.removeEventListener('resize', checkNavBar);
+      if (checkTimeoutRef.current) {
+        clearTimeout(checkTimeoutRef.current);
+      }
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      clearTimeout(resizeTimeout);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('popstate', handleRouteChange);
       observer.disconnect();
     };
-  }, []);
+  }, [checkNavBar]);
 
   const formatTime = (seconds: number): string => {
     if (isNaN(seconds)) return '0:00';
@@ -139,11 +227,10 @@ export function SpotifyPlayer({
 
   return (
     <div 
-      className="fixed left-0 right-0 bg-card border-t border-border z-[60] shadow-lg md:bottom-0" 
+      ref={playerRef}
+      className="fixed left-0 right-0 bg-card border-t border-border z-[60] shadow-lg transition-[bottom] duration-200 ease-out md:!bottom-0" 
       style={{ 
-        bottom: hasMobileNav 
-          ? 'max(64px, calc(64px + env(safe-area-inset-bottom)))'
-          : 'max(0px, env(safe-area-inset-bottom))',
+        bottom: playerBottom,
         paddingBottom: 'max(0px, env(safe-area-inset-bottom))'
       }}
     >
