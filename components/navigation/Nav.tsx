@@ -19,7 +19,7 @@ export function Nav() {
   const isActive = (href: string) => pathname === href;
 
   return (
-    <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40">
+    <nav className="sticky top-0 z-50 bg-background/95 md:bg-background/80 backdrop-blur-sm md:backdrop-blur-xl border-b border-border/40 supports-[backdrop-filter]:bg-background/80 sticky-nav">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="flex justify-between items-center h-14">
           {/* Logo */}

@@ -114,4 +114,13 @@
   .pb-safe {
     padding-bottom: calc(1rem + env(safe-area-inset-bottom));
   }
+
+  /* Fix for mobile nav bar scroll issues */
+  .sticky-nav {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    will-change: transform;
+  }
 }
