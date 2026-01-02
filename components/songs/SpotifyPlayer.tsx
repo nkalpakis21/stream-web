@@ -114,7 +114,13 @@ export function SpotifyPlayer({
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50 shadow-lg md:pb-0" style={{ paddingBottom: 'max(0px, env(safe-area-inset-bottom))' }}>
+    <div 
+      className="fixed left-0 right-0 bg-card border-t border-border z-[60] shadow-lg md:bottom-0" 
+      style={{ 
+        bottom: 'max(64px, calc(64px + env(safe-area-inset-bottom)))',
+        paddingBottom: 'max(0px, env(safe-area-inset-bottom))'
+      }}
+    >
       <audio ref={audioRef} src={audioUrl} preload="metadata" />
       
       <div className="max-w-7xl mx-auto px-4 py-3">
