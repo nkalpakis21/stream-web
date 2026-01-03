@@ -101,55 +101,12 @@ export function SpotifyPlayer({
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (isPlaying) {
-      // Wait for audio to be ready before playing
-      const playWhenReady = async () => {
-        // If already ready, play immediately
-        if (audio.readyState >= 2) {
-          audio.play().catch(console.error);
-          return;
-        }
-        
-        // Otherwise, wait for audio to be ready
-        // Use a promise-based approach to ensure we wait properly
-        const waitForReady = () => {
-          return new Promise<void>((resolve) => {
-            // If already ready, resolve immediately
-            if (audio.readyState >= 2) {
-              resolve();
-              return;
-            }
-            
-            // Wait for canplay or loadeddata event
-            const handleReady = () => {
-              audio.removeEventListener('canplay', handleReady);
-              audio.removeEventListener('canplaythrough', handleReady);
-              audio.removeEventListener('loadeddata', handleReady);
-              resolve();
-            };
-            
-            audio.addEventListener('canplay', handleReady);
-            audio.addEventListener('canplaythrough', handleReady);
-            audio.addEventListener('loadeddata', handleReady);
-            
-            // Ensure audio is loading - if not, start loading
-            if (audio.readyState === 0 || audio.networkState === 0) {
-              audio.load();
-            }
-          });
-        };
-        
-        // Wait for ready, then play
-        waitForReady().then(() => {
-          audio.play().catch(console.error);
-        });
-      };
-      
-      playWhenReady();
-    } else {
+    // Only handle pause from useEffect (play is handled directly in click handler for mobile Chrome)
+    if (!isPlaying) {
       audio.pause();
     }
-  }, [isPlaying, proxiedAudioUrl]); // Add proxiedAudioUrl to dependencies
+    // Note: We don't call play() here because mobile Chrome requires it to be called directly from user interaction
+  }, [isPlaying]);
 
   useEffect(() => {
     const audio = audioRef.current;
