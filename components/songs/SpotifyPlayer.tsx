@@ -104,29 +104,52 @@ export function SpotifyPlayer({
     if (isPlaying) {
       // Wait for audio to be ready before playing
       const playWhenReady = async () => {
+        // If already ready, play immediately
         if (audio.readyState >= 2) {
-          // Already ready, play immediately
           audio.play().catch(console.error);
-        } else {
-          // Wait for canplay event
-          const handleCanPlay = () => {
-            audio.play().catch(console.error);
-            audio.removeEventListener('canplay', handleCanPlay);
-            audio.removeEventListener('loadeddata', handleCanPlay);
-          };
-          audio.addEventListener('canplay', handleCanPlay);
-          audio.addEventListener('loadeddata', handleCanPlay);
-          // Start loading if not already
-          if (audio.readyState === 0) {
-            audio.load();
-          }
+          return;
         }
+        
+        // Otherwise, wait for audio to be ready
+        // Use a promise-based approach to ensure we wait properly
+        const waitForReady = () => {
+          return new Promise<void>((resolve) => {
+            // If already ready, resolve immediately
+            if (audio.readyState >= 2) {
+              resolve();
+              return;
+            }
+            
+            // Wait for canplay or loadeddata event
+            const handleReady = () => {
+              audio.removeEventListener('canplay', handleReady);
+              audio.removeEventListener('canplaythrough', handleReady);
+              audio.removeEventListener('loadeddata', handleReady);
+              resolve();
+            };
+            
+            audio.addEventListener('canplay', handleReady);
+            audio.addEventListener('canplaythrough', handleReady);
+            audio.addEventListener('loadeddata', handleReady);
+            
+            // Ensure audio is loading - if not, start loading
+            if (audio.readyState === 0 || audio.networkState === 0) {
+              audio.load();
+            }
+          });
+        };
+        
+        // Wait for ready, then play
+        waitForReady().then(() => {
+          audio.play().catch(console.error);
+        });
       };
+      
       playWhenReady();
     } else {
       audio.pause();
     }
-  }, [isPlaying]);
+  }, [isPlaying, proxiedAudioUrl]); // Add proxiedAudioUrl to dependencies
 
   useEffect(() => {
     const audio = audioRef.current;
