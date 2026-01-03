@@ -57,8 +57,8 @@ export function AudioPreloader({ songs }: AudioPreloaderProps) {
       // Append to document body (hidden)
       document.body.appendChild(audio);
       
-      // Preload immediately for first 10 songs (above the fold)
-      if (index < 10) {
+      // Preload immediately for first 20 songs (above the fold and initial scroll)
+      if (index < 20) {
         audio.load();
       }
       
