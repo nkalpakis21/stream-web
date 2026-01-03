@@ -523,38 +523,6 @@ export async function getArtistNamesForSongs(
 }
 
 /**
- * Helper function to fetch audio URLs for a list of songs.
- * Returns a map of songId -> audioURL.
- */
-export async function getAudioUrlsForSongs(
-  songs: SongDocument[]
-): Promise<Map<string, string | null>> {
-  const songAudioMap = new Map<string, string | null>();
-  
-  // Get unique currentVersionIds
-  const uniqueVersionIds = [...new Set(songs.map(song => song.currentVersionId))];
-
-  // Fetch all song versions in parallel
-  const versionPromises = uniqueVersionIds.map(versionId => getSongVersion(versionId));
-  const versions = await Promise.all(versionPromises);
-
-  // Create a map of versionId -> audioURL
-  const versionAudioMap = new Map<string, string | null>();
-  versions.forEach(version => {
-    if (version) {
-      versionAudioMap.set(version.id, version.audioURL);
-    }
-  });
-
-  // Populate songAudioMap
-  songs.forEach(song => {
-    songAudioMap.set(song.id, versionAudioMap.get(song.currentVersionId) || null);
-  });
-
-  return songAudioMap;
-}
-
-/**
  * Delete a song and all related notifications (soft delete)
  * 
  * Only deletes:
