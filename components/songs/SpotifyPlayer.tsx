@@ -39,6 +39,15 @@ export function SpotifyPlayer({
   const previousBottomRef = useRef<string>('0px');
   const viewportResizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Load audio when audioUrl changes
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !audioUrl) return;
+
+    // Load the new audio source when URL changes
+    audio.load();
+  }, [audioUrl]);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -343,6 +352,14 @@ export function SpotifyPlayer({
                   // Mobile Chrome requires play() to be called directly from click
                   if (audio) {
                     try {
+                      // Ensure audio is loaded before playing
+                      if (audio.readyState === 0) {
+                        // Audio hasn't started loading, load it now
+                        audio.load();
+                        // Wait a bit for it to start loading (mobile Chrome needs this)
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                      }
+                      
                       // Call play() directly from click handler (required for mobile Chrome)
                       const playPromise = audio.play();
                       if (playPromise !== undefined) {
