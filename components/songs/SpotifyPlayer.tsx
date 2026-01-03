@@ -5,8 +5,7 @@ import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { X, Play, Pause, Volume2 } from 'lucide-react';
-
-// Trigger Vercel build after rollback
+import { getProxiedAudioUrl } from '@/lib/utils/audioProxy';
 
 interface SpotifyPlayerProps {
   songTitle: string;
@@ -27,6 +26,9 @@ export function SpotifyPlayer({
   onPlayPause,
   onClose,
 }: SpotifyPlayerProps) {
+  // Convert to proxied URL for caching (doesn't affect play logic)
+  const proxiedAudioUrl = getProxiedAudioUrl(audioUrl) || audioUrl;
+  
   const audioRef = useRef<HTMLAudioElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -42,11 +44,16 @@ export function SpotifyPlayer({
   // Load audio when audioUrl changes
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !audioUrl) return;
+    if (!audio || !proxiedAudioUrl) return;
 
+    // Explicitly set src before loading (ensures it's set before load() is called)
+    if (audio.src !== proxiedAudioUrl) {
+      audio.src = proxiedAudioUrl;
+    }
+    
     // Load the new audio source when URL changes
     audio.load();
-  }, [audioUrl]);
+  }, [proxiedAudioUrl]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -88,7 +95,7 @@ export function SpotifyPlayer({
       audio.removeEventListener('ended', handleEnded);
       window.removeEventListener('lyrics-seek', handleLyricsSeek);
     };
-  }, [audioUrl, onPlayPause]);
+  }, [proxiedAudioUrl, onPlayPause]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -322,7 +329,7 @@ export function SpotifyPlayer({
         paddingBottom: 'max(0px, env(safe-area-inset-bottom))'
       }}
     >
-      <audio ref={audioRef} src={audioUrl} preload="metadata" />
+      <audio ref={audioRef} src={proxiedAudioUrl} preload="metadata" />
       
       <div className="max-w-7xl mx-auto px-4 py-3">
         {/* Progress Bar */}

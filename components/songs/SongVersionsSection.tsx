@@ -6,6 +6,7 @@ import { db } from '@/lib/firebase/config';
 import type { SongDocument, SongVersionDocument } from '@/types/firestore';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { setPrimarySongVersion } from '@/lib/services/songs';
+import { getProxiedAudioUrl } from '@/lib/utils/audioProxy';
 
 // Serialized versions for client components (Timestamps converted to numbers)
 type SerializedSongVersionDocument = Omit<SongVersionDocument, 'createdAt'> & {
@@ -138,7 +139,7 @@ export function SongVersionsSection({
                     <audio
                       controls
                       className="w-full h-12 rounded-lg"
-                      src={version.audioURL || undefined}
+                      src={version.audioURL ? (getProxiedAudioUrl(version.audioURL) || version.audioURL) : undefined}
                       preload="metadata"
                       onError={(e) => {
                         console.error('Audio playback error:', e);
