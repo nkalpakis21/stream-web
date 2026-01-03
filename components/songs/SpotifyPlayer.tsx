@@ -85,11 +85,11 @@ export function SpotifyPlayer({
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (isPlaying) {
-      audio.play().catch(console.error);
-    } else {
+    // Only handle pause from useEffect (play is handled directly in click handler for mobile Chrome)
+    if (!isPlaying) {
       audio.pause();
     }
+    // Note: We don't call play() here because mobile Chrome requires it to be called directly from user interaction
   }, [isPlaying]);
 
   useEffect(() => {
@@ -336,7 +336,36 @@ export function SpotifyPlayer({
           {/* Center: Play/Pause Button */}
           <div className="flex items-center gap-2">
             <Button
-              onClick={onPlayPause}
+              onClick={async (e) => {
+                const audio = audioRef.current;
+                
+                if (!isPlaying) {
+                  // Mobile Chrome requires play() to be called directly from click
+                  if (audio) {
+                    try {
+                      // Call play() directly from click handler (required for mobile Chrome)
+                      const playPromise = audio.play();
+                      if (playPromise !== undefined) {
+                        await playPromise;
+                      }
+                      // Success - update state
+                      onPlayPause();
+                    } catch (error) {
+                      console.error('[SpotifyPlayer] Play failed:', error);
+                      // Still update state - user can try again
+                      onPlayPause();
+                    }
+                  } else {
+                    onPlayPause();
+                  }
+                } else {
+                  // Already playing, just pause
+                  if (audio) {
+                    audio.pause();
+                  }
+                  onPlayPause();
+                }
+              }}
               size="icon"
               className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 hover:scale-105 transition-all shadow-lg"
               aria-label={isPlaying ? 'Pause' : 'Play'}
