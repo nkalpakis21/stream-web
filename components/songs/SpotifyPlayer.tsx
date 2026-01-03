@@ -352,7 +352,67 @@ export function SpotifyPlayer({
           {/* Center: Play/Pause Button */}
           <div className="flex items-center gap-2">
             <Button
-              onClick={onPlayPause}
+              onClick={async (e) => {
+                const audio = audioRef.current;
+                
+                if (!isPlaying) {
+                  // Mobile Chrome requires play() to be called directly from click
+                  if (!audio) {
+                    onPlayPause(); // Just toggle state if no audio element
+                    return;
+                  }
+                  
+                  try {
+                    // Wait for audio to be ready before playing (needed for proxy)
+                    const waitForReady = () => {
+                      return new Promise<void>((resolve) => {
+                        // If already ready, resolve immediately
+                        if (audio.readyState >= 2) {
+                          resolve();
+                          return;
+                        }
+                        
+                        // Wait for canplay or loadeddata event
+                        const handleReady = () => {
+                          audio.removeEventListener('canplay', handleReady);
+                          audio.removeEventListener('canplaythrough', handleReady);
+                          audio.removeEventListener('loadeddata', handleReady);
+                          resolve();
+                        };
+                        
+                        audio.addEventListener('canplay', handleReady);
+                        audio.addEventListener('canplaythrough', handleReady);
+                        audio.addEventListener('loadeddata', handleReady);
+                        
+                        // Ensure audio is loading - if not, start loading
+                        if (audio.readyState === 0 || audio.networkState === 0) {
+                          audio.load();
+                        }
+                      });
+                    };
+                    
+                    // Wait for ready, then play directly from click handler (mobile requirement)
+                    await waitForReady();
+                    const playPromise = audio.play();
+                    if (playPromise !== undefined) {
+                      await playPromise;
+                    }
+                    
+                    // Success - update state
+                    onPlayPause();
+                  } catch (error) {
+                    console.error('[SpotifyPlayer] Play failed:', error);
+                    // Still update state - user can try again
+                    onPlayPause();
+                  }
+                } else {
+                  // Already playing, just pause
+                  if (audio) {
+                    audio.pause();
+                  }
+                  onPlayPause();
+                }
+              }}
               size="icon"
               className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 hover:scale-105 transition-all shadow-lg"
               aria-label={isPlaying ? 'Pause' : 'Play'}
