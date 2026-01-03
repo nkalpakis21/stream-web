@@ -6,6 +6,8 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { X, Play, Pause, Volume2 } from 'lucide-react';
 
+// Trigger Vercel build after rollback
+
 interface SpotifyPlayerProps {
   songTitle: string;
   artistName: string;
