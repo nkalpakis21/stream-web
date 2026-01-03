@@ -94,11 +94,31 @@ export function SpotifyPlayer({
     const audio = audioRef.current;
     if (!audio) return;
 
-    // Only handle pause from useEffect (play is handled directly in click handler for mobile Chrome)
-    if (!isPlaying) {
+    if (isPlaying) {
+      // Wait for audio to be ready before playing
+      const playWhenReady = async () => {
+        if (audio.readyState >= 2) {
+          // Already ready, play immediately
+          audio.play().catch(console.error);
+        } else {
+          // Wait for canplay event
+          const handleCanPlay = () => {
+            audio.play().catch(console.error);
+            audio.removeEventListener('canplay', handleCanPlay);
+            audio.removeEventListener('loadeddata', handleCanPlay);
+          };
+          audio.addEventListener('canplay', handleCanPlay);
+          audio.addEventListener('loadeddata', handleCanPlay);
+          // Start loading if not already
+          if (audio.readyState === 0) {
+            audio.load();
+          }
+        }
+      };
+      playWhenReady();
+    } else {
       audio.pause();
     }
-    // Note: We don't call play() here because mobile Chrome requires it to be called directly from user interaction
   }, [isPlaying]);
 
   useEffect(() => {
@@ -345,44 +365,7 @@ export function SpotifyPlayer({
           {/* Center: Play/Pause Button */}
           <div className="flex items-center gap-2">
             <Button
-              onClick={async (e) => {
-                const audio = audioRef.current;
-                
-                if (!isPlaying) {
-                  // Mobile Chrome requires play() to be called directly from click
-                  if (audio) {
-                    try {
-                      // Ensure audio is loaded before playing
-                      if (audio.readyState === 0) {
-                        // Audio hasn't started loading, load it now
-                        audio.load();
-                        // Wait a bit for it to start loading (mobile Chrome needs this)
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                      }
-                      
-                      // Call play() directly from click handler (required for mobile Chrome)
-                      const playPromise = audio.play();
-                      if (playPromise !== undefined) {
-                        await playPromise;
-                      }
-                      // Success - update state
-                      onPlayPause();
-                    } catch (error) {
-                      console.error('[SpotifyPlayer] Play failed:', error);
-                      // Still update state - user can try again
-                      onPlayPause();
-                    }
-                  } else {
-                    onPlayPause();
-                  }
-                } else {
-                  // Already playing, just pause
-                  if (audio) {
-                    audio.pause();
-                  }
-                  onPlayPause();
-                }
-              }}
+              onClick={onPlayPause}
               size="icon"
               className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 hover:scale-105 transition-all shadow-lg"
               aria-label={isPlaying ? 'Pause' : 'Play'}
