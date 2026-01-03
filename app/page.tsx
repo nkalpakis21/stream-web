@@ -1,10 +1,9 @@
-import { getPublicSongs, getTopSongs, getArtistNamesForSongs, getAudioUrlsForSongs } from '@/lib/services/songs';
+import { getPublicSongs, getTopSongs, getArtistNamesForSongs } from '@/lib/services/songs';
 import { getPublicArtists } from '@/lib/services/artists';
 import { SongCard } from '@/components/songs/SongCard';
 import { ArtistCard } from '@/components/artists/ArtistCard';
 import { Nav } from '@/components/navigation/Nav';
 import { HeroCTA } from '@/components/homepage/HeroCTA';
-import { AudioPreloader } from '@/components/songs/AudioPreloader';
 
 // ISR: Revalidate every 2 minutes (120 seconds)
 export const revalidate = 120;
@@ -18,12 +17,10 @@ export default async function HomePage() {
     getTopSongs(50),
   ]);
 
-  // Fetch artist names and audio URLs for songs
-  const [songArtistMap, topSongArtistMap, songAudioMap, topSongAudioMap] = await Promise.all([
+  // Fetch artist names for songs
+  const [songArtistMap, topSongArtistMap] = await Promise.all([
     getArtistNamesForSongs(songs),
     getArtistNamesForSongs(topSongs),
-    getAudioUrlsForSongs(songs),
-    getAudioUrlsForSongs(topSongs),
   ]);
 
   return (
@@ -52,24 +49,15 @@ export default async function HomePage() {
             <h2 className="text-3xl font-bold tracking-tight">Latest Songs</h2>
           </div>
           {songs.length > 0 ? (
-            <>
-              {/* Audio Preloader - Preloads audio files for instant playback */}
-              <AudioPreloader 
-                songs={songs.map(song => ({
-                  id: song.id,
-                  audioUrl: songAudioMap.get(song.id) || null,
-                }))}
-              />
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {songs.map(song => (
-                  <SongCard 
-                    key={song.id} 
-                    song={song} 
-                    artistName={songArtistMap.get(song.id)}
-                  />
-                ))}
-              </div>
-            </>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {songs.map(song => (
+                <SongCard 
+                  key={song.id} 
+                  song={song} 
+                  artistName={songArtistMap.get(song.id)}
+                />
+              ))}
+            </div>
           ) : (
             <div className="py-16 text-center">
               <p className="text-muted-foreground text-lg">
@@ -105,24 +93,15 @@ export default async function HomePage() {
             <h2 className="text-3xl font-bold tracking-tight">Top Songs</h2>
           </div>
           {topSongs.length > 0 ? (
-            <>
-              {/* Audio Preloader - Preloads audio files for instant playback */}
-              <AudioPreloader 
-                songs={topSongs.map(song => ({
-                  id: song.id,
-                  audioUrl: topSongAudioMap.get(song.id) || null,
-                }))}
-              />
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {topSongs.map(song => (
-                  <SongCard 
-                    key={song.id} 
-                    song={song} 
-                    artistName={topSongArtistMap.get(song.id)}
-                  />
-                ))}
-              </div>
-            </>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {topSongs.map(song => (
+                <SongCard 
+                  key={song.id} 
+                  song={song} 
+                  artistName={topSongArtistMap.get(song.id)}
+                />
+              ))}
+            </div>
           ) : (
             <div className="py-16 text-center">
               <p className="text-muted-foreground text-lg">

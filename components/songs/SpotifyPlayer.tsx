@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { X, Play, Pause, Volume2 } from 'lucide-react';
-import { getProxiedAudioUrl } from '@/lib/utils/audioProxy';
 
 interface SpotifyPlayerProps {
   songTitle: string;
@@ -26,9 +25,6 @@ export function SpotifyPlayer({
   onPlayPause,
   onClose,
 }: SpotifyPlayerProps) {
-  // Convert to proxied URL for caching (doesn't affect play logic)
-  const proxiedAudioUrl = getProxiedAudioUrl(audioUrl) || audioUrl;
-  
   const audioRef = useRef<HTMLAudioElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -40,20 +36,6 @@ export function SpotifyPlayer({
   const rafRef = useRef<number | null>(null);
   const previousBottomRef = useRef<string>('0px');
   const viewportResizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Load audio when audioUrl changes
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !proxiedAudioUrl) return;
-
-    // Explicitly set src before loading (ensures it's set before load() is called)
-    if (audio.src !== proxiedAudioUrl) {
-      audio.src = proxiedAudioUrl;
-    }
-    
-    // Load the new audio source when URL changes
-    audio.load();
-  }, [proxiedAudioUrl]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -95,17 +77,17 @@ export function SpotifyPlayer({
       audio.removeEventListener('ended', handleEnded);
       window.removeEventListener('lyrics-seek', handleLyricsSeek);
     };
-  }, [proxiedAudioUrl, onPlayPause]);
+  }, [audioUrl, onPlayPause]);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    // Only handle pause from useEffect (play is handled directly in click handler for mobile Chrome)
-    if (!isPlaying) {
+    if (isPlaying) {
+      audio.play().catch(console.error);
+    } else {
       audio.pause();
     }
-    // Note: We don't call play() here because mobile Chrome requires it to be called directly from user interaction
   }, [isPlaying]);
 
   useEffect(() => {
@@ -309,7 +291,7 @@ export function SpotifyPlayer({
         paddingBottom: 'max(0px, env(safe-area-inset-bottom))'
       }}
     >
-      <audio ref={audioRef} src={proxiedAudioUrl} preload="metadata" />
+      <audio ref={audioRef} src={audioUrl} preload="metadata" />
       
       <div className="max-w-7xl mx-auto px-4 py-3">
         {/* Progress Bar */}
@@ -352,67 +334,7 @@ export function SpotifyPlayer({
           {/* Center: Play/Pause Button */}
           <div className="flex items-center gap-2">
             <Button
-              onClick={async (e) => {
-                const audio = audioRef.current;
-                
-                if (!isPlaying) {
-                  // Mobile Chrome requires play() to be called directly from click
-                  if (!audio) {
-                    onPlayPause(); // Just toggle state if no audio element
-                    return;
-                  }
-                  
-                  try {
-                    // Wait for audio to be ready before playing (needed for proxy)
-                    const waitForReady = () => {
-                      return new Promise<void>((resolve) => {
-                        // If already ready, resolve immediately
-                        if (audio.readyState >= 2) {
-                          resolve();
-                          return;
-                        }
-                        
-                        // Wait for canplay or loadeddata event
-                        const handleReady = () => {
-                          audio.removeEventListener('canplay', handleReady);
-                          audio.removeEventListener('canplaythrough', handleReady);
-                          audio.removeEventListener('loadeddata', handleReady);
-                          resolve();
-                        };
-                        
-                        audio.addEventListener('canplay', handleReady);
-                        audio.addEventListener('canplaythrough', handleReady);
-                        audio.addEventListener('loadeddata', handleReady);
-                        
-                        // Ensure audio is loading - if not, start loading
-                        if (audio.readyState === 0 || audio.networkState === 0) {
-                          audio.load();
-                        }
-                      });
-                    };
-                    
-                    // Wait for ready, then play directly from click handler (mobile requirement)
-                    await waitForReady();
-                    const playPromise = audio.play();
-                    if (playPromise !== undefined) {
-                      await playPromise;
-                    }
-                    
-                    // Success - update state
-                    onPlayPause();
-                  } catch (error) {
-                    console.error('[SpotifyPlayer] Play failed:', error);
-                    // Still update state - user can try again
-                    onPlayPause();
-                  }
-                } else {
-                  // Already playing, just pause
-                  if (audio) {
-                    audio.pause();
-                  }
-                  onPlayPause();
-                }
-              }}
+              onClick={onPlayPause}
               size="icon"
               className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 hover:scale-105 transition-all shadow-lg"
               aria-label={isPlaying ? 'Pause' : 'Play'}
