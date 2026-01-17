@@ -6,6 +6,8 @@ import { db } from '@/lib/firebase/config';
 import type { SongDocument, SongVersionDocument } from '@/types/firestore';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { setPrimarySongVersion } from '@/lib/services/songs';
+import { useToast, ToastContainer } from '@/components/ui/toast';
+import { Star, StarOff } from 'lucide-react';
 
 // Serialized versions for client components (Timestamps converted to numbers)
 type SerializedSongVersionDocument = Omit<SongVersionDocument, 'createdAt'> & {
@@ -32,6 +34,7 @@ export function SongVersionsSection({
   const { user } = useAuth();
   const [versions, setVersions] = useState<SerializedSongVersionDocument[]>(initialVersions);
   const [updatingPrimary, setUpdatingPrimary] = useState<string | null>(null);
+  const { toasts, showToast, dismissToast } = useToast();
 
   const isOwner = user?.uid === song.ownerId;
 
@@ -80,9 +83,11 @@ export function SongVersionsSection({
     setUpdatingPrimary(versionId);
     try {
       await setPrimarySongVersion(song.id, versionId);
+      showToast('Primary version updated successfully', 'success');
     } catch (error) {
       console.error('Failed to set primary version', error);
-      alert('Failed to set primary version. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to set primary version. Please try again.';
+      showToast(errorMessage, 'error');
     } finally {
       setUpdatingPrimary(null);
     }
@@ -91,47 +96,74 @@ export function SongVersionsSection({
   const hasAnyAudio = playableVersions.length > 0;
 
   return (
-    <section className="mb-12">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold tracking-tight">Versions</h2>
-        {hasPendingGeneration && !hasAnyAudio && (
-          <span className="text-sm text-muted-foreground flex items-center gap-2">
-            <span className="w-2 h-2 bg-accent rounded-full animate-pulse" />
-            Generating…
-          </span>
-        )}
-      </div>
+    <>
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold tracking-tight">Versions</h2>
+          {hasPendingGeneration && !hasAnyAudio && (
+            <span className="text-sm text-muted-foreground flex items-center gap-2">
+              <span className="w-2 h-2 bg-accent rounded-full animate-pulse" />
+              Generating…
+            </span>
+          )}
+        </div>
 
-      {hasAnyAudio ? (
-        <div className="space-y-4">
-          {playableVersions.map((version, index) => {
-            const label = String.fromCharCode('A'.charCodeAt(0) + index);
-            const isPrimary = version.id === primaryVersionId;
+        {hasAnyAudio ? (
+          <div className="space-y-4">
+            {playableVersions.map((version, index) => {
+              const label = String.fromCharCode('A'.charCodeAt(0) + index);
+              const isPrimary = version.id === primaryVersionId;
 
-            return (
-              <div
-                key={version.id}
-                className="bg-card rounded-2xl p-6 shadow-soft border border-border/50"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg font-semibold">Version {label}</span>
-                    {isPrimary && (
-                      <span className="px-3 py-1 text-xs font-medium rounded-full bg-accent/10 text-accent border border-accent/20">
-                        Primary
-                      </span>
+              return (
+                <div
+                  key={version.id}
+                  className={`bg-card rounded-2xl p-6 shadow-soft border transition-all duration-200 ${
+                    isPrimary
+                      ? 'border-accent/50 bg-accent/5 shadow-lg'
+                      : 'border-border/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg font-semibold">Version {label}</span>
+                      {isPrimary && (
+                        <span className="px-3 py-1.5 text-xs font-medium rounded-full bg-accent/20 text-accent border border-accent/30 flex items-center gap-1.5">
+                          <Star className="w-3 h-3 fill-accent" />
+                          Primary
+                        </span>
+                      )}
+                    </div>
+                    {isOwner && (
+                      <button
+                        onClick={() => handleSetPrimary(version.id)}
+                        disabled={updatingPrimary === version.id || isPrimary}
+                        className={`flex items-center gap-2 text-sm px-4 py-2 rounded-full border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                          isPrimary
+                            ? 'border-accent/30 bg-accent/10 text-accent cursor-default'
+                            : 'border-border hover:bg-muted hover:border-accent/20 text-muted-foreground hover:text-foreground'
+                        }`}
+                        aria-label={isPrimary ? 'Current primary version' : 'Set as primary version'}
+                      >
+                        {updatingPrimary === version.id ? (
+                          <>
+                            <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            Updating…
+                          </>
+                        ) : isPrimary ? (
+                          <>
+                            <Star className="w-4 h-4 fill-accent" />
+                            Primary
+                          </>
+                        ) : (
+                          <>
+                            <StarOff className="w-4 h-4" />
+                            Set as Primary
+                          </>
+                        )}
+                      </button>
                     )}
                   </div>
-                  {isOwner && !isPrimary && (
-                    <button
-                      onClick={() => handleSetPrimary(version.id)}
-                      disabled={updatingPrimary === version.id}
-                      className="text-sm px-4 py-2 rounded-full border border-border hover:bg-muted hover:border-accent/20 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground"
-                    >
-                      {updatingPrimary === version.id ? 'Updating…' : 'Set as Primary'}
-                    </button>
-                  )}
-                </div>
 
                 <div className="space-y-3">
                   <div className="relative">
@@ -183,7 +215,8 @@ export function SongVersionsSection({
           </div>
         </div>
       )}
-    </section>
+      </section>
+    </>
   );
 }
 

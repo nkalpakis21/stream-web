@@ -205,6 +205,11 @@ export async function createSongVersion(
   const versionRef = doc(collection(db, COLLECTIONS.songVersions));
   const versionId = versionRef.id;
 
+  // Get all versions to determine if this should be primary
+  const allVersions = await getSongVersions(songId);
+  const hasPrimary = allVersions.some(v => v.isPrimary);
+  
+  // New version should only be primary if no primary exists (first version case)
   const newVersion: SongVersionDocument = {
     id: versionId,
     songId,
@@ -215,22 +220,25 @@ export async function createSongVersion(
     parentVersionId: currentVersion.id,
     audioURL: null,
     providerOutputId: null,
-    isPrimary: true,
+    isPrimary: !hasPrimary, // Only set as primary if no primary exists
   };
 
   await setDoc(versionRef, newVersion);
 
-  // Update song to point to new version
+  // Only update song.currentVersionId if this is the primary version
+  // Otherwise, keep the existing primary version as currentVersionId
   const songRef = doc(db, getSongPath(songId));
-  await setDoc(
-    songRef,
-    {
-      title: newVersion.title,
-      currentVersionId: versionId,
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
+  const updateData: Partial<SongDocument> = {
+    title: newVersion.title,
+    updatedAt: serverTimestamp(),
+  };
+  
+  // If this is the primary version, update currentVersionId
+  if (newVersion.isPrimary) {
+    updateData.currentVersionId = versionId;
+  }
+  
+  await setDoc(songRef, updateData, { merge: true });
 
   return newVersion;
 }
@@ -461,24 +469,52 @@ export async function getTopSongs(
  * - The `currentVersionId` field on the song document
  *
  * Writes are performed in a single batch for basic atomicity.
+ *
+ * @throws Error if song not found, version not found, or version doesn't belong to song
  */
 export async function setPrimarySongVersion(
   songId: string,
   versionId: string
 ): Promise<void> {
+  // Validate song exists
+  const song = await getSong(songId);
+  if (!song) {
+    throw new Error(`Song ${songId} not found`);
+  }
+  if (song.deletedAt) {
+    throw new Error('Cannot set primary version for deleted song');
+  }
+
+  // Get all versions for the song
   const versionsQuery = query(
     collection(db, COLLECTIONS.songVersions),
     where('songId', '==', songId)
   );
   const versionsSnapshot = await getDocs(versionsQuery);
 
+  if (versionsSnapshot.empty) {
+    throw new Error(`No versions found for song ${songId}`);
+  }
+
+  // Validate that the target version exists and belongs to this song
+  const targetVersion = versionsSnapshot.docs.find(doc => doc.id === versionId);
+  if (!targetVersion) {
+    throw new Error(`Version ${versionId} not found or does not belong to song ${songId}`);
+  }
+
+  // Check if version already has audio (optional validation - versions without audio can still be primary)
+  const versionData = targetVersion.data() as SongVersionDocument;
+  
+  // Create batch update
   const batch = writeBatch(db);
 
+  // Update all versions: set isPrimary based on whether it's the target
   versionsSnapshot.docs.forEach(docSnapshot => {
     const isTarget = docSnapshot.id === versionId;
     batch.update(docSnapshot.ref, { isPrimary: isTarget });
   });
 
+  // Update song to point to primary version
   const songRef = doc(db, getSongPath(songId));
   batch.update(songRef, {
     currentVersionId: versionId,
@@ -486,6 +522,111 @@ export async function setPrimarySongVersion(
   });
 
   await batch.commit();
+}
+
+/**
+ * Ensure primary version consistency for a song.
+ * 
+ * Fixes common inconsistencies:
+ * - No primary version: Sets currentVersionId version as primary (or first version)
+ * - Multiple primary versions: Keeps one matching currentVersionId (or oldest)
+ * - currentVersionId mismatch: Updates to match primary version
+ * 
+ * @param songId - The song ID to check and fix
+ * @returns Object with information about what was fixed
+ */
+export async function ensurePrimaryVersionConsistency(
+  songId: string
+): Promise<{
+  fixed: boolean;
+  issues: string[];
+  actionTaken: string | null;
+}> {
+  const song = await getSong(songId);
+  if (!song || song.deletedAt) {
+    return {
+      fixed: false,
+      issues: ['Song not found or deleted'],
+      actionTaken: null,
+    };
+  }
+
+  const versions = await getSongVersions(songId);
+  if (versions.length === 0) {
+    return {
+      fixed: false,
+      issues: ['No versions found'],
+      actionTaken: null,
+    };
+  }
+
+  const primaryVersions = versions.filter(v => v.isPrimary);
+  const issues: string[] = [];
+  let actionTaken: string | null = null;
+
+  // Check for issues
+  if (primaryVersions.length === 0) {
+    issues.push('No primary version found');
+  } else if (primaryVersions.length > 1) {
+    issues.push(`Multiple primary versions found (${primaryVersions.length})`);
+  }
+
+  const currentPrimary = primaryVersions.find(v => v.id === song.currentVersionId);
+  if (!currentPrimary && primaryVersions.length > 0) {
+    issues.push('currentVersionId does not match primary version');
+  }
+
+  // If no issues, return early
+  if (issues.length === 0) {
+    return {
+      fixed: false,
+      issues: [],
+      actionTaken: null,
+    };
+  }
+
+  // Fix issues
+  const batch = writeBatch(db);
+  let targetVersionId: string;
+
+  if (primaryVersions.length === 0) {
+    // No primary: use currentVersionId if valid, else first version
+    const currentVersion = versions.find(v => v.id === song.currentVersionId);
+    targetVersionId = currentVersion?.id || versions[0].id;
+    actionTaken = `Set version ${targetVersionId} as primary (no primary existed)`;
+  } else if (primaryVersions.length > 1) {
+    // Multiple primaries: keep one matching currentVersionId, or oldest
+    const matchingCurrent = primaryVersions.find(v => v.id === song.currentVersionId);
+    targetVersionId = matchingCurrent?.id || primaryVersions[0].id;
+    actionTaken = `Fixed multiple primaries, kept version ${targetVersionId}`;
+  } else {
+    // One primary but currentVersionId mismatch
+    targetVersionId = primaryVersions[0].id;
+    actionTaken = `Updated currentVersionId to match primary version`;
+  }
+
+  // Update all versions
+  versions.forEach(version => {
+    const versionRef = doc(db, getSongVersionPath(version.id));
+    batch.update(versionRef, { isPrimary: version.id === targetVersionId });
+  });
+
+  // Update song currentVersionId if needed
+  if (song.currentVersionId !== targetVersionId) {
+    const songRef = doc(db, getSongPath(songId));
+    batch.update(songRef, {
+      currentVersionId: targetVersionId,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  await batch.commit();
+
+  return {
+    fixed: true,
+    issues,
+    actionTaken,
+  };
 }
 
 /**

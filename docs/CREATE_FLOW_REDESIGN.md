@@ -248,3 +248,4 @@ router.push(`/songs/${song.id}`);
 3. **User manually navigates**: URL params handle state correctly
 4. **Mobile experience**: Progress indicator adapts to smaller screens
 
+

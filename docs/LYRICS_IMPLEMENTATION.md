@@ -161,3 +161,4 @@ LyricsSection → LyricsViewer → LyricsLine
 
 *Implementation completed following the design document in `LYRICS_DESIGN.md`*
 
+

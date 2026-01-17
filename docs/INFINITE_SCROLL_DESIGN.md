@@ -260,3 +260,4 @@ function useInfiniteSongs(query?: string): {
 
 *This design prioritizes clarity, performance, and user delight—core Apple design principles.*
 
+

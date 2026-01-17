@@ -35,8 +35,17 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
     };
   }
 
+  // Get all versions to find primary version
+  const versions = await getSongVersions(song.id);
+  
+  // Find primary version, fallback to currentVersionId, then first version
+  const primaryVersion = versions.find(v => v.isPrimary && v.audioURL) || 
+                         versions.find(v => v.id === song.currentVersionId && v.audioURL) ||
+                         versions.find(v => v.audioURL) ||
+                         null;
+  
   const [songVersion, artist] = await Promise.all([
-    getSongVersion(song.currentVersionId),
+    getSongVersion(primaryVersion?.id || song.currentVersionId),
     getArtist(song.artistId),
   ]);
 
@@ -88,16 +97,25 @@ export default async function SongPage({ params }: SongPageProps) {
   // Check if song is public or user has access
   // TODO: Add auth check for private songs
 
-  const [songVersion, artist, versions, generations] = await Promise.all([
-    getSongVersion(song.currentVersionId),
+  const [artist, allVersions, generations] = await Promise.all([
     getArtist(song.artistId),
     getSongVersions(song.id),
     getSongGenerations(song.id),
   ]);
 
+  // Find primary version for display - prioritize primary with audio, then currentVersionId, then any version
+  const primaryVersion = allVersions.find(v => v.isPrimary && v.audioURL) || 
+                         allVersions.find(v => v.id === song.currentVersionId && v.audioURL) ||
+                         allVersions.find(v => v.audioURL) ||
+                         null;
+  
+  const songVersion = primaryVersion || allVersions.find(v => v.id === song.currentVersionId) || allVersions[0];
+  
   if (!songVersion) {
     notFound();
   }
+
+  const versions = allVersions;
 
   const latestGeneration = generations.find(g => g.status === 'completed');
   const hasPendingGeneration = generations.some(g => g.status === 'pending' || g.status === 'processing');
@@ -121,10 +139,7 @@ export default async function SongPage({ params }: SongPageProps) {
 
   const coverImageUrl = song.albumCoverThumbnail || song.albumCoverPath;
   
-  // Find the primary version with audio, or fall back to any version with audio
-  const primaryVersion = versions.find(v => v.isPrimary && v.audioURL) || 
-                         versions.find(v => v.audioURL) || 
-                         null;
+  // Use primary version audio URL (already found above)
   const primaryAudioUrl = primaryVersion?.audioURL || null;
 
   // Get lyrics from generations
@@ -212,6 +227,8 @@ export default async function SongPage({ params }: SongPageProps) {
           albumCoverUrl={coverImageUrl}
           initialVersions={serializedVersions}
           hasPendingGeneration={hasPendingGeneration}
+          songId={song.id}
+          ownerId={song.ownerId}
         />
 
         {/* Developer Section */}
