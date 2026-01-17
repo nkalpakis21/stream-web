@@ -72,18 +72,43 @@ export async function createSongReadyNotification(params: {
 export async function getUnreadNotifications(
   userId: string
 ): Promise<NotificationDocument[]> {
-  const q = query(
-    collection(db, COLLECTIONS.notifications),
-    where('userId', '==', userId),
-    where('read', '==', false),
-    orderBy('createdAt', 'desc')
-  );
+  try {
+    const q = query(
+      collection(db, COLLECTIONS.notifications),
+      where('userId', '==', userId),
+      where('read', '==', false),
+      orderBy('createdAt', 'desc')
+    );
 
-  const snapshot = await getDocs(q);
-  // Handle both null and undefined (for older documents without deletedAt field)
-  return snapshot.docs
-    .map(doc => doc.data() as NotificationDocument)
-    .filter(notif => !notif.deletedAt);
+    const snapshot = await getDocs(q);
+    // Handle both null and undefined (for older documents without deletedAt field)
+    return snapshot.docs
+      .map(doc => doc.data() as NotificationDocument)
+      .filter(notif => !notif.deletedAt);
+  } catch (error: any) {
+    // Fallback if composite index doesn't exist
+    if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
+      console.warn('[getUnreadNotifications] Composite index missing, using fallback');
+      
+      // Fallback query without orderBy
+      const fallbackQuery = query(
+        collection(db, COLLECTIONS.notifications),
+        where('userId', '==', userId),
+        where('read', '==', false)
+      );
+      
+      const snapshot = await getDocs(fallbackQuery);
+      const notifications = snapshot.docs
+        .map(doc => doc.data() as NotificationDocument)
+        .filter(notif => !notif.deletedAt);
+      
+      // Sort in memory by createdAt descending
+      return notifications.sort((a, b) => 
+        b.createdAt.toMillis() - a.createdAt.toMillis()
+      );
+    }
+    throw error;
+  }
 }
 
 /**
