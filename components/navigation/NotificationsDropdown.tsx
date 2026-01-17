@@ -67,12 +67,25 @@ export function NotificationsDropdown({ isOpen, onClose }: NotificationsDropdown
   }, [isOpen, onClose]);
 
   const handleNotificationClick = async (notification: SerializedNotificationDocument) => {
-    // Mark as read
-    await markNotificationRead(notification.id);
-    
-    // Navigate to song
-    router.push(`/songs/${notification.songId}`);
-    onClose();
+    try {
+      // Mark as read
+      await markNotificationRead(notification.id);
+      
+      // Remove from local state immediately for better UX
+      setNotifications(prev => prev.filter(n => n.id !== notification.id));
+      
+      // Small delay to ensure Firestore update propagates before navigation
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Navigate to song
+      router.push(`/songs/${notification.songId}`);
+      onClose();
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+      // Still navigate even if marking as read fails
+      router.push(`/songs/${notification.songId}`);
+      onClose();
+    }
   };
 
   if (!isOpen) return null;

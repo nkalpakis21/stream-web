@@ -136,8 +136,17 @@ export async function getNotificationsBySong(
 export async function markNotificationRead(
   notificationId: string
 ): Promise<void> {
-  const ref = doc(db, getNotificationPath(notificationId));
-  await updateDoc(ref, { read: true });
+  try {
+    const ref = doc(db, getNotificationPath(notificationId));
+    await updateDoc(ref, { read: true });
+  } catch (error: any) {
+    console.error('[markNotificationRead] Failed to mark notification as read:', {
+      notificationId,
+      error: error?.message,
+      code: error?.code,
+    });
+    throw error;
+  }
 }
 
 

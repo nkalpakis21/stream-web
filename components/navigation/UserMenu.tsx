@@ -7,7 +7,9 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { getInitials } from '@/lib/utils/avatar';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import { COLLECTIONS } from '@/lib/firebase/collections';
 import type { NotificationDocument } from '@/types/firestore';
+import { getUnreadNotifications } from '@/lib/services/notifications';
 import { NotificationsDropdown } from './NotificationsDropdown';
 
 export function UserMenu() {
@@ -30,17 +32,27 @@ export function UserMenu() {
     }
 
     const q = query(
-      collection(db, 'notifications'),
+      collection(db, COLLECTIONS.notifications),
       where('userId', '==', user.uid),
       where('read', '==', false)
     );
 
-    const unsubscribe = onSnapshot(q, snapshot => {
-      const items = snapshot.docs
-        .map(doc => doc.data() as NotificationDocument)
-        .filter(notif => !notif.deletedAt);
-      setUnreadCount(items.length);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      snapshot => {
+        const items = snapshot.docs
+          .map(doc => doc.data() as NotificationDocument)
+          .filter(notif => !notif.deletedAt);
+        setUnreadCount(items.length);
+      },
+      error => {
+        console.error('[UserMenu] Error listening to notifications:', error);
+        // On error, try to fetch count manually as fallback
+        getUnreadNotifications(user.uid)
+          .then(notifications => setUnreadCount(notifications.length))
+          .catch(err => console.error('[UserMenu] Failed to fetch notification count:', err));
+      }
+    );
 
     return unsubscribe;
   }, [user]);
