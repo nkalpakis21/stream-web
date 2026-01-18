@@ -9,8 +9,11 @@ import { Edit2, Trash2, X, Check } from 'lucide-react';
 interface CommentActionsProps {
   comment: {
     id: string;
-    content: string;
+    targetType: 'artist' | 'song';
+    targetId: string;
     authorId: string;
+    content: string;
+    parentCommentId: string | null;
     createdAt: number;
     updatedAt: number;
     deletedAt: number | null;
