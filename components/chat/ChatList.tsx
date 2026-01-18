@@ -242,7 +242,8 @@ export function ChatList({ selectedConversationId, onSelectConversation, onNewCh
               </div>
             );
           } else {
-            displayName = `Group (${conv.participants.length})`;
+            // For group chats, use custom title or default
+            displayName = conv.title || `Group (${conv.participants.length})`;
             avatarElement = (
               <div className="flex-shrink-0 w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
                 <Users className="w-5 h-5 text-accent" />

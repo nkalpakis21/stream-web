@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
       createdAt: conv.createdAt.toMillis(),
       updatedAt: conv.updatedAt.toMillis(),
       lastMessageAt: conv.lastMessageAt ? conv.lastMessageAt.toMillis() : null,
+      // artistIds is already an array of strings, no serialization needed
     }));
 
     return NextResponse.json({
@@ -53,11 +54,13 @@ export async function GET(request: NextRequest) {
  * - participants: string[] (required)
  * - type: 'direct' | 'group' (optional, default: 'direct')
  * - artistId: string (optional, required for artist conversations)
+ * - artistIds: string[] (optional, for group chats with multiple artists)
+ * - createdBy: string (optional, user ID of creator - will be extracted from auth if not provided)
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { participants, type = 'direct', artistId } = body;
+    const { participants, type = 'direct', artistId, artistIds, createdBy } = body;
 
     if (!participants || !Array.isArray(participants) || participants.length < 2) {
       return NextResponse.json(
@@ -66,7 +69,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const conversation = await createConversation(participants, type, artistId);
+    // Extract userId from header or use provided createdBy
+    const userId = createdBy || request.headers.get('x-user-id') || request.nextUrl.searchParams.get('userId');
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'User ID is required (createdBy or x-user-id header)' },
+        { status: 400 }
+      );
+    }
+
+    const conversation = await createConversation(participants, type, artistId, userId, artistIds);
 
     // Serialize Timestamps for client
     const serialized = {
@@ -74,6 +87,7 @@ export async function POST(request: NextRequest) {
       createdAt: conversation.createdAt.toMillis(),
       updatedAt: conversation.updatedAt.toMillis(),
       lastMessageAt: conversation.lastMessageAt ? conversation.lastMessageAt.toMillis() : null,
+      // artistIds is already an array of strings, no serialization needed
     };
 
     return NextResponse.json({

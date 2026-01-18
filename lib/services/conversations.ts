@@ -34,7 +34,9 @@ import type { ConversationDocument } from '@/types/firestore';
 export async function createConversation(
   participants: string[],
   type: 'direct' | 'group' = 'direct',
-  artistId?: string
+  artistId?: string,
+  createdBy?: string,
+  artistIds?: string[]
 ): Promise<ConversationDocument> {
   // Validate participants
   if (participants.length < 2) {
@@ -64,7 +66,7 @@ export async function createConversation(
 
   const now = Timestamp.now();
 
-  // Build conversation object, only including artistId if it's defined
+  // Build conversation object, only including optional fields if they're defined
   const conversation: ConversationDocument = {
     id: conversationId,
     type,
@@ -75,9 +77,15 @@ export async function createConversation(
     lastMessagePreview: null,
   };
 
-  // Only include artistId if it's defined (not undefined)
+  // Only include optional fields if they're defined (not undefined)
   if (artistId !== undefined) {
     conversation.artistId = artistId;
+  }
+  if (createdBy !== undefined) {
+    conversation.createdBy = createdBy;
+  }
+  if (artistIds !== undefined && artistIds.length > 0) {
+    conversation.artistIds = artistIds;
   }
 
   await setDoc(conversationRef, conversation);
@@ -344,6 +352,46 @@ export async function updateConversationLastMessage(
   await updateDoc(conversationRef, {
     lastMessageAt: serverTimestamp(),
     lastMessagePreview: messagePreview.substring(0, 100), // Limit preview length
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Update conversation title (creator only)
+ */
+export async function updateConversationTitle(
+  conversationId: string,
+  title: string,
+  requesterId: string
+): Promise<void> {
+  const conversation = await getConversation(conversationId);
+  if (!conversation) {
+    throw new Error('Conversation not found');
+  }
+
+  // Only creator can update title
+  if (conversation.createdBy !== requesterId) {
+    throw new Error('Only the creator can update the conversation title');
+  }
+
+  // Validate title
+  const trimmedTitle = title.trim();
+  if (trimmedTitle.length === 0) {
+    throw new Error('Title cannot be empty');
+  }
+  if (trimmedTitle.length > 100) {
+    throw new Error('Title must be 100 characters or less');
+  }
+
+  // Validate title format (letters, numbers, spaces, hyphens, underscores)
+  const allowedPattern = /^[a-zA-Z0-9\s\-_]+$/;
+  if (!allowedPattern.test(trimmedTitle)) {
+    throw new Error('Title can only contain letters, numbers, spaces, hyphens, and underscores');
+  }
+
+  const conversationRef = doc(db, getConversationPath(conversationId));
+  await updateDoc(conversationRef, {
+    title: trimmedTitle,
     updatedAt: serverTimestamp(),
   });
 }

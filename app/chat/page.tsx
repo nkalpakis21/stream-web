@@ -62,11 +62,15 @@ function ChatPageContent() {
 
       const conversationResponse = await fetch('/api/conversations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': user.uid, // Pass user ID for creator tracking
+        },
         body: JSON.stringify({
           participants: uniqueParticipants,
           type: conversationType,
           artistId: artistId, // Pass artistId for artist-centric conversations
+          artistIds: conversationType === 'group' ? artistIds : undefined, // Pass artistIds for group chats
         }),
       });
 

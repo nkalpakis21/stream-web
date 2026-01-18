@@ -242,6 +242,9 @@ export interface ConversationDocument {
   participants: string[]; // User IDs (for backward compatibility and message routing)
   artistId?: string; // Artist ID (required for direct conversations with artists)
   ownerId?: string; // User ID who owns the artist (for grouping conversations)
+  createdBy?: string; // User ID of the conversation creator
+  title?: string; // Custom title for group chats (optional)
+  artistIds?: string[]; // Array of artist IDs in the conversation (for group chats with multiple artists)
   createdAt: Timestamp;
   updatedAt: Timestamp;
   lastMessageAt: Timestamp | null;
