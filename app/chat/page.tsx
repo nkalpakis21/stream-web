@@ -45,7 +45,7 @@ function ChatPageContent() {
         artistId: artist.id,
         ownerId: artist.ownerId,
       }));
-      const ownerIds = artistData.map(a => a.ownerId);
+      const ownerIds = artistData.map((a: { artistId: string; ownerId: string }) => a.ownerId);
       
       // Ensure current user is included in participants
       const participants = [user.uid, ...ownerIds];
