@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Nav } from '@/components/navigation/Nav';
 import { ChatList } from '@/components/chat/ChatList';
@@ -9,7 +9,7 @@ import { NewChatModal } from '@/components/chat/NewChatModal';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast, ToastContainer } from '@/components/ui/toast';
 
-export default function ChatPage() {
+function ChatPageContent() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -136,5 +136,22 @@ export default function ChatPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background">
+        <Nav />
+        <main className="max-w-7xl mx-auto px-6 lg:px-8 py-8 lg:py-12">
+          <div className="text-center">
+            <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin mx-auto" />
+          </div>
+        </main>
+      </div>
+    }>
+      <ChatPageContent />
+    </Suspense>
   );
 }
