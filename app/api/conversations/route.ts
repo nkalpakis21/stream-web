@@ -52,11 +52,12 @@ export async function GET(request: NextRequest) {
  * Body:
  * - participants: string[] (required)
  * - type: 'direct' | 'group' (optional, default: 'direct')
+ * - artistId: string (optional, required for artist conversations)
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { participants, type = 'direct' } = body;
+    const { participants, type = 'direct', artistId } = body;
 
     if (!participants || !Array.isArray(participants) || participants.length < 2) {
       return NextResponse.json(
@@ -65,7 +66,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const conversation = await createConversation(participants, type);
+    // If artistId is provided, validate that the user is following the artist
+    if (artistId) {
+      const { isFollowing } = await import('@/lib/services/follows');
+      const userId = participants.find((id: string) => id !== participants[0]) || participants[0];
+      const follow = await isFollowing(userId, artistId);
+      if (!follow) {
+        return NextResponse.json(
+          { error: 'You must follow the artist before starting a conversation' },
+          { status: 403 }
+        );
+      }
+    }
+
+    const conversation = await createConversation(participants, type, artistId);
 
     // Serialize Timestamps for client
     const serialized = {

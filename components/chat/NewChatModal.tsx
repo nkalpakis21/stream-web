@@ -2,19 +2,19 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { useUsersDisplayNames } from '@/hooks/useUserDisplayName';
 import { X, Search, UserPlus, Loader2, Check, Users } from 'lucide-react';
 import { getAvatarGradient, getInitials } from '@/lib/utils/avatar';
-import type { UserDocument } from '@/types/firestore';
+import type { AIArtistDocument } from '@/types/firestore';
+import Image from 'next/image';
 
 interface NewChatModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onStartChat: (userIds: string[], type: 'direct' | 'group') => void;
+  onStartChat: (artistIds: string[], type: 'direct' | 'group') => void;
 }
 
-// Serialized user for client
-type SerializedUserDocument = Omit<UserDocument, 'createdAt' | 'updatedAt' | 'deletedAt'> & {
+// Serialized artist for client
+type SerializedArtistDocument = Omit<AIArtistDocument, 'createdAt' | 'updatedAt' | 'deletedAt'> & {
   createdAt: number;
   updatedAt: number;
   deletedAt: number | null;
@@ -23,133 +23,84 @@ type SerializedUserDocument = Omit<UserDocument, 'createdAt' | 'updatedAt' | 'de
 export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps) {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-  const [users, setUsers] = useState<SerializedUserDocument[]>([]);
-  const [followedUsers, setFollowedUsers] = useState<SerializedUserDocument[]>([]);
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [artists, setArtists] = useState<SerializedArtistDocument[]>([]);
+  const [followedArtists, setFollowedArtists] = useState<SerializedArtistDocument[]>([]);
+  const [selectedArtistIds, setSelectedArtistIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingFollowed, setLoadingFollowed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get display names for users
-  const allUserIds = [...users, ...followedUsers].map(u => u.id);
-  const { displayNames } = useUsersDisplayNames(allUserIds);
-
-  // Load followed users on modal open
+  // Load followed artists on modal open
   useEffect(() => {
     if (!isOpen || !user) {
-      setFollowedUsers([]);
-      setSelectedUserIds([]);
+      setFollowedArtists([]);
+      setSelectedArtistIds([]);
       setSearchQuery('');
       setError(null);
       return;
     }
 
-    const loadFollowedUsers = async () => {
+    const loadFollowedArtists = async () => {
       setLoadingFollowed(true);
       try {
         const params = new URLSearchParams({
           userId: user.uid,
         });
 
-        const response = await fetch(`/api/users/followed?${params.toString()}`);
+        const response = await fetch(`/api/artists/followed?${params.toString()}`);
         
         if (!response.ok) {
           const data = await response.json();
-          throw new Error(data.error || 'Failed to load followed users');
+          throw new Error(data.error || 'Failed to load followed artists');
         }
 
         const data = await response.json();
-        setFollowedUsers(data.users || []);
+        setFollowedArtists(data.artists || []);
       } catch (err) {
-        console.error('Failed to load followed users:', err);
-        // Don't show error for followed users, just log it
+        console.error('Failed to load followed artists:', err);
+        // Don't show error for followed artists, just log it
       } finally {
         setLoadingFollowed(false);
       }
     };
 
-    loadFollowedUsers();
+    loadFollowedArtists();
   }, [isOpen, user]);
 
-  // Debounced search
-  useEffect(() => {
-    if (!isOpen || !user) {
-      setUsers([]);
-      return;
-    }
+  // Note: Artist search is not implemented yet - for now, only show followed artists
+  // In the future, we can add artist search functionality
 
-    const trimmedQuery = searchQuery.trim();
-    
-    if (!trimmedQuery || trimmedQuery.length === 0) {
-      setUsers([]);
-      setLoading(false);
-      return;
-    }
-
-    // Debounce search
-    const debounceTimer = setTimeout(async () => {
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const params = new URLSearchParams({
-          query: trimmedQuery,
-          limit: '10',
-          excludeUserId: user.uid,
-        });
-
-        const response = await fetch(`/api/users/search?${params.toString()}`);
-        
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Failed to search users');
-        }
-
-        const data = await response.json();
-        setUsers(data.users || []);
-      } catch (err) {
-        console.error('Failed to search users:', err);
-        setError(err instanceof Error ? err.message : 'Failed to search users');
-        setUsers([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(debounceTimer);
-  }, [searchQuery, isOpen, user]);
-
-  const handleToggleUser = useCallback((userId: string, e?: React.MouseEvent) => {
+  const handleToggleArtist = useCallback((artistId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     e?.preventDefault();
-    setSelectedUserIds(prev => {
-      if (prev.includes(userId)) {
-        return prev.filter(id => id !== userId);
+    setSelectedArtistIds(prev => {
+      if (prev.includes(artistId)) {
+        return prev.filter(id => id !== artistId);
       } else {
-        return [...prev, userId];
+        return [...prev, artistId];
       }
     });
   }, []);
 
-  const handleRemoveSelected = useCallback((userId: string) => {
-    setSelectedUserIds(prev => prev.filter(id => id !== userId));
+  const handleRemoveSelected = useCallback((artistId: string) => {
+    setSelectedArtistIds(prev => prev.filter(id => id !== artistId));
   }, []);
 
   const handleStartChat = useCallback(() => {
-    if (selectedUserIds.length === 0) return;
+    if (selectedArtistIds.length === 0) return;
 
-    const type = selectedUserIds.length === 1 ? 'direct' : 'group';
-    onStartChat(selectedUserIds, type);
+    const type = selectedArtistIds.length === 1 ? 'direct' : 'group';
+    onStartChat(selectedArtistIds, type);
     onClose();
-  }, [selectedUserIds, onStartChat, onClose]);
+  }, [selectedArtistIds, onStartChat, onClose]);
 
-  const isUserSelected = (userId: string) => selectedUserIds.includes(userId);
+  const isArtistSelected = (artistId: string) => selectedArtistIds.includes(artistId);
 
   if (!isOpen) return null;
 
-  const showFollowedUsers = searchQuery.trim().length === 0;
-  const displayUsers = showFollowedUsers ? followedUsers : users;
-  const hasResults = displayUsers.length > 0;
+  const showFollowedArtists = searchQuery.trim().length === 0;
+  const displayArtists = showFollowedArtists ? followedArtists : artists;
+  const hasResults = displayArtists.length > 0;
 
   return (
     <div 
@@ -171,40 +122,50 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
           </button>
         </div>
 
-        {/* Selected Users Chips */}
-        {selectedUserIds.length > 0 && (
+        {/* Selected Artists Chips */}
+        {selectedArtistIds.length > 0 && (
           <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
             <div className="flex items-center gap-2 mb-2">
               <Users className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium text-muted-foreground">
-                {selectedUserIds.length === 1 ? 'Direct Message' : `Group Chat (${selectedUserIds.length + 1})`}
+                {selectedArtistIds.length === 1 ? 'Direct Message' : `Group Chat (${selectedArtistIds.length + 1})`}
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
-              {selectedUserIds.map(userId => {
-                const userDoc = [...followedUsers, ...users].find(u => u.id === userId);
-                const displayName = userDoc 
-                  ? (displayNames.get(userId) || userDoc.displayName || userDoc.email?.split('@')[0] || 'User')
-                  : 'User';
-                const avatarBg = getAvatarGradient(displayName);
-                const initials = getInitials(displayName);
+              {selectedArtistIds.map(artistId => {
+                const artistDoc = [...followedArtists, ...artists].find(a => a.id === artistId);
+                const artistName = artistDoc?.name || 'Artist';
+                const avatarBg = getAvatarGradient(artistName);
+                const initials = getInitials(artistName);
 
                 return (
                   <div
-                    key={userId}
+                    key={artistId}
                     className="flex items-center gap-2 px-3 py-1.5 bg-background border border-border rounded-full text-sm"
                   >
-                    <div 
-                      className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ background: avatarBg }}
-                    >
-                      <span className="text-white font-semibold text-xs">
-                        {initials}
-                      </span>
-                    </div>
-                    <span className="truncate max-w-[120px]">{displayName}</span>
+                    {artistDoc?.avatarURL ? (
+                      <div className="w-5 h-5 rounded-full overflow-hidden flex-shrink-0">
+                        <Image
+                          src={artistDoc.avatarURL}
+                          alt={artistName}
+                          width={20}
+                          height={20}
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div 
+                        className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ background: avatarBg }}
+                      >
+                        <span className="text-white font-semibold text-xs">
+                          {initials}
+                        </span>
+                      </div>
+                    )}
+                    <span className="truncate max-w-[120px]">{artistName}</span>
                     <button
-                      onClick={() => handleRemoveSelected(userId)}
+                      onClick={() => handleRemoveSelected(artistId)}
                       className="ml-1 hover:text-foreground text-muted-foreground transition-colors"
                       aria-label="Remove"
                     >
@@ -223,14 +184,15 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by display name..."
+            placeholder="Search artists you follow..."
             className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             autoFocus
+            disabled // Disabled until artist search is implemented
           />
         </div>
 
         <div className="flex-1 overflow-y-auto min-h-0">
-          {loadingFollowed && showFollowedUsers ? (
+          {loadingFollowed && showFollowedArtists ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
@@ -244,52 +206,62 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
             </div>
           ) : !hasResults ? (
             <div className="text-center py-8 text-muted-foreground">
-              {showFollowedUsers 
+              {showFollowedArtists 
                 ? 'You\'re not following any artists yet' 
-                : searchQuery.trim() 
-                  ? 'No users found' 
-                  : 'Start typing to search for users'}
+                : 'No artists found'}
             </div>
           ) : (
             <div className="space-y-1">
-              {showFollowedUsers && (
+              {showFollowedArtists && (
                 <div className="mb-3">
                   <h3 className="text-sm font-medium text-muted-foreground mb-2 px-1">
-                    People you follow
+                    Artists you follow
                   </h3>
                 </div>
               )}
-              {displayUsers.map((userResult) => {
-                const displayName = displayNames.get(userResult.id) || userResult.displayName || userResult.email?.split('@')[0] || 'User';
-                const avatarBg = getAvatarGradient(displayName);
-                const initials = getInitials(displayName);
-                const selected = isUserSelected(userResult.id);
+              {displayArtists.map((artist) => {
+                const artistName = artist.name;
+                const avatarBg = getAvatarGradient(artistName);
+                const initials = getInitials(artistName);
+                const selected = isArtistSelected(artist.id);
 
                 return (
                   <button
-                    key={userResult.id}
+                    key={artist.id}
                     onClick={(e) => {
                       e.stopPropagation();
                       e.preventDefault();
-                      handleToggleUser(userResult.id, e);
+                      handleToggleArtist(artist.id, e);
                     }}
                     className={`w-full p-3 text-left hover:bg-muted rounded-lg transition-colors flex items-center gap-3 ${
                       selected ? 'bg-muted border-2 border-accent' : ''
                     }`}
                   >
-                    <div 
-                      className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ background: avatarBg }}
-                    >
-                      <span className="text-white font-semibold text-sm">
-                        {initials}
-                      </span>
-                    </div>
+                    {artist.avatarURL ? (
+                      <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                        <Image
+                          src={artist.avatarURL}
+                          alt={artistName}
+                          width={40}
+                          height={40}
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ background: avatarBg }}
+                      >
+                        <span className="text-white font-semibold text-sm">
+                          {initials}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{displayName}</div>
-                      {userResult.email && (
+                      <div className="font-medium truncate">{artistName}</div>
+                      {artist.lore && (
                         <div className="text-sm text-muted-foreground truncate">
-                          {userResult.email}
+                          {artist.lore}
                         </div>
                       )}
                     </div>
@@ -308,7 +280,7 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
         </div>
 
         {/* Start Chat Button */}
-        {selectedUserIds.length > 0 && (
+        {selectedArtistIds.length > 0 && (
           <div className="mt-4 pt-4 border-t border-border">
             <button
               onClick={handleStartChat}
@@ -316,9 +288,9 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
             >
               <Users className="w-4 h-4" />
               <span>
-                {selectedUserIds.length === 1 
+                {selectedArtistIds.length === 1 
                   ? 'Start Direct Message' 
-                  : `Start Group Chat (${selectedUserIds.length + 1})`}
+                  : `Start Group Chat (${selectedArtistIds.length + 1})`}
               </span>
             </button>
           </div>

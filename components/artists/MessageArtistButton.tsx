@@ -30,6 +30,7 @@ export function MessageArtistButton({ artistId, ownerId }: MessageArtistButtonPr
         body: JSON.stringify({
           participants: [user.uid, ownerId],
           type: 'direct',
+          artistId: artistId, // Pass artistId to create artist-centric conversation
         }),
       });
 

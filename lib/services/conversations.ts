@@ -24,6 +24,7 @@ import { db } from '@/lib/firebase/config';
 import {
   COLLECTIONS,
   getConversationPath,
+  getArtistPath,
 } from '@/lib/firebase/collections';
 import type { ConversationDocument } from '@/types/firestore';
 
@@ -32,7 +33,8 @@ import type { ConversationDocument } from '@/types/firestore';
  */
 export async function createConversation(
   participants: string[],
-  type: 'direct' | 'group' = 'direct'
+  type: 'direct' | 'group' = 'direct',
+  artistId?: string
 ): Promise<ConversationDocument> {
   // Validate participants
   if (participants.length < 2) {
@@ -43,8 +45,26 @@ export async function createConversation(
     throw new Error('Direct conversation must have exactly 2 participants');
   }
 
-  // For direct conversations, check if one already exists
-  if (type === 'direct') {
+  // If artistId is provided, fetch artist to get ownerId
+  let ownerId: string | undefined;
+  if (artistId) {
+    const artistRef = doc(db, getArtistPath(artistId));
+    const artistSnapshot = await getDoc(artistRef);
+    if (!artistSnapshot.exists()) {
+      throw new Error('Artist not found');
+    }
+    const artistData = artistSnapshot.data();
+    ownerId = artistData.ownerId;
+  }
+
+  // For direct conversations with artistId, check if one already exists
+  if (type === 'direct' && artistId) {
+    const existing = await findDirectConversationByArtist(participants[0], artistId);
+    if (existing) {
+      return existing;
+    }
+  } else if (type === 'direct') {
+    // Fallback to user-based lookup for backward compatibility
     const existing = await findDirectConversation(participants[0], participants[1]);
     if (existing) {
       return existing;
@@ -60,6 +80,8 @@ export async function createConversation(
     id: conversationId,
     type,
     participants: [...participants].sort(), // Sort for consistency
+    artistId,
+    ownerId,
     createdAt: now,
     updatedAt: now,
     lastMessageAt: null,
@@ -117,6 +139,79 @@ async function findDirectConversation(
     }
     throw error;
   }
+}
+
+/**
+ * Find existing direct conversation by artist ID
+ */
+async function findDirectConversationByArtist(
+  userId: string,
+  artistId: string
+): Promise<ConversationDocument | null> {
+  try {
+    // Query for conversations with this artistId
+    const q = query(
+      collection(db, COLLECTIONS.conversations),
+      where('type', '==', 'direct'),
+      where('artistId', '==', artistId),
+      where('participants', 'array-contains', userId)
+    );
+
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+      return null;
+    }
+
+    // Return the first match (should only be one)
+    return snapshot.docs[0].data() as ConversationDocument;
+  } catch (error: any) {
+    // Fallback if index doesn't exist
+    if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
+      console.warn('[findDirectConversationByArtist] Index missing, using fallback');
+      // Fallback: get all direct conversations and filter in memory
+      const q = query(
+        collection(db, COLLECTIONS.conversations),
+        where('type', '==', 'direct')
+      );
+      const snapshot = await getDocs(q);
+      
+      for (const docSnapshot of snapshot.docs) {
+        const conv = docSnapshot.data() as ConversationDocument;
+        if (conv.artistId === artistId && conv.participants.includes(userId) && conv.participants.length === 2) {
+          return conv;
+        }
+      }
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Get the artist associated with a conversation
+ */
+export async function getConversationArtist(
+  conversationId: string
+): Promise<{ id: string; name: string; avatarURL: string | null } | null> {
+  const conversation = await getConversation(conversationId);
+  if (!conversation || !conversation.artistId) {
+    return null;
+  }
+
+  const artistRef = doc(db, getArtistPath(conversation.artistId));
+  const artistSnapshot = await getDoc(artistRef);
+  
+  if (!artistSnapshot.exists()) {
+    return null;
+  }
+
+  const artistData = artistSnapshot.data();
+  return {
+    id: conversation.artistId,
+    name: artistData.name,
+    avatarURL: artistData.avatarURL,
+  };
 }
 
 /**

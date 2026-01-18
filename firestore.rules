@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to validate artist name format
+    function isValidArtistName(name) {
+      return name is string &&
+             name.size() >= 2 &&
+             name.size() <= 50 &&
+             name.matches('^[a-zA-Z0-9\\s\\-_]+$');
+    }
+    
+    // Helper function to check if user owns the artist
+    function isArtistOwner(artistId) {
+      return request.auth != null &&
+             get(/databases/$(database)/documents/artists/$(artistId)).data.ownerId == request.auth.uid;
+    }
+    
+    match /artists/{artistId} {
+      // Anyone authenticated can read artists
+      allow read: if request.auth != null;
+      
+      // Create artist - validate name format and ownership
+      allow create: if request.auth != null &&
+                    request.auth.uid == request.resource.data.ownerId &&
+                    isValidArtistName(request.resource.data.name) &&
+                    request.resource.data.nameLowercase == request.resource.data.name.lower() &&
+                    request.resource.data.deletedAt == null;
+      
+      // Update artist - validate ownership and name format
+      allow update: if request.auth != null &&
+                    isArtistOwner(artistId) &&
+                    isValidArtistName(request.resource.data.name) &&
+                    request.resource.data.nameLowercase == request.resource.data.name.lower() &&
+                    request.resource.data.ownerId == resource.data.ownerId &&
+                    request.resource.data.deletedAt == null;
+      
+      // No hard deletes - use soft delete via deletedAt
+      allow delete: if false;
+    }
+    
+    // Other collection rules...
+    match /{document=**} {
+      allow read, write: if false; // Deny by default
+    }
+  }
+}

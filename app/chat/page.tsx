@@ -17,12 +17,38 @@ function ChatPageContent() {
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const { toasts, showToast, dismissToast } = useToast();
 
-  const handleCreateConversation = async (otherUserIds: string[], type: 'direct' | 'group' = 'direct') => {
+  const handleCreateConversation = async (artistIds: string[], type: 'direct' | 'group' = 'direct') => {
     if (!user) return;
 
     try {
+      // For artist conversations, we need to get the owner IDs
+      // For now, we'll fetch the artists to get their ownerIds
+      // In a direct chat with one artist, we create a conversation with the artist's owner
+      if (artistIds.length === 0) {
+        throw new Error('At least one artist is required');
+      }
+
+      // Fetch artists to get their ownerIds
+      const artistsResponse = await fetch('/api/artists/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artistIds }),
+      });
+
+      if (!artistsResponse.ok) {
+        const errorData = await artistsResponse.json();
+        throw new Error(errorData.error || 'Failed to fetch artists');
+      }
+
+      const artistsData = await artistsResponse.json();
+      const artistData = artistsData.artists.map((artist: any) => ({
+        artistId: artist.id,
+        ownerId: artist.ownerId,
+      }));
+      const ownerIds = artistData.map(a => a.ownerId);
+      
       // Ensure current user is included in participants
-      const participants = [user.uid, ...otherUserIds];
+      const participants = [user.uid, ...ownerIds];
       const uniqueParticipants = Array.from(new Set(participants));
 
       // Validate participant count
@@ -30,32 +56,34 @@ function ChatPageContent() {
         throw new Error('At least one other participant is required');
       }
 
-      // For direct chats, ensure exactly 2 participants
-      const conversationType = uniqueParticipants.length === 2 ? 'direct' : 'group';
+      // For direct chats, ensure exactly 2 participants and one artist
+      const conversationType = uniqueParticipants.length === 2 && artistIds.length === 1 ? 'direct' : 'group';
+      const artistId = artistIds.length === 1 ? artistIds[0] : undefined;
 
-      const response = await fetch('/api/conversations', {
+      const conversationResponse = await fetch('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           participants: uniqueParticipants,
           type: conversationType,
+          artistId: artistId, // Pass artistId for artist-centric conversations
         }),
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to create conversation');
+      if (!conversationResponse.ok) {
+        const errorData = await conversationResponse.json();
+        throw new Error(errorData.error || 'Failed to create conversation');
       }
 
-      const data = await response.json();
-      const conversationId = data.conversation.id;
+      const conversationData = await conversationResponse.json();
+      const conversationId = conversationData.conversation.id;
       
       setSelectedConversationId(conversationId);
       router.push(`/chat?conversationId=${conversationId}`, { scroll: false });
       showToast(
         conversationType === 'direct' 
           ? 'Conversation started' 
-          : `Group chat started with ${uniqueParticipants.length - 1} ${uniqueParticipants.length === 2 ? 'person' : 'people'}`,
+          : `Group chat started with ${artistIds.length} ${artistIds.length === 1 ? 'artist' : 'artists'}`,
         'success'
       );
     } catch (error) {

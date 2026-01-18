@@ -6,6 +6,7 @@ import { Nav } from '@/components/navigation/Nav';
 import { FollowButton } from '@/components/artists/FollowButton';
 import { FollowersList } from '@/components/artists/FollowersList';
 import { MessageArtistButton } from '@/components/artists/MessageArtistButton';
+import { EditArtistName } from '@/components/artists/EditArtistName';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import { formatDistanceToNow } from 'date-fns';
 import Image from 'next/image';
@@ -74,47 +75,38 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
             </div>
           </div>
           
-          <div className="flex-1">
-            <div className="flex items-start justify-between mb-3">
-              <h1 className="text-4xl lg:text-5xl font-bold tracking-tight">{artist.name}</h1>
-              <div className="flex items-center gap-3">
-                <MessageArtistButton artistId={artist.id} ownerId={artist.ownerId} />
-                <FollowButton artistId={artist.id} ownerId={artist.ownerId} />
-              </div>
+          <ArtistHeader 
+            artist={artist} 
+            timeAgo={timeAgo}
+            isOwner={false} // Will be checked client-side
+          />
+          
+          {/* Style DNA */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-border">
+            <div>
+              <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Genres</span>
+              <p className="text-sm font-medium">
+                {artist.styleDNA.genres.length > 0 ? artist.styleDNA.genres.join(', ') : 'None'}
+              </p>
             </div>
-            <div className="flex items-center gap-4 mb-6">
-              <p className="text-sm text-muted-foreground">Created {timeAgo}</p>
-              <FollowersList artistId={artist.id} />
+            <div>
+              <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Moods</span>
+              <p className="text-sm font-medium">
+                {artist.styleDNA.moods.length > 0 ? artist.styleDNA.moods.join(', ') : 'None'}
+              </p>
             </div>
-            <p className="text-lg text-foreground/80 mb-8 leading-relaxed max-w-2xl">{artist.lore}</p>
-            
-            {/* Style DNA */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-border">
-              <div>
-                <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Genres</span>
-                <p className="text-sm font-medium">
-                  {artist.styleDNA.genres.length > 0 ? artist.styleDNA.genres.join(', ') : 'None'}
-                </p>
-              </div>
-              <div>
-                <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Moods</span>
-                <p className="text-sm font-medium">
-                  {artist.styleDNA.moods.length > 0 ? artist.styleDNA.moods.join(', ') : 'None'}
-                </p>
-              </div>
-              <div>
-                <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Tempo Range</span>
-                <p className="text-sm font-medium">
-                  {artist.styleDNA.tempoRange.min} - {artist.styleDNA.tempoRange.max} BPM
-                </p>
-              </div>
-              {artist.styleDNA.influences.length > 0 && (
-                <div>
-                  <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Influences</span>
-                  <p className="text-sm font-medium">{artist.styleDNA.influences.join(', ')}</p>
-                </div>
-              )}
+            <div>
+              <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Tempo Range</span>
+              <p className="text-sm font-medium">
+                {artist.styleDNA.tempoRange.min} - {artist.styleDNA.tempoRange.max} BPM
+              </p>
             </div>
+            {artist.styleDNA.influences.length > 0 && (
+              <div>
+                <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Influences</span>
+                <p className="text-sm font-medium">{artist.styleDNA.influences.join(', ')}</p>
+              </div>
+            )}
           </div>
         </div>
 

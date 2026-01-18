@@ -40,6 +40,7 @@ export interface AIArtistDocument {
   id: string;
   ownerId: string; // User ID
   name: string;
+  nameLowercase: string; // Lowercase version for case-insensitive uniqueness checks
   avatarURL: string | null;
   styleDNA: StyleDNA;
   lore: string; // Bio/backstory
@@ -238,7 +239,9 @@ export interface NotificationDocument {
 export interface ConversationDocument {
   id: string;
   type: 'direct' | 'group';
-  participants: string[]; // User IDs
+  participants: string[]; // User IDs (for backward compatibility and message routing)
+  artistId?: string; // Artist ID (required for direct conversations with artists)
+  ownerId?: string; // User ID who owns the artist (for grouping conversations)
   createdAt: Timestamp;
   updatedAt: Timestamp;
   lastMessageAt: Timestamp | null;

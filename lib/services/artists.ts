@@ -69,6 +69,7 @@ export async function createArtist(
     id: artistId,
     ownerId,
     name: data.name,
+    nameLowercase: data.name.toLowerCase().trim(),
     avatarURL: data.avatarURL || null,
     styleDNA: data.styleDNA,
     lore: data.lore,
@@ -181,6 +182,7 @@ export async function createArtistVersion(
     artistRef,
     {
       name: newVersion.name,
+      nameLowercase: newVersion.name.toLowerCase().trim(),
       avatarURL: newVersion.avatarURL,
       styleDNA: newVersion.styleDNA,
       lore: newVersion.lore,
@@ -255,5 +257,159 @@ export async function getPublicArtists(
   return snapshot.docs
     .map(doc => doc.data() as AIArtistDocument)
     .filter(artist => !artist.deletedAt);
+}
+
+/**
+ * Check if an artist name is available (case-insensitive uniqueness check)
+ */
+export async function checkArtistNameAvailable(
+  name: string,
+  excludeArtistId?: string
+): Promise<boolean> {
+  const normalizedName = name.toLowerCase().trim();
+  
+  if (normalizedName.length < 2 || normalizedName.length > 50) {
+    return false;
+  }
+
+  // Validate name format
+  const allowedPattern = /^[a-zA-Z0-9\s\-_]+$/;
+  if (!allowedPattern.test(name.trim())) {
+    return false;
+  }
+
+  try {
+    const q = query(
+      collection(db, COLLECTIONS.artists),
+      where('nameLowercase', '==', normalizedName),
+      limit(10)
+    );
+
+    const snapshot = await getDocs(q);
+    
+    // Filter out deleted artists and excluded artist
+    const conflicts = snapshot.docs
+      .map(doc => doc.data() as AIArtistDocument)
+      .filter(artist => {
+        if (artist.deletedAt) return false;
+        if (excludeArtistId && artist.id === excludeArtistId) return false;
+        return true;
+      });
+
+    return conflicts.length === 0;
+  } catch (error: any) {
+    // Fallback if index doesn't exist - query without nameLowercase filter
+    if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
+      console.warn('[checkArtistNameAvailable] Index missing, using fallback');
+      // For fallback, we'd need to fetch all artists and filter in memory
+      // This is inefficient but works as a fallback
+      const q = query(collection(db, COLLECTIONS.artists), limit(1000));
+      const snapshot = await getDocs(q);
+      const conflicts = snapshot.docs
+        .map(doc => doc.data() as AIArtistDocument)
+        .filter(artist => {
+          if (artist.deletedAt) return false;
+          if (excludeArtistId && artist.id === excludeArtistId) return false;
+          const artistNameLower = (artist.nameLowercase || artist.name.toLowerCase().trim());
+          return artistNameLower === normalizedName;
+        });
+      return conflicts.length === 0;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Update artist name with uniqueness validation
+ */
+export async function updateArtistName(
+  artistId: string,
+  userId: string,
+  newName: string
+): Promise<AIArtistDocument> {
+  // Validate name format
+  const trimmedName = newName.trim();
+  
+  if (trimmedName.length < 2) {
+    throw new Error('Artist name must be at least 2 characters');
+  }
+  
+  if (trimmedName.length > 50) {
+    throw new Error('Artist name must be 50 characters or less');
+  }
+
+  const allowedPattern = /^[a-zA-Z0-9\s\-_]+$/;
+  if (!allowedPattern.test(trimmedName)) {
+    throw new Error('Artist name can only contain letters, numbers, spaces, hyphens, and underscores');
+  }
+
+  // Get artist and validate ownership
+  const artist = await getArtist(artistId);
+  if (!artist) {
+    throw new Error('Artist not found');
+  }
+
+  if (artist.ownerId !== userId) {
+    throw new Error('Only the owner can update the artist name');
+  }
+
+  // Check if name is available (excluding current artist)
+  const isAvailable = await checkArtistNameAvailable(trimmedName, artistId);
+  if (!isAvailable) {
+    throw new Error('This artist name is already taken');
+  }
+
+  // Create new version with updated name
+  const updatedVersion = await createArtistVersion(artistId, userId, {
+    name: trimmedName,
+  });
+
+  // Return updated artist
+  const updatedArtist = await getArtist(artistId);
+  if (!updatedArtist) {
+    throw new Error('Failed to retrieve updated artist');
+  }
+
+  return updatedArtist;
+}
+
+/**
+ * Get multiple artists by their IDs (batch fetch)
+ */
+export async function getArtistsByIds(
+  artistIds: string[]
+): Promise<AIArtistDocument[]> {
+  if (artistIds.length === 0) {
+    return [];
+  }
+
+  // Firestore 'in' queries are limited to 10 items, so batch if needed
+  const artists: AIArtistDocument[] = [];
+  
+  for (let i = 0; i < artistIds.length; i += 10) {
+    const batch = artistIds.slice(i, i + 10);
+    const artistPromises = batch.map(artistId => getArtist(artistId));
+    const batchArtists = await Promise.all(artistPromises);
+    artists.push(...batchArtists.filter((a): a is AIArtistDocument => a !== null));
+  }
+
+  return artists;
+}
+
+/**
+ * Get artists that a user is following
+ */
+export async function getFollowedArtists(
+  userId: string
+): Promise<AIArtistDocument[]> {
+  const { getFollowing } = await import('./follows');
+  const follows = await getFollowing(userId);
+  
+  if (follows.length === 0) {
+    return [];
+  }
+
+  const artistIds = follows.map(follow => follow.artistId);
+  return getArtistsByIds(artistIds);
 }
 
