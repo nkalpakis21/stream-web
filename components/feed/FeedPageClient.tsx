@@ -220,6 +220,8 @@ export function FeedPageClient() {
                 return {
                   ...data,
                   createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toMillis() : data.createdAt,
+                  updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toMillis() : data.updatedAt,
+                  deletedAt: data.deletedAt instanceof Timestamp ? data.deletedAt.toMillis() : null,
                 };
               })
               .filter(song => {
@@ -233,7 +235,7 @@ export function FeedPageClient() {
                 ...song,
                 createdAt: Timestamp.fromMillis(song.createdAt as number),
                 updatedAt: Timestamp.fromMillis(song.updatedAt as number),
-                deletedAt: song.deletedAt ? Timestamp.fromMillis(song.deletedAt) : null,
+                deletedAt: song.deletedAt ? Timestamp.fromMillis(song.deletedAt as number) : null,
               })) as SongDocument[];
 
               // Prepend new songs to the beginning
