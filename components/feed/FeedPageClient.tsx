@@ -93,7 +93,7 @@ export function FeedPageClient() {
         isLoadingRef.current = false;
       }
     }
-  }, [user, deserializeSong]);
+  }, [user]);
 
   // Load initial songs
   const loadInitial = useCallback(async () => {
