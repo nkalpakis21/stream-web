@@ -119,7 +119,9 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
     return () => clearTimeout(debounceTimer);
   }, [searchQuery, isOpen, user]);
 
-  const handleToggleUser = useCallback((userId: string) => {
+  const handleToggleUser = useCallback((userId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    e?.preventDefault();
     setSelectedUserIds(prev => {
       if (prev.includes(userId)) {
         return prev.filter(id => id !== userId);
@@ -266,7 +268,11 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
                 return (
                   <button
                     key={userResult.id}
-                    onClick={() => handleToggleUser(userResult.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      handleToggleUser(userResult.id, e);
+                    }}
                     className={`w-full p-3 text-left hover:bg-muted rounded-lg transition-colors flex items-center gap-3 ${
                       selected ? 'bg-muted border-2 border-accent' : ''
                     }`}
