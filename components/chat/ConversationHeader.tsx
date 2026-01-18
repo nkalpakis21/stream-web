@@ -280,7 +280,7 @@ export function ConversationHeader({ conversationId }: ConversationHeaderProps) 
           </div>
         </div>
         {conversation.type === 'group' && (
-          <div className="flex items-center gap-3 ml-11">
+          <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground">
               {conversation.participants.length} {conversation.participants.length === 1 ? 'member' : 'members'}
             </span>
