@@ -163,6 +163,48 @@ export async function getUsersDisplayNames(
 }
 
 /**
+ * Batch fetch full user documents for multiple users
+ * Returns a Map of userId -> UserDocument
+ * Useful when you need full user data including photoURL
+ */
+export async function getUsersData(
+  userIds: string[]
+): Promise<Map<string, UserDocument>> {
+  if (userIds.length === 0) {
+    return new Map();
+  }
+
+  // Remove duplicates
+  const uniqueIds = Array.from(new Set(userIds));
+
+  // Batch fetch user documents
+  // Firestore has a limit of 10 items per 'in' query, so we batch if needed
+  const usersMap = new Map<string, UserDocument>();
+
+  for (let i = 0; i < uniqueIds.length; i += 10) {
+    const batch = uniqueIds.slice(i, i + 10);
+    const userPromises = batch.map(userId => {
+      const userRef = doc(db, getUserPath(userId));
+      return getDoc(userRef);
+    });
+
+    const userSnapshots = await Promise.all(userPromises);
+
+    userSnapshots.forEach(snapshot => {
+      if (snapshot.exists()) {
+        const user = snapshot.data() as UserDocument;
+        // Filter out deleted users
+        if (!user.deletedAt) {
+          usersMap.set(user.id, user);
+        }
+      }
+    });
+  }
+
+  return usersMap;
+}
+
+/**
  * Search users by display name (prefix matching)
  * Server-side only - queries Firestore directly
  * 

@@ -397,6 +397,35 @@ export async function getArtistsByIds(
 }
 
 /**
+ * Batch fetch full artist documents for multiple artists
+ * Returns a Map of artistId -> AIArtistDocument
+ * Useful when you need full artist data including avatarURL
+ */
+export async function getArtistsData(
+  artistIds: string[]
+): Promise<Map<string, AIArtistDocument>> {
+  if (artistIds.length === 0) {
+    return new Map();
+  }
+
+  // Remove duplicates
+  const uniqueIds = Array.from(new Set(artistIds));
+
+  // Use existing getArtistsByIds function
+  const artists = await getArtistsByIds(uniqueIds);
+
+  // Convert to Map for efficient lookup
+  const artistsMap = new Map<string, AIArtistDocument>();
+  artists.forEach(artist => {
+    if (!artist.deletedAt) {
+      artistsMap.set(artist.id, artist);
+    }
+  });
+
+  return artistsMap;
+}
+
+/**
  * Get artists that a user is following
  */
 export async function getFollowedArtists(
