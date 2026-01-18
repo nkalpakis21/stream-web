@@ -131,6 +131,39 @@ export async function getNotificationsBySong(
 }
 
 /**
+ * Create an "artist_new_song" notification for followers when an artist creates a new song.
+ * 
+ * This should be called when a song is created/completed for an artist.
+ * It will create notifications for all users following that artist.
+ */
+export async function createArtistNewSongNotification(params: {
+  artistId: string;
+  songId: string;
+  generationId: string;
+}): Promise<void> {
+  const { artistId, songId, generationId } = params;
+
+  // Get all followers of this artist
+  const { getFollowers } = await import('./follows');
+  const followers = await getFollowers(artistId);
+
+  // Create notifications for each follower
+  const notificationPromises = followers.map(follow => {
+    return createSongReadyNotification({
+      userId: follow.followerId,
+      songId,
+      generationId,
+    }).catch(error => {
+      // Log but don't fail if individual notification creation fails
+      console.error(`[createArtistNewSongNotification] Failed to create notification for user ${follow.followerId}:`, error);
+      return null;
+    });
+  });
+
+  await Promise.all(notificationPromises);
+}
+
+/**
  * Mark a notification as read.
  */
 export async function markNotificationRead(

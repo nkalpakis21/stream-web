@@ -204,10 +204,21 @@ export interface CollaborationDocument {
 }
 
 // ============================================================================
+// Follows
+// ============================================================================
+
+export interface FollowDocument {
+  id: string;
+  followerId: string; // User ID
+  artistId: string; // AI Artist ID
+  createdAt: Timestamp;
+}
+
+// ============================================================================
 // Notifications
 // ============================================================================
 
-export type NotificationType = 'song_ready';
+export type NotificationType = 'song_ready' | 'artist_new_song';
 
 export interface NotificationDocument {
   id: string;
@@ -218,6 +229,46 @@ export interface NotificationDocument {
   read: boolean;
   createdAt: Timestamp;
   deletedAt: Timestamp | null; // Soft delete
+}
+
+// ============================================================================
+// Chat
+// ============================================================================
+
+export interface ConversationDocument {
+  id: string;
+  type: 'direct' | 'group';
+  participants: string[]; // User IDs
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  lastMessageAt: Timestamp | null;
+  lastMessagePreview: string | null;
+}
+
+export interface MessageDocument {
+  id: string;
+  conversationId: string;
+  senderId: string; // User ID
+  content: string;
+  createdAt: Timestamp;
+  readBy: string[]; // User IDs who have read
+  deletedAt: Timestamp | null;
+}
+
+// ============================================================================
+// Comments
+// ============================================================================
+
+export interface CommentDocument {
+  id: string;
+  targetType: 'artist' | 'song';
+  targetId: string; // Artist ID or Song ID
+  authorId: string; // User ID
+  content: string;
+  parentCommentId: string | null; // For nested replies
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  deletedAt: Timestamp | null;
 }
 
 // ============================================================================

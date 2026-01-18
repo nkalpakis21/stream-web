@@ -15,6 +15,7 @@ import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
 import { Nav } from '@/components/navigation/Nav';
 import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
 import { getLyricsForSong } from '@/lib/services/lyrics';
+import { CommentsSection } from '@/components/comments/CommentsSection';
 import Link from 'next/link';
 
 // Force dynamic rendering to always fetch fresh data from Firestore
@@ -233,6 +234,9 @@ export default async function SongPage({ params }: SongPageProps) {
 
         {/* Developer Section */}
         <DeveloperSection generations={serializedGenerations} songId={song.id} />
+
+        {/* Comments Section */}
+        <CommentsSection targetType="song" targetId={song.id} />
       </main>
     </div>
   );

@@ -3,6 +3,10 @@ import { getArtist } from '@/lib/services/artists';
 import { getArtistSongs } from '@/lib/services/songs';
 import { SongCard } from '@/components/songs/SongCard';
 import { Nav } from '@/components/navigation/Nav';
+import { FollowButton } from '@/components/artists/FollowButton';
+import { FollowersList } from '@/components/artists/FollowersList';
+import { MessageArtistButton } from '@/components/artists/MessageArtistButton';
+import { CommentsSection } from '@/components/comments/CommentsSection';
 import { formatDistanceToNow } from 'date-fns';
 import Image from 'next/image';
 import { getAvatarGradient, getInitials } from '@/lib/utils/avatar';
@@ -71,8 +75,17 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
           </div>
           
           <div className="flex-1">
-            <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-3">{artist.name}</h1>
-            <p className="text-sm text-muted-foreground mb-6">Created {timeAgo}</p>
+            <div className="flex items-start justify-between mb-3">
+              <h1 className="text-4xl lg:text-5xl font-bold tracking-tight">{artist.name}</h1>
+              <div className="flex items-center gap-3">
+                <MessageArtistButton artistId={artist.id} ownerId={artist.ownerId} />
+                <FollowButton artistId={artist.id} ownerId={artist.ownerId} />
+              </div>
+            </div>
+            <div className="flex items-center gap-4 mb-6">
+              <p className="text-sm text-muted-foreground">Created {timeAgo}</p>
+              <FollowersList artistId={artist.id} />
+            </div>
             <p className="text-lg text-foreground/80 mb-8 leading-relaxed max-w-2xl">{artist.lore}</p>
             
             {/* Style DNA */}
@@ -125,6 +138,9 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
             </div>
           )}
         </section>
+
+        {/* Comments Section */}
+        <CommentsSection targetType="artist" targetId={artist.id} />
       </main>
     </div>
   );

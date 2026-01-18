@@ -14,6 +14,10 @@ export const COLLECTIONS = {
   generations: 'generations',
   collaborations: 'collaborations',
   notifications: 'notifications',
+  follows: 'follows',
+  conversations: 'conversations',
+  messages: 'messages',
+  comments: 'comments',
 } as const;
 
 export type CollectionName = typeof COLLECTIONS[keyof typeof COLLECTIONS];
@@ -57,3 +61,18 @@ export const getNotificationPath = (notificationId: string): string => {
   return `${COLLECTIONS.notifications}/${notificationId}`;
 };
 
+export const getFollowPath = (followId: string): string => {
+  return `${COLLECTIONS.follows}/${followId}`;
+};
+
+export const getConversationPath = (conversationId: string): string => {
+  return `${COLLECTIONS.conversations}/${conversationId}`;
+};
+
+export const getMessagePath = (messageId: string): string => {
+  return `${COLLECTIONS.messages}/${messageId}`;
+};
+
+export const getCommentPath = (commentId: string): string => {
+  return `${COLLECTIONS.comments}/${commentId}`;
+};

@@ -12,8 +12,10 @@ export function Nav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
+    { href: '/feed', label: 'Feed', requireAuth: true },
     { href: '/discover', label: 'Discover' },
     { href: '/artists', label: 'Artists' },
+    { href: '/chat', label: 'Chat', requireAuth: true },
   ];
 
   const isActive = (href: string) => pathname === href;
@@ -32,19 +34,25 @@ export function Nav() {
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`text-sm font-medium transition-colors duration-200 ${
-                  isActive(link.href)
-                    ? 'text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              // Hide auth-required links if user is not logged in
+              if (link.requireAuth && !user) {
+                return null;
+              }
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`text-sm font-medium transition-colors duration-200 ${
+                    isActive(link.href)
+                      ? 'text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
             
             {user ? (
               <>
@@ -97,20 +105,26 @@ export function Nav() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-border/40 py-3 animate-in slide-in-from-top-2 duration-200">
             <div className="flex flex-col gap-1">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`px-4 py-2.5 text-base font-medium rounded-lg transition-colors duration-200 ${
-                    isActive(link.href)
-                      ? 'text-foreground bg-muted/50'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {navLinks.map((link) => {
+                // Hide auth-required links if user is not logged in
+                if (link.requireAuth && !user) {
+                  return null;
+                }
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`px-4 py-2.5 text-base font-medium rounded-lg transition-colors duration-200 ${
+                      isActive(link.href)
+                        ? 'text-foreground bg-muted/50'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
               
               {user ? (
                 <Link

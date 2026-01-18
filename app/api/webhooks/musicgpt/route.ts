@@ -13,7 +13,7 @@ import { db } from '@/lib/firebase/config';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import { getSong, getSongVersions, setPrimarySongVersion } from '@/lib/services/songs';
 import type { SongDocument, SongVersionDocument, GenerationDocument } from '@/types/firestore';
-import { createSongReadyNotification } from '@/lib/services/notifications';
+import { createSongReadyNotification, createArtistNewSongNotification } from '@/lib/services/notifications';
 import { getConversionDataByConversionID } from '@/lib/ai/providers/musicgpt';
 
 /**
@@ -580,6 +580,18 @@ export async function POST(request: Request) {
         songId: song.id,
         generationId: generation.id,
       });
+
+      // Create notifications for all followers of this artist
+      try {
+        await createArtistNewSongNotification({
+          artistId: song.artistId,
+          songId: song.id,
+          generationId: generation.id,
+        });
+      } catch (error) {
+        // Log but don't fail if follower notifications fail
+        console.error('[MusicGPT Webhook] Failed to create follower notifications:', error);
+      }
 
       // Revalidate homepage so new song appears
       try {
