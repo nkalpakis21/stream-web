@@ -334,10 +334,10 @@ export function FeedPageClient() {
         ))}
       </div>
 
-      {hasMore && (
+      {hasMore && !loadingMore && (
         <InfiniteScrollSentinel
           onIntersect={loadMore}
-          loading={loadingMore}
+          enabled={!loading && !loadingMore}
         />
       )}
 
