@@ -45,18 +45,6 @@ export async function createConversation(
     throw new Error('Direct conversation must have exactly 2 participants');
   }
 
-  // If artistId is provided, fetch artist to get ownerId
-  let ownerId: string | undefined;
-  if (artistId) {
-    const artistRef = doc(db, getArtistPath(artistId));
-    const artistSnapshot = await getDoc(artistRef);
-    if (!artistSnapshot.exists()) {
-      throw new Error('Artist not found');
-    }
-    const artistData = artistSnapshot.data();
-    ownerId = artistData.ownerId;
-  }
-
   // For direct conversations with artistId, check if one already exists
   if (type === 'direct' && artistId) {
     const existing = await findDirectConversationByArtist(participants[0], artistId);
@@ -76,17 +64,21 @@ export async function createConversation(
 
   const now = Timestamp.now();
 
+  // Build conversation object, only including artistId if it's defined
   const conversation: ConversationDocument = {
     id: conversationId,
     type,
     participants: [...participants].sort(), // Sort for consistency
-    artistId,
-    ownerId,
     createdAt: now,
     updatedAt: now,
     lastMessageAt: null,
     lastMessagePreview: null,
   };
+
+  // Only include artistId if it's defined (not undefined)
+  if (artistId !== undefined) {
+    conversation.artistId = artistId;
+  }
 
   await setDoc(conversationRef, conversation);
   return conversation;

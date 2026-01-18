@@ -163,7 +163,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   if (!conversationId) {
     return (
-      <div className="flex-1 flex items-center justify-center text-muted-foreground">
+      <div className="flex-1 flex items-center justify-center text-muted-foreground p-8">
         <div className="text-center">
           <p className="text-lg mb-2">Select a conversation</p>
           <p className="text-sm">Choose a conversation from the list to start chatting</p>
