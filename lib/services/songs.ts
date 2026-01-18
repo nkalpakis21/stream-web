@@ -228,15 +228,11 @@ export async function createSongVersion(
   // Only update song.currentVersionId if this is the primary version
   // Otherwise, keep the existing primary version as currentVersionId
   const songRef = doc(db, getSongPath(songId));
-  const updateData: Partial<SongDocument> = {
+  const updateData = {
     title: newVersion.title,
     updatedAt: serverTimestamp(),
+    ...(newVersion.isPrimary && { currentVersionId: versionId }),
   };
-  
-  // If this is the primary version, update currentVersionId
-  if (newVersion.isPrimary) {
-    updateData.currentVersionId = versionId;
-  }
   
   await setDoc(songRef, updateData, { merge: true });
 
