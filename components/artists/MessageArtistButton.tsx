@@ -26,7 +26,10 @@ export function MessageArtistButton({ artistId, ownerId }: MessageArtistButtonPr
     try {
       const response = await fetch('/api/conversations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': user.uid,
+        },
         body: JSON.stringify({
           participants: [user.uid, ownerId],
           type: 'direct',
