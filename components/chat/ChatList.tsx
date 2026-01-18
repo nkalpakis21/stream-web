@@ -172,15 +172,6 @@ export function ChatList({ selectedConversationId, onSelectConversation, onNewCh
     );
   }
 
-  if (conversations.length === 0) {
-    return (
-      <div className="p-4 text-center text-muted-foreground">
-        <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
-        <p>No conversations yet</p>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-border flex items-center justify-between">
@@ -193,6 +184,20 @@ export function ChatList({ selectedConversationId, onSelectConversation, onNewCh
           <Plus className="w-5 h-5" />
         </button>
       </div>
+      
+      {conversations.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+          <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          <p className="mb-4">No conversations yet</p>
+          <button
+            onClick={onNewChat}
+            className="px-4 py-2 rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 transition-colors flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Start a new chat</span>
+          </button>
+        </div>
+      ) : (
       <div className="flex-1 overflow-y-auto">
         {conversations.map(conv => {
           // For artist conversations, show artist name
@@ -275,6 +280,7 @@ export function ChatList({ selectedConversationId, onSelectConversation, onNewCh
           );
         })}
       </div>
+      )}
     </div>
   );
 }

@@ -413,3 +413,90 @@ export async function getFollowedArtists(
   return getArtistsByIds(artistIds);
 }
 
+/**
+ * Search artists by name (prefix matching, case-insensitive)
+ * Server-side only - queries Firestore directly
+ * 
+ * @param searchQuery - Artist name prefix to search for
+ * @param excludeOwnerId - Owner ID to exclude from results (e.g., current user's own artists)
+ * @param limitCount - Maximum number of results (default: 20, max: 50)
+ * @returns Array of AIArtistDocument matching the search query
+ */
+export async function searchArtistsByName(
+  searchQuery: string,
+  excludeOwnerId?: string,
+  limitCount: number = 20
+): Promise<AIArtistDocument[]> {
+  const trimmedQuery = searchQuery.trim().toLowerCase();
+  
+  if (!trimmedQuery || trimmedQuery.length === 0) {
+    return [];
+  }
+
+  // Validate limit
+  const limitValue = Math.min(Math.max(1, limitCount), 50);
+
+  try {
+    // Query Firestore with prefix matching on nameLowercase
+    // Firestore range queries work well for prefix matching
+    const q = query(
+      collection(db, COLLECTIONS.artists),
+      where('nameLowercase', '>=', trimmedQuery),
+      where('nameLowercase', '<=', trimmedQuery + '\uf8ff'),
+      where('deletedAt', '==', null),
+      orderBy('nameLowercase', 'asc'),
+      limit(limitValue * 2) // Get more to account for filtering
+    );
+
+    const snapshot = await getDocs(q);
+    
+    // Filter results
+    let artists = snapshot.docs
+      .map(doc => doc.data() as AIArtistDocument)
+      .filter(artist => {
+        // Filter out excluded owner's artists
+        if (excludeOwnerId && artist.ownerId === excludeOwnerId) {
+          return false;
+        }
+        // Ensure nameLowercase exists and matches prefix
+        const nameLower = artist.nameLowercase || artist.name.toLowerCase().trim();
+        return nameLower.startsWith(trimmedQuery);
+      })
+      .slice(0, limitValue);
+
+    return artists;
+  } catch (error: any) {
+    // Fallback if composite index doesn't exist
+    if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
+      console.warn('[searchArtistsByName] Index missing, using fallback');
+      
+      // Fallback: query without orderBy and filter in memory
+      const q = query(
+        collection(db, COLLECTIONS.artists),
+        where('deletedAt', '==', null),
+        limit(limitValue * 10) // Get more for in-memory filtering
+      );
+      
+      const snapshot = await getDocs(q);
+      const artists = snapshot.docs
+        .map(doc => doc.data() as AIArtistDocument)
+        .filter(artist => {
+          if (excludeOwnerId && artist.ownerId === excludeOwnerId) {
+            return false;
+          }
+          const nameLower = artist.nameLowercase || artist.name.toLowerCase().trim();
+          return nameLower.startsWith(trimmedQuery);
+        })
+        .sort((a, b) => {
+          const aName = a.nameLowercase || a.name.toLowerCase();
+          const bName = b.nameLowercase || b.name.toLowerCase();
+          return aName.localeCompare(bName);
+        })
+        .slice(0, limitValue);
+      
+      return artists;
+    }
+    throw error;
+  }
+}
+

@@ -37,6 +37,7 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
       setSelectedArtistIds([]);
       setSearchQuery('');
       setError(null);
+      setArtists([]);
       return;
     }
 
@@ -67,8 +68,51 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
     loadFollowedArtists();
   }, [isOpen, user]);
 
-  // Note: Artist search is not implemented yet - for now, only show followed artists
-  // In the future, we can add artist search functionality
+  // Search artists when query changes
+  useEffect(() => {
+    if (!isOpen || !user) return;
+
+    const trimmedQuery = searchQuery.trim();
+    
+    // If query is empty, clear search results
+    if (trimmedQuery.length === 0) {
+      setArtists([]);
+      setError(null);
+      return;
+    }
+
+    // Debounce search
+    const timeoutId = setTimeout(async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const params = new URLSearchParams({
+          query: trimmedQuery,
+          limit: '20',
+          excludeOwnerId: user.uid, // Exclude user's own artists
+        });
+
+        const response = await fetch(`/api/artists/search?${params.toString()}`);
+        
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to search artists');
+        }
+
+        const data = await response.json();
+        setArtists(data.artists || []);
+      } catch (err) {
+        console.error('Failed to search artists:', err);
+        setError(err instanceof Error ? err.message : 'Failed to search artists');
+        setArtists([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, isOpen, user]);
 
   const handleToggleArtist = useCallback((artistId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -212,10 +256,16 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
             </div>
           ) : (
             <div className="space-y-1">
-              {showFollowedArtists && (
+              {showFollowedArtists ? (
                 <div className="mb-3">
                   <h3 className="text-sm font-medium text-muted-foreground mb-2 px-1">
                     Artists you follow
+                  </h3>
+                </div>
+              ) : (
+                <div className="mb-3">
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2 px-1">
+                    Search results
                   </h3>
                 </div>
               )}

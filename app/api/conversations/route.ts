@@ -66,19 +66,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If artistId is provided, validate that the user is following the artist
-    if (artistId) {
-      const { isFollowing } = await import('@/lib/services/follows');
-      const userId = participants.find((id: string) => id !== participants[0]) || participants[0];
-      const follow = await isFollowing(userId, artistId);
-      if (!follow) {
-        return NextResponse.json(
-          { error: 'You must follow the artist before starting a conversation' },
-          { status: 403 }
-        );
-      }
-    }
-
     const conversation = await createConversation(participants, type, artistId);
 
     // Serialize Timestamps for client
