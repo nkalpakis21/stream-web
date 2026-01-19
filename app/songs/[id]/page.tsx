@@ -59,7 +59,7 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
         : `${process.env.NEXT_PUBLIC_APP_URL || 'https://stream.app'}${coverImageUrl}`)
     : undefined;
 
-  const title = songVersion?.title || song.title;
+  const title = song.title;
   const artistName = artist?.name || 'Unknown Artist';
   const description = `Listen to ${title} by ${artistName} on Stream ⭐`;
 
@@ -154,7 +154,7 @@ export default async function SongPage({ params }: SongPageProps) {
         {/* Song Card with Play Functionality */}
         <div className="flex flex-col items-center mb-6 sm:mb-12">
           <SongPlayCardClient
-            songTitle={songVersion.title}
+            songTitle={song.title}
             artistName={artist?.name || 'Unknown Artist'}
             albumCoverUrl={coverImageUrl}
             audioUrl={primaryAudioUrl}
@@ -164,7 +164,7 @@ export default async function SongPage({ params }: SongPageProps) {
           {/* Song Info Below Card */}
           <div className="mt-4 sm:mt-6 text-center w-full px-2">
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-1 sm:mb-2 text-foreground">
-              {songVersion.title}
+              {song.title}
             </h1>
             <div className="flex flex-col items-center gap-3">
               {artist && (
@@ -177,13 +177,13 @@ export default async function SongPage({ params }: SongPageProps) {
               )}
               <ShareButton 
                 url={`${process.env.NEXT_PUBLIC_APP_URL || 'https://stream.app'}/songs/${song.id}`}
-                title={songVersion.title}
+                title={song.title}
                 artistName={artist?.name}
               />
             </div>
             <SongOwnerActions
               songId={song.id}
-              songTitle={songVersion.title}
+              songTitle={song.title}
               ownerId={song.ownerId}
             />
             <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3">
@@ -213,7 +213,7 @@ export default async function SongPage({ params }: SongPageProps) {
           <div className="mb-16">
             <LyricsSectionWrapper
               lyrics={lyrics}
-              songTitle={songVersion.title}
+              songTitle={song.title}
               artistName={artist?.name || 'Unknown Artist'}
               albumCoverUrl={coverImageUrl}
               audioUrl={primaryAudioUrl}
@@ -223,7 +223,7 @@ export default async function SongPage({ params }: SongPageProps) {
 
         {/* Version Cards */}
         <VersionCards
-          songTitle={songVersion.title}
+          songTitle={song.title}
           artistName={artist?.name || 'Unknown Artist'}
           albumCoverUrl={coverImageUrl}
           initialVersions={serializedVersions}
