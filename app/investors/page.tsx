@@ -477,7 +477,7 @@ function InvestorsContent() {
             Stream Star will be the platform where the next generation of music is created
           </p>
           <p className="text-xl text-muted-foreground">
-            We're not building a feature - we're building the future of music
+            We&apos;re not building a feature - we&apos;re building the future of music
           </p>
           <p className="text-lg text-muted-foreground">
             Join us in revolutionizing how music is created, shared, and monetized
@@ -490,7 +490,7 @@ function InvestorsContent() {
       title: 'Thank You',
       content: (
         <div className="space-y-6 text-center">
-          <p className="text-2xl font-bold mb-4">Let's Build the Future of Music Together</p>
+          <p className="text-2xl font-bold mb-4">Let&apos;s Build the Future of Music Together</p>
           <div className="space-y-2">
             <p className="text-lg">streamstar.xyz</p>
             <p className="text-muted-foreground">[Your Contact Email]</p>
