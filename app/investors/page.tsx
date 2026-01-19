@@ -31,7 +31,7 @@ function InvestorsContent() {
 
     // Check if user email is in whitelist
     const userEmail = user.email?.toLowerCase();
-    const isAuthorized = userEmail && INVESTOR_EMAIL_WHITELIST.includes(userEmail);
+    const isAuthorized = userEmail ? INVESTOR_EMAIL_WHITELIST.includes(userEmail) : false;
     setAuthorized(isAuthorized);
 
     if (!isAuthorized) {
