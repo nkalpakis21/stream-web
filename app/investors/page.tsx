@@ -12,7 +12,8 @@ const INVESTOR_EMAIL_WHITELIST = [
   // 'investor@example.com',
   // 'partner@vc.com',
   'nkalpakis21@gmail.com',
-  'mshaffer13@msn.com'
+  'mshaffer13@msn.com',
+  'jjketellapper@gmail.com'
 ];
 
 function InvestorsContent() {
