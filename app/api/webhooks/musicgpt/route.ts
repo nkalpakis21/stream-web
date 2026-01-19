@@ -462,7 +462,7 @@ export async function POST(request: Request) {
       id: versionId,
       songId: song.id,
       versionNumber: maxVersionNumber + 1,
-      title: body.title || song.title,
+      title: song.title,
       createdBy: song.ownerId,
       createdAt: now,
       parentVersionId: song.currentVersionId,
