@@ -11,6 +11,7 @@ import { COLLECTIONS } from '@/lib/firebase/collections';
 import type { NotificationDocument } from '@/types/firestore';
 import { getUnreadNotifications } from '@/lib/services/notifications';
 import { NotificationsDropdown } from './NotificationsDropdown';
+import { WalletConnectSection } from './WalletConnectSection';
 
 export function UserMenu() {
   const { user, signOut } = useAuth();
@@ -139,6 +140,14 @@ export function UserMenu() {
               <div className="text-xs text-muted-foreground truncate">
                 {user.email}
               </div>
+            </div>
+
+            {/* Wallet Connect */}
+            <div className="px-4 py-3 border-b border-border/40">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
+                Solana Wallet
+              </p>
+              <WalletConnectSection />
             </div>
 
             {/* Menu Items */}

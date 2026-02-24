@@ -122,6 +122,20 @@
     }
   }
 
+  /* Solana wallet adapter dark theme overrides */
+  .wallet-adapter-button {
+    @apply bg-accent text-accent-foreground hover:opacity-90;
+  }
+  .wallet-adapter-button-trigger {
+    @apply !bg-accent !text-accent-foreground;
+  }
+  .wallet-adapter-modal-wrapper {
+    @apply !bg-background;
+  }
+  .wallet-adapter-modal-title {
+    @apply !text-foreground;
+  }
+
   /* Fix for mobile nav bar scroll issues */
   .sticky-nav {
     -webkit-transform: translateZ(0);

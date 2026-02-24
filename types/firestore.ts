@@ -20,6 +20,8 @@ export interface UserDocument {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   deletedAt: Timestamp | null; // Soft delete
+  /** Linked Solana wallet address (base58). Set when user connects and links wallet. */
+  solanaWalletAddress?: string | null;
 }
 
 // ============================================================================
@@ -100,6 +102,14 @@ export interface SongDocument {
    * Optional for backward compatibility with existing songs.
    */
   playCount?: number;
+  /**
+   * Solana SPL token mint address for this song (Phase 1 tokenization).
+   */
+  tokenMintAddress?: string | null;
+  /**
+   * When the token was created. Used for idempotency and audit.
+   */
+  tokenMintCreatedAt?: Timestamp | null;
 }
 
 export interface SongVersionDocument {

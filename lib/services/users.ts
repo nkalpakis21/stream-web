@@ -120,6 +120,37 @@ export async function getUserDisplayName(userId: string): Promise<string> {
 }
 
 /**
+ * Update a user's linked Solana wallet address.
+ * Creates the user document if it doesn't exist (with minimal fields).
+ */
+export async function updateUserSolanaWallet(
+  userId: string,
+  solanaWalletAddress: string | null,
+  userEmail?: string
+): Promise<void> {
+  const userRef = doc(db, getUserPath(userId));
+  const userDoc = await getDoc(userRef);
+
+  if (userDoc.exists()) {
+    await updateDoc(userRef, {
+      solanaWalletAddress,
+      updatedAt: serverTimestamp(),
+    });
+  } else {
+    const now = Timestamp.now();
+    await setDoc(userRef, {
+      email: userEmail || '',
+      displayName: null,
+      photoURL: null,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+      solanaWalletAddress,
+    });
+  }
+}
+
+/**
  * Batch fetch display names for multiple users
  * Returns a Map of userId -> displayName
  */

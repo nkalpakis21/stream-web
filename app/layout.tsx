@@ -1,8 +1,17 @@
 import type { Metadata } from 'next';
+import dynamic from 'next/dynamic';
 import { Figtree, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { SongPlayerProvider } from '@/components/songs/SongPlayerProvider';
+
+const SolanaWalletProvider = dynamic(
+  () =>
+    import('@/components/providers/SolanaWalletProvider').then(
+      (mod) => mod.SolanaWalletProvider
+    ),
+  { ssr: false }
+);
 import { AnalyticsProvider } from '@/components/providers/AnalyticsProvider';
 import { Footer } from '@/components/layout/Footer';
 
@@ -35,10 +44,12 @@ export default function RootLayout({
       <body className="antialiased flex flex-col min-h-screen">
         <AnalyticsProvider>
           <AuthProvider>
-            <SongPlayerProvider>
+            <SolanaWalletProvider>
+              <SongPlayerProvider>
               {children}
               <Footer />
-            </SongPlayerProvider>
+              </SongPlayerProvider>
+            </SolanaWalletProvider>
           </AuthProvider>
         </AnalyticsProvider>
       </body>

@@ -30,6 +30,7 @@ yarn-error.log*
 
 # Firebase service account keys (never commit these!)
 serviceAccountKey.json
+serviceAccountKey.dev.json
 *-service-account*.json
 
 # vercel
