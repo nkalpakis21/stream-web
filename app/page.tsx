@@ -1,116 +1,99 @@
 import { getPublicSongs, getTopSongs, getArtistNamesForSongs } from '@/lib/services/songs';
-import { getPublicArtists } from '@/lib/services/artists';
 import { SongCard } from '@/components/songs/SongCard';
-import { ArtistCard } from '@/components/artists/ArtistCard';
 import { Nav } from '@/components/navigation/Nav';
 import { HeroCTA } from '@/components/homepage/HeroCTA';
+import { ValuePropsSection } from '@/components/homepage/ValuePropsSection';
+
+const SONGS_PER_SECTION = 24;
 
 // ISR: Revalidate every 2 minutes (120 seconds)
 export const revalidate = 120;
 
 export default async function HomePage() {
-  // Fetch public content for discovery feed
-  // Increased to 50 for better caching and preloading
-  const [songs, artists, topSongs] = await Promise.all([
-    getPublicSongs(50),
-    getPublicArtists(8),
-    getTopSongs(50),
+  const [latestSongs, topSongs] = await Promise.all([
+    getPublicSongs(SONGS_PER_SECTION),
+    getTopSongs(SONGS_PER_SECTION),
   ]);
 
-  // Fetch artist names for songs
-  const [songArtistMap, topSongArtistMap] = await Promise.all([
-    getArtistNamesForSongs(songs),
+  const [latestArtistMap, topArtistMap] = await Promise.all([
+    getArtistNamesForSongs(latestSongs),
     getArtistNamesForSongs(topSongs),
   ]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-b from-blue-950 via-purple-900 to-indigo-950">
       <Nav />
 
-      <main className="max-w-7xl mx-auto px-6 lg:px-8 py-12 lg:py-16">
-        {/* Hero Section */}
-        <section className="mb-16 lg:mb-24">
-          <div className="max-w-3xl">
-            <h1 className="text-5xl lg:text-6xl font-bold tracking-tight mb-6 text-foreground">
-              Create real music with AI
-              <br />
-              <span className="text-muted-foreground">in seconds.</span>
+      {/* Seamless gradient: hero → value props → songs (all one flowing section) */}
+      <section className="relative overflow-hidden min-h-screen">
+        {/* Hero */}
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 pt-12 pb-16 lg:pt-16 lg:pb-24">
+          <div className="max-w-3xl mx-auto text-center">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white">
+              Create real music with AI in seconds
             </h1>
-            <p className="text-xl lg:text-2xl text-muted-foreground leading-relaxed mb-8">
-              From first idea to finished track, create your own music and collaborate with your AI artists. You own everything you create.
-            </p>
-            <HeroCTA />
+            <div className="mt-8 flex justify-center">
+              <HeroCTA variant="hero" />
+            </div>
           </div>
-        </section>
+        </div>
+
+        {/* Value Props */}
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-12 lg:pb-16">
+          <ValuePropsSection />
+        </div>
 
         {/* Latest Songs */}
-        <section className="mb-20">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-bold tracking-tight">Latest Songs</h2>
-          </div>
-          {songs.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {songs.map(song => (
-                <SongCard 
-                  key={song.id} 
-                  song={song} 
-                  artistName={songArtistMap.get(song.id)}
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-16 lg:pb-20">
+          <h2 className="text-2xl lg:text-3xl font-bold tracking-tight text-white/95 mb-8">
+            Latest from creators
+          </h2>
+          {latestSongs.length > 0 ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
+              {latestSongs.map((song) => (
+                <SongCard
+                  key={song.id}
+                  song={song}
+                  artistName={latestArtistMap.get(song.id)}
+                  variant="glass"
+                  size="compact"
                 />
               ))}
             </div>
           ) : (
-            <div className="py-16 text-center">
-              <p className="text-muted-foreground text-lg">
+            <div className="py-16 text-center rounded-xl border border-white/20 border-dashed bg-white/5">
+              <p className="text-white/80 text-lg mb-4">
                 No songs yet. Be the first to create one!
               </p>
+              <HeroCTA variant="hero" />
             </div>
           )}
-        </section>
+        </div>
 
-        {/* Featured Artists */}
-        <section className="mb-20">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-bold tracking-tight">Featured Artists</h2>
-          </div>
-          {artists.length > 0 ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-6">
-              {artists.map(artist => (
-                <ArtistCard key={artist.id} artist={artist} />
-              ))}
-            </div>
-          ) : (
-            <div className="py-16 text-center">
-              <p className="text-muted-foreground text-lg">
-                No artists yet. Create your first AI artist!
-              </p>
-            </div>
-          )}
-        </section>
-
-        {/* Top Songs */}
-        <section>
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-bold tracking-tight">Top Songs</h2>
-          </div>
+        {/* Top Songs - by play count descending */}
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-20 lg:pb-32">
+          <h2 className="text-2xl lg:text-3xl font-bold tracking-tight text-white/95 mb-8">
+            Top songs
+          </h2>
           {topSongs.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {topSongs.map(song => (
-                <SongCard 
-                  key={song.id} 
-                  song={song} 
-                  artistName={topSongArtistMap.get(song.id)}
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
+              {topSongs.map((song) => (
+                <SongCard
+                  key={song.id}
+                  song={song}
+                  artistName={topArtistMap.get(song.id)}
+                  variant="glass"
+                  size="compact"
                 />
               ))}
             </div>
           ) : (
-            <div className="py-16 text-center">
-              <p className="text-muted-foreground text-lg">
-                No songs yet. Be the first to create one!
-              </p>
+            <div className="py-12 text-center rounded-xl border border-white/10 bg-white/5">
+              <p className="text-white/60 text-base">No top songs yet.</p>
             </div>
           )}
-        </section>
-      </main>
+        </div>
+      </section>
     </div>
   );
 }
