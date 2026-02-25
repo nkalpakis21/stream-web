@@ -14,7 +14,7 @@ import { ShareButton } from '@/components/songs/ShareButton';
 import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
 import { CreateSongTokenButton } from '@/components/songs/CreateSongTokenButton';
 import { SongTokenCard } from '@/components/songs/SongTokenCard';
-import { Nav } from '@/components/navigation/Nav';
+import { V0Navbar } from '@/components/navigation/V0Navbar';
 import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
 import { getLyricsForSong } from '@/lib/services/lyrics';
 import { CommentsSection } from '@/components/comments/CommentsSection';
@@ -150,9 +150,9 @@ export default async function SongPage({ params }: SongPageProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      <Nav />
+      <V0Navbar />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 lg:py-12">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-4 sm:pb-8 lg:pb-12">
         {/* Song Card with Play Functionality */}
         <div className="flex flex-col items-center mb-6 sm:mb-12">
           <SongPlayCardClient

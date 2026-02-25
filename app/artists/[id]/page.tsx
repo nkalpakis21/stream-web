@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { getArtist } from '@/lib/services/artists';
 import { getArtistSongs } from '@/lib/services/songs';
 import { SongCard } from '@/components/songs/SongCard';
-import { Nav } from '@/components/navigation/Nav';
+import { V0Navbar } from '@/components/navigation/V0Navbar';
 import { ArtistHeader } from '@/components/artists/ArtistHeader';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import { formatDistanceToNow } from 'date-fns';
@@ -35,9 +35,9 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      <Nav />
+      <V0Navbar />
 
-      <main className="max-w-7xl mx-auto px-6 lg:px-8 py-8 lg:py-12">
+      <main className="max-w-7xl mx-auto px-6 lg:px-8 pt-20 pb-8 lg:pt-24 lg:pb-12">
         {/* Artist Header */}
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12">
           <div className="flex-shrink-0">

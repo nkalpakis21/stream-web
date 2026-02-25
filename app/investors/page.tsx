@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Nav } from '@/components/navigation/Nav';
+import { V0Navbar } from '@/components/navigation/V0Navbar';
 import { Logo } from '@/components/branding/Logo';
 
 // Email whitelist - add investor emails here
@@ -65,8 +65,8 @@ function InvestorsContent() {
   if (authLoading || authorized === null) {
     return (
       <div className="min-h-screen bg-background">
-        <Nav />
-        <div className="flex items-center justify-center min-h-[60vh]">
+        <V0Navbar />
+        <div className="flex items-center justify-center min-h-[60vh] pt-20">
           <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin" />
         </div>
       </div>
@@ -76,8 +76,8 @@ function InvestorsContent() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background">
-        <Nav />
-        <div className="flex items-center justify-center min-h-[60vh] px-4">
+        <V0Navbar />
+        <div className="flex items-center justify-center min-h-[60vh] pt-20 px-4">
           <div className="max-w-md w-full text-center">
             <h1 className="text-3xl font-bold mb-4">Investor Access</h1>
             <p className="text-muted-foreground mb-6">
@@ -98,8 +98,8 @@ function InvestorsContent() {
   if (authorized === false) {
     return (
       <div className="min-h-screen bg-background">
-        <Nav />
-        <div className="flex items-center justify-center min-h-[60vh] px-4">
+        <V0Navbar />
+        <div className="flex items-center justify-center min-h-[60vh] pt-20 px-4">
           <div className="max-w-md w-full text-center">
             <h1 className="text-3xl font-bold mb-4">Access Denied</h1>
             <p className="text-muted-foreground mb-2">
@@ -504,12 +504,12 @@ function InvestorsContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Nav />
+      <V0Navbar />
       
-      <div className="flex flex-col h-[calc(100vh-3.5rem)]">
+      <div className="flex flex-col h-[calc(100vh-5rem)] pt-20">
         {/* Slide Content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pt-4">
             <div className="min-h-[60vh] flex flex-col justify-center">
               {currentSlide === 0 ? (
                 // Title slide

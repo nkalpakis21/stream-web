@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Nav } from '@/components/navigation/Nav';
+import { V0Navbar } from '@/components/navigation/V0Navbar';
 import Link from 'next/link';
 
 export default function SignInPage() {
@@ -52,8 +52,8 @@ export default function SignInPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Nav />
-        <div className="flex items-center justify-center min-h-[60vh]">
+        <V0Navbar />
+        <div className="flex items-center justify-center min-h-[60vh] pt-20">
           <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin" />
         </div>
       </div>
@@ -66,9 +66,9 @@ export default function SignInPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Nav />
+      <V0Navbar />
       
-      <main className="flex items-center justify-center min-h-[calc(100vh-3.5rem)] px-4 py-12">
+      <main className="flex items-center justify-center min-h-[calc(100vh-5rem)] pt-20 px-4 py-12">
         <div className="w-full max-w-md">
           {/* Header */}
           <div className="text-center mb-10">

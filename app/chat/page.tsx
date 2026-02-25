@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Nav } from '@/components/navigation/Nav';
+import { V0Navbar } from '@/components/navigation/V0Navbar';
 import { ChatList } from '@/components/chat/ChatList';
 import { ChatView } from '@/components/chat/ChatView';
 import { NewChatModal } from '@/components/chat/NewChatModal';
@@ -121,8 +121,8 @@ function ChatPageContent() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background">
-        <Nav />
-        <main className="max-w-7xl mx-auto px-6 lg:px-8 py-8 lg:py-12">
+        <V0Navbar />
+        <main className="max-w-7xl mx-auto px-6 lg:px-8 pt-20 pb-8 lg:pt-24 lg:pb-12">
           <div className="text-center">
             <p className="text-lg text-muted-foreground mb-4">
               Please sign in to use chat
@@ -135,8 +135,8 @@ function ChatPageContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Nav />
-      <main className="max-w-7xl mx-auto px-6 lg:px-8 py-8 lg:py-12">
+      <V0Navbar />
+      <main className="max-w-7xl mx-auto px-6 lg:px-8 pt-20 pb-8 lg:pt-24 lg:pb-12">
         <div className="mb-8">
           <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-2">Chat</h1>
           <p className="text-lg text-muted-foreground">
@@ -175,8 +175,8 @@ export default function ChatPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-background">
-        <Nav />
-        <main className="max-w-7xl mx-auto px-6 lg:px-8 py-8 lg:py-12">
+        <V0Navbar />
+        <main className="max-w-7xl mx-auto px-6 lg:px-8 pt-20 pb-8 lg:pt-24 lg:pb-12">
           <div className="text-center">
             <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin mx-auto" />
           </div>

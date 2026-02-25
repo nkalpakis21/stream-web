@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Nav } from '@/components/navigation/Nav';
+import { V0Navbar } from '@/components/navigation/V0Navbar';
 import { DashboardTabs } from '@/components/dashboard/DashboardTabs';
 import { MobileBottomNav } from '@/components/dashboard/MobileBottomNav';
 import { OverviewTab } from '@/components/dashboard/OverviewTab';
@@ -69,7 +69,7 @@ function DashboardContent() {
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background">
-        <Nav />
+        <V0Navbar />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin" />
         </div>
@@ -91,9 +91,9 @@ function DashboardContent() {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">
-      <Nav />
+      <V0Navbar />
       
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-6 lg:pt-24 lg:pb-10">
         {/* Dashboard Header */}
         <div className="mb-8">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-2 text-foreground">
@@ -158,7 +158,7 @@ export default function DashboardPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-background">
-        <Nav />
+        <V0Navbar />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin" />
         </div>
