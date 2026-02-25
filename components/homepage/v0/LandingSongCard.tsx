@@ -10,7 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 // Firestore Timestamp gets serialized when passed from server to client - handle both
 function toDate(value: { toDate?: () => Date; seconds?: number } | Date): Date {
   if (value instanceof Date) return value;
-  if (typeof (value as { toDate }).toDate === 'function') return (value as { toDate: () => Date }).toDate();
+  if ('toDate' in value && typeof value.toDate === 'function') return value.toDate();
   const ts = value as { seconds: number };
   if (typeof ts.seconds === 'number') return new Date(ts.seconds * 1000);
   return new Date();
