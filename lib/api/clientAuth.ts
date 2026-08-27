@@ -18,6 +18,8 @@ function errorText(error: unknown): string {
 
 export function isAuthFailure(status?: number, error?: unknown): boolean {
   if (status === 401) return true;
+  // 503 / Admin-down must not look like a session expiry.
+  if (status !== undefined) return false;
   return AUTH_FAILURE_PATTERN.test(errorText(error));
 }
 
@@ -28,6 +30,10 @@ export function userFacingApiError(
 ): string {
   if (isAuthFailure(status, error)) return SIGN_IN_AGAIN_MESSAGE;
   const text = errorText(error).trim();
+  // Never surface Admin setup / env-var names to the user.
+  if (/Firebase Admin not initialized|FIREBASE_SERVICE_ACCOUNT/i.test(text)) {
+    return fallback;
+  }
   return text || fallback;
 }
 

@@ -127,3 +127,9 @@ export function isFirebaseAdminConfigured(): boolean {
     return false;
   }
 }
+
+/** True when Admin never started (missing FIREBASE_SERVICE_ACCOUNT, etc.). Not a user-token failure. */
+export function isFirebaseAdminInitError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err ?? '');
+  return /Firebase Admin not initialized|FIREBASE_SERVICE_ACCOUNT/i.test(message);
+}
