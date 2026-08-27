@@ -61,6 +61,55 @@ export function emptyPumpFunCoin(): PumpFunCoin {
   };
 }
 
+/**
+ * Public (non-secret) X connection state for an artist.
+ * Access/refresh tokens are NOT stored here — see artistXAuth (Admin SDK only).
+ */
+export type XConnectionStatus = 'disconnected' | 'connected' | 'paused';
+
+export interface XPostLogEntry {
+  tweetId: string;
+  url: string;
+  songId: string;
+  songTitle: string;
+  text: string;
+  createdAt: Timestamp;
+}
+
+export interface XConnectionPublic {
+  status: XConnectionStatus;
+  /** X handle without @. Null until OAuth completes. */
+  username: string | null;
+  /** X numeric user id. */
+  userId: string | null;
+  connectedAt: Timestamp | null;
+  pausedAt: Timestamp | null;
+  /** Human-readable reason posting was paused (auth, spam, rate limit). */
+  lastError: string | null;
+  lastErrorAt: Timestamp | null;
+  /** Set once after a successful name/bio/avatar sync on connect. */
+  profileSyncedAt: Timestamp | null;
+  /** Last ~20 post bodies so we do not repeat copy. */
+  recentPostTexts: string[];
+  /** Activity log of posts we made (newest first, capped). */
+  posts: XPostLogEntry[];
+}
+
+export function emptyXConnection(): XConnectionPublic {
+  return {
+    status: 'disconnected',
+    username: null,
+    userId: null,
+    connectedAt: null,
+    pausedAt: null,
+    lastError: null,
+    lastErrorAt: null,
+    profileSyncedAt: null,
+    recentPostTexts: [],
+    posts: [],
+  };
+}
+
 export interface AIArtistDocument {
   id: string;
   ownerId: string; // User ID
@@ -85,6 +134,11 @@ export interface AIArtistDocument {
    * without launching a coin (the default).
    */
   pumpFun?: PumpFunCoin | null;
+  /**
+   * Optional public X account for this artist. Absent/undefined on older
+   * documents is equivalent to disconnected. Tokens are never stored here.
+   */
+  x?: XConnectionPublic | null;
 }
 
 export interface AIArtistVersionDocument {

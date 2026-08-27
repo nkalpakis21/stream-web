@@ -25,6 +25,7 @@ import {
 } from '@/lib/firebase/collections';
 import {
   emptyPumpFunCoin,
+  emptyXConnection,
   type AIArtistDocument,
   type AIArtistVersionDocument,
   type PumpFunCoin,
@@ -87,6 +88,7 @@ export async function createArtist(
     deletedAt: null,
     currentVersionId: versionId,
     pumpFun: data.pumpFun ?? emptyPumpFunCoin(),
+    x: emptyXConnection(),
   };
 
   // Write both documents

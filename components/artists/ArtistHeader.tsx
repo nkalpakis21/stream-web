@@ -1,10 +1,12 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { EditArtistName } from './EditArtistName';
 import { MessageArtistButton } from './MessageArtistButton';
 import { FollowButton } from './FollowButton';
 import { FollowersList } from './FollowersList';
+import { ArtistXPanel } from './ArtistXPanel';
 import type { AIArtistDocument } from '@/types/firestore';
 
 interface ArtistHeaderProps {
@@ -35,6 +37,9 @@ export function ArtistHeader({ artist, timeAgo, isOwner: propIsOwner }: ArtistHe
         <FollowersList artistId={artist.id} />
       </div>
       <p className="text-lg text-foreground/80 mb-8 leading-relaxed max-w-2xl">{artist.lore}</p>
+      <Suspense fallback={null}>
+        <ArtistXPanel artistId={artist.id} ownerId={artist.ownerId} />
+      </Suspense>
     </div>
   );
 }
