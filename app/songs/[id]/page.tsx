@@ -12,7 +12,6 @@ import { DeveloperSection } from '@/components/songs/DeveloperSection';
 import { SongPlayCardClient } from '@/components/songs/SongPlayCardClient';
 import { ShareButton } from '@/components/songs/ShareButton';
 import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
-import { CreateSongTokenButton } from '@/components/songs/CreateSongTokenButton';
 import { SongTokenCard } from '@/components/songs/SongTokenCard';
 import { V0Navbar } from '@/components/navigation/V0Navbar';
 import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
@@ -187,11 +186,6 @@ export default async function SongPage({ params }: SongPageProps) {
               songId={song.id}
               songTitle={song.title}
               ownerId={song.ownerId}
-            />
-            <CreateSongTokenButton
-              songId={song.id}
-              ownerId={song.ownerId}
-              tokenMintAddress={song.tokenMintAddress}
             />
             {song.tokenMintAddress && (
               <SongTokenCard

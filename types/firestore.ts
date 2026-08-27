@@ -38,6 +38,29 @@ export interface StyleDNA {
   influences: string[]; // e.g., ["Miles Davis", "Daft Punk"]
 }
 
+/**
+ * Optional artist-level pump.fun coin. All fields are nullable: an artist
+ * can exist with no token. Absent/undefined on older documents is equivalent
+ * to an unlaunched coin.
+ */
+export interface PumpFunCoin {
+  mint: string | null;
+  url: string | null;
+  symbol: string | null;
+  launchedAt: Timestamp | null;
+  creatorWallet: string | null;
+}
+
+export function emptyPumpFunCoin(): PumpFunCoin {
+  return {
+    mint: null,
+    url: null,
+    symbol: null,
+    launchedAt: null,
+    creatorWallet: null,
+  };
+}
+
 export interface AIArtistDocument {
   id: string;
   ownerId: string; // User ID
@@ -51,6 +74,11 @@ export interface AIArtistDocument {
   updatedAt: Timestamp;
   deletedAt: Timestamp | null;
   currentVersionId: string; // Latest version ID
+  /**
+   * Artist-level pump.fun coin. Null/empty when the artist was created
+   * without launching a coin (the default).
+   */
+  pumpFun?: PumpFunCoin | null;
 }
 
 export interface AIArtistVersionDocument {
@@ -103,11 +131,12 @@ export interface SongDocument {
    */
   playCount?: number;
   /**
-   * Solana SPL token mint address for this song (Phase 1 tokenization).
+   * Legacy per-song Metaplex mint address. Kept so existing documents still
+   * load. New tokens are artist-level via pump.fun; do not mint new song tokens.
    */
   tokenMintAddress?: string | null;
   /**
-   * When the token was created. Used for idempotency and audit.
+   * When the legacy song token was created. Kept for existing rows.
    */
   tokenMintCreatedAt?: Timestamp | null;
 }

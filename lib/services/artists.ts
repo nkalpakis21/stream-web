@@ -23,10 +23,12 @@ import {
   getArtistPath,
   getArtistVersionPath,
 } from '@/lib/firebase/collections';
-import type {
-  AIArtistDocument,
-  AIArtistVersionDocument,
-  StyleDNA,
+import {
+  emptyPumpFunCoin,
+  type AIArtistDocument,
+  type AIArtistVersionDocument,
+  type PumpFunCoin,
+  type StyleDNA,
 } from '@/types/firestore';
 
 /**
@@ -40,6 +42,8 @@ export async function createArtist(
     styleDNA: StyleDNA;
     lore: string;
     isPublic?: boolean;
+    /** Optional artist-level pump.fun coin. Defaults to all-null (no token). */
+    pumpFun?: PumpFunCoin | null;
   }
 ): Promise<AIArtistDocument> {
   const artistRef = doc(collection(db, COLLECTIONS.artists));
@@ -64,7 +68,8 @@ export async function createArtist(
     parentVersionId: null,
   };
 
-  // Create artist document
+  // Create artist document. pumpFun is always written so new artists have
+  // an explicit unlaunched coin (all-null) rather than a missing field.
   const artist: AIArtistDocument = {
     id: artistId,
     ownerId,
@@ -78,6 +83,7 @@ export async function createArtist(
     updatedAt: now,
     deletedAt: null,
     currentVersionId: versionId,
+    pumpFun: data.pumpFun ?? emptyPumpFunCoin(),
   };
 
   // Write both documents

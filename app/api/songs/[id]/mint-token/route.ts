@@ -1,6 +1,10 @@
 /**
  * POST /api/songs/[id]/mint-token
  *
+ * Legacy per-song Metaplex mint. Product song minting is retired — tokens
+ * are artist-level via pump.fun. This route is not reachable from product UI.
+ * Do not re-enable production minting.
+ *
  * Creates an SPL token with Metaplex metadata for a song.
  * Owner-only, idempotent (returns existing mint if already created).
  *

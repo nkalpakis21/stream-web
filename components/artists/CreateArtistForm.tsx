@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { LaunchCoinToggle } from '@/components/artists/LaunchCoinToggle';
 import { createArtist } from '@/lib/services/artists';
+import { resolvePumpFunForArtistCreate } from '@/lib/solana/launchArtistPumpFunCoin';
 import type { StyleDNA } from '@/types/firestore';
 
 interface CreateArtistFormProps {
@@ -23,6 +25,7 @@ export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
     tempoMin: '60',
     tempoMax: '180',
     isPublic: true,
+    launchCoin: false,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,12 +44,22 @@ export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
         influences: formData.influences.split(',').map(i => i.trim()).filter(Boolean),
       };
 
+      const { pumpFun, launchNotice } = await resolvePumpFunForArtistCreate({
+        launchCoin: formData.launchCoin,
+        artistName: formData.name,
+      });
+
       const artist = await createArtist(user.uid, {
         name: formData.name,
         styleDNA,
         lore: formData.lore,
         isPublic: formData.isPublic,
+        pumpFun,
       });
+
+      if (launchNotice) {
+        alert(launchNotice);
+      }
 
       // If onSuccess callback provided, use it (for multi-step flow)
       // Otherwise, redirect to artist page (backward compatible)
@@ -178,6 +191,12 @@ export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
           Make this artist public
         </label>
       </div>
+
+      <LaunchCoinToggle
+        checked={formData.launchCoin}
+        onChange={launchCoin => setFormData({ ...formData, launchCoin })}
+        disabled={loading}
+      />
 
       <button
         type="submit"
