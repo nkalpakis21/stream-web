@@ -33,6 +33,12 @@ const nextConfig = {
       'lalals.s3.amazonaws.com',
       'lalals.s3.us-east-1.amazonaws.com',
       'lh3.googleusercontent.com',
+      'fal.media',
+      'v3.fal.media',
+    ],
+    remotePatterns: [
+      { protocol: 'https', hostname: 'fal.media' },
+      { protocol: 'https', hostname: '*.fal.media' },
     ],
   },
 }

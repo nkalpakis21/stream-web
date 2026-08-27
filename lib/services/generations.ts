@@ -57,6 +57,7 @@ export async function createGeneration(
         influences: string[];
       };
       lore: string;
+      vocalIdentity?: string | null;
     };
     lyrics?: string;
   } & {
@@ -82,6 +83,7 @@ export async function createGeneration(
         },
         body: JSON.stringify({
           prompt: data.prompt.freeText,
+          // Includes locked vocalIdentity; server maps it into music_style.
           artistContext: data.artistContext,
           ...(data.lyrics && { lyrics: data.lyrics }),
         }),
@@ -198,6 +200,7 @@ async function processGeneration(
         influences: string[];
       };
       lore: string;
+      vocalIdentity?: string | null;
     };
   }
 ): Promise<void> {

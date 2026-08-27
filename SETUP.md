@@ -34,6 +34,12 @@ npm install
    NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
    ```
 
+   Optional — artist look generation (Fal Flux). Server-side only; do not commit a key:
+   ```
+   FAL_KEY=your-fal-api-key
+   ```
+   If `FAL_KEY` is unset, look generation is disabled and artist create still works with a placeholder avatar.
+
 4. Set up Firestore Security Rules:
    ```javascript
    rules_version = '2';

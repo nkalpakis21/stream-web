@@ -28,6 +28,13 @@ export function buildMusicGPTStyleFromArtistContext(artistContext?: ArtistContex
   const { styleDNA, lore } = artistContext;
   const parts: string[] = [];
 
+  // Locked vocal identity first so every song for this artist shares it.
+  // MusicGPT MusicAI has no persistent voice_id/clone on this endpoint.
+  const vocal = artistContext.vocalIdentity?.trim();
+  if (vocal) {
+    parts.push(vocal);
+  }
+
   const genres = (styleDNA.genres ?? []).map(value => value.trim()).filter(Boolean);
   if (genres.length > 0) {
     parts.push(genres.join(', '));

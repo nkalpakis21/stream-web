@@ -41,6 +41,7 @@ export async function createArtist(
     avatarURL?: string | null;
     styleDNA: StyleDNA;
     lore: string;
+    vocalIdentity?: string | null;
     isPublic?: boolean;
     /** Optional artist-level pump.fun coin. Defaults to all-null (no token). */
     pumpFun?: PumpFunCoin | null;
@@ -63,6 +64,7 @@ export async function createArtist(
     avatarURL: data.avatarURL || null,
     styleDNA: data.styleDNA,
     lore: data.lore,
+    vocalIdentity: data.vocalIdentity?.trim() || null,
     createdBy: ownerId,
     createdAt: now,
     parentVersionId: null,
@@ -78,6 +80,7 @@ export async function createArtist(
     avatarURL: data.avatarURL || null,
     styleDNA: data.styleDNA,
     lore: data.lore,
+    vocalIdentity: data.vocalIdentity?.trim() || null,
     isPublic: data.isPublic ?? true,
     createdAt: now,
     updatedAt: now,
@@ -147,6 +150,7 @@ export async function createArtistVersion(
     avatarURL?: string | null;
     styleDNA?: StyleDNA;
     lore?: string;
+    vocalIdentity?: string | null;
   }
 ): Promise<AIArtistVersionDocument> {
   // Get current artist and version
@@ -175,6 +179,7 @@ export async function createArtistVersion(
     avatarURL: updates.avatarURL ?? currentVersion.avatarURL,
     styleDNA: updates.styleDNA ?? currentVersion.styleDNA,
     lore: updates.lore ?? currentVersion.lore,
+    vocalIdentity: updates.vocalIdentity ?? currentVersion.vocalIdentity ?? null,
     createdBy: userId,
     createdAt: Timestamp.now(),
     parentVersionId: currentVersion.id,
@@ -192,6 +197,7 @@ export async function createArtistVersion(
       avatarURL: newVersion.avatarURL,
       styleDNA: newVersion.styleDNA,
       lore: newVersion.lore,
+      vocalIdentity: newVersion.vocalIdentity ?? null,
       currentVersionId: versionId,
       updatedAt: serverTimestamp(),
     },
