@@ -300,6 +300,14 @@ export function ArtistLookPicker({
                 Remove photo
               </button>
             </div>
+            {!user && (
+              <p className="text-xs text-muted-foreground">
+                <Link href="/signin" className="underline font-medium text-foreground hover:text-accent">
+                  Sign in
+                </Link>{' '}
+                to use this photo.
+              </p>
+            )}
             {usingUploadedPhoto && (
               <p className="text-xs text-muted-foreground">
                 {isLockMode ? 'This photo is locked as the artist look.' : 'This photo will be used as the artist look.'}
