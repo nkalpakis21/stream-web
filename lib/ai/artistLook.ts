@@ -1,8 +1,9 @@
 /**
- * Create-time artist look prompts for Fal Flux.
+ * Artist look prompts for Fal Flux.
  *
- * Looks are generated once at artist create and persisted on `avatarURL`.
- * Per-song face generation is intentionally not done here.
+ * Looks are generated at artist create or by the owner on the artist page,
+ * then persisted on `avatarURL`. Per-song face generation is intentionally
+ * not done here.
  */
 
 export interface ArtistLookPromptInput {
