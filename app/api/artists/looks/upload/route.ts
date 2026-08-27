@@ -40,11 +40,11 @@ function sniffImageType(buffer: Buffer): 'image/jpeg' | 'image/png' | 'image/web
  */
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request);
+
     if (!isFirebaseAdminConfigured()) {
       throw new HttpError(503, 'Photo upload is not configured (Firebase Admin).');
     }
-
-    const userId = await requireUserId(request);
 
     const form = await request.formData().catch(() => null);
     const file = form?.get('file');
