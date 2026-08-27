@@ -1,6 +1,20 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { useAuth } from '@/components/providers/AuthProvider';
+import {
+  PhotoFrameEditor,
+  type PhotoFrameEditorHandle,
+} from '@/components/artists/PhotoFrameEditor';
+
+const MAX_SOURCE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_SOURCE_TYPES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]);
 
 interface ArtistLookPickerProps {
   artistName: string;
@@ -22,29 +36,13 @@ function splitCsv(value: string): string[] {
   return value.split(',').map(part => part.trim()).filter(Boolean);
 }
 
-async function fileToDataUri(file: File, maxPx = 1024): Promise<string> {
-  const objectUrl = URL.createObjectURL(file);
-  try {
-    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('Could not read that image.'));
-      img.src = objectUrl;
-    });
-
-    const scale = Math.min(1, maxPx / Math.max(image.width, image.height));
-    const width = Math.max(1, Math.round(image.width * scale));
-    const height = Math.max(1, Math.round(image.height * scale));
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Could not process that image.');
-    ctx.drawImage(image, 0, 0, width, height);
-    return canvas.toDataURL('image/jpeg', 0.85);
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
+function blobToDataUri(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Could not read that image.'));
+    reader.readAsDataURL(blob);
+  });
 }
 
 export function ArtistLookPicker({
@@ -58,18 +56,23 @@ export function ArtistLookPicker({
   disabled = false,
   mode = 'create',
 }: ArtistLookPickerProps) {
+  const { user } = useAuth();
   const isLockMode = mode === 'lock';
   const autoSelectFirst = !isLockMode;
   const allowClear = !isLockMode;
   const fileInputId = useId();
   const lookNotesId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const frameRef = useRef<PhotoFrameEditorHandle>(null);
+  const objectUrlRef = useRef<string | null>(null);
+
   const [available, setAvailable] = useState<boolean | null>(null);
   const [lookNotes, setLookNotes] = useState('');
-  const [referencePreview, setReferencePreview] = useState<string | null>(null);
-  const [referenceDataUri, setReferenceDataUri] = useState<string | null>(null);
+  const [photoSrc, setPhotoSrc] = useState<string | null>(null);
+  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const [looks, setLooks] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -87,23 +90,76 @@ export function ArtistLookPicker({
     };
   }, []);
 
-  const handleReferenceChange = async (file: File | null) => {
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    };
+  }, []);
+
+  const clearPhoto = () => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+    setPhotoSrc(null);
+    setUploadedUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handlePhotoChange = (file: File | null) => {
     if (!file) {
-      setReferencePreview(null);
-      setReferenceDataUri(null);
+      clearPhoto();
       return;
     }
-    if (!file.type.startsWith('image/')) {
-      setError('Please choose an image file.');
+    const type = (file.type || '').toLowerCase();
+    if (!type.startsWith('image/') || (type && !ALLOWED_SOURCE_TYPES.has(type))) {
+      setError('Please choose a JPEG, PNG, WebP, or GIF image.');
       return;
     }
+    if (file.size > MAX_SOURCE_BYTES) {
+      setError('Photo must be 5 MB or smaller.');
+      return;
+    }
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    const objectUrl = URL.createObjectURL(file);
+    objectUrlRef.current = objectUrl;
+    setPhotoSrc(objectUrl);
+    setUploadedUrl(null);
+    setError(null);
+  };
+
+  const handleUsePhoto = async () => {
+    if (!user) {
+      setError('Sign in to use this photo.');
+      return;
+    }
+    if (!frameRef.current) {
+      setError('Choose a photo first.');
+      return;
+    }
+
+    setUploading(true);
+    setError(null);
     try {
-      const dataUri = await fileToDataUri(file);
-      setReferenceDataUri(dataUri);
-      setReferencePreview(dataUri);
-      setError(null);
+      const blob = await frameRef.current.exportJpeg();
+      const token = await user.getIdToken();
+      const form = new FormData();
+      form.append('file', blob, 'look.jpg');
+      const response = await fetch('/api/artists/looks/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || typeof data.url !== 'string' || !/^https?:\/\//i.test(data.url)) {
+        throw new Error(data.error || 'Failed to upload photo.');
+      }
+      setUploadedUrl(data.url);
+      onSelectedUrlChange(data.url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not read that image.');
+      setError(err instanceof Error ? err.message : 'Failed to upload photo.');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -114,7 +170,9 @@ export function ArtistLookPicker({
     }
     if (available === false) {
       setError(
-        'Look generation is not configured (FAL_KEY). You can still create this artist with a placeholder avatar.'
+        isLockMode
+          ? "Look generation is not configured (FAL_KEY). You can still upload a photo and lock it as this artist's look."
+          : "Look generation is not configured (FAL_KEY). You can still upload a photo as this artist's look, or create with a placeholder avatar."
       );
       return;
     }
@@ -122,6 +180,12 @@ export function ArtistLookPicker({
     setGenerating(true);
     setError(null);
     try {
+      let referenceImage: string | undefined;
+      if (photoSrc && frameRef.current) {
+        const framed = await frameRef.current.exportJpeg();
+        referenceImage = await blobToDataUri(framed);
+      }
+
       const response = await fetch('/api/artists/looks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -132,7 +196,7 @@ export function ArtistLookPicker({
           moods: splitCsv(moods),
           influences: splitCsv(influences),
           lookNotes: lookNotes.trim() || undefined,
-          referenceImage: referenceDataUri || undefined,
+          referenceImage,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -140,7 +204,9 @@ export function ArtistLookPicker({
         throw new Error(
           data.error ||
             (response.status === 503
-              ? 'Look generation is not configured (FAL_KEY). You can still create this artist with a placeholder avatar.'
+              ? isLockMode
+                ? "Look generation is not configured (FAL_KEY). You can still upload a photo and lock it as this artist's look."
+                : "Look generation is not configured (FAL_KEY). You can still upload a photo as this artist's look, or create with a placeholder avatar."
               : 'Failed to generate looks.')
         );
       }
@@ -148,7 +214,11 @@ export function ArtistLookPicker({
         ? data.looks.map((look: { url?: string }) => look.url).filter(Boolean)
         : [];
       if (urls.length === 0) {
-        throw new Error('No looks were returned. Create the artist without an avatar, or try again.');
+        throw new Error(
+          isLockMode
+            ? 'No looks were returned. Upload a photo instead, or try again.'
+            : 'No looks were returned. Upload a photo, create the artist without an avatar, or try again.'
+        );
       }
       setLooks(urls);
       if (autoSelectFirst) {
@@ -156,15 +226,18 @@ export function ArtistLookPicker({
       }
     } catch (err) {
       setLooks([]);
-      onSelectedUrlChange(null);
+      if (!(uploadedUrl && selectedUrl === uploadedUrl)) {
+        onSelectedUrlChange(null);
+      }
       setError(err instanceof Error ? err.message : 'Failed to generate looks.');
     } finally {
       setGenerating(false);
     }
   };
 
-  const generateDisabled =
-    disabled || generating || available === false || !artistName.trim();
+  const busy = disabled || generating || uploading;
+  const generateDisabled = busy || available === false || !artistName.trim();
+  const usingUploadedPhoto = Boolean(uploadedUrl && selectedUrl === uploadedUrl);
 
   return (
     <div className="space-y-4">
@@ -173,13 +246,13 @@ export function ArtistLookPicker({
         <p className="text-xs text-muted-foreground mt-1">
           {isLockMode ? (
             <>
-              Generate a small set of portraits from this artist&apos;s lore and style. Pick one to lock it as this
-              artist&apos;s face. Songs will keep this face.
+              Upload a photo and frame the face to lock it — no AI required. Generate looks is optional. Songs will keep
+              this face.
             </>
           ) : (
             <>
-              Generate a small set of portraits from this artist&apos;s lore and style. Pick one to lock it — songs will
-              keep this face. Optional. Regenerating later is not in this flow.
+              Upload a photo and frame the face to use it as this artist&apos;s look — no AI required. Generate looks is
+              optional. Songs will keep this face.
             </>
           )}
         </p>
@@ -187,35 +260,43 @@ export function ArtistLookPicker({
 
       <div>
         <label htmlFor={fileInputId} className="block text-sm font-medium mb-2 text-foreground">
-          Reference photo (optional)
+          Photo
         </label>
         <input
           id={fileInputId}
           ref={fileInputRef}
           type="file"
-          accept="image/*"
-          disabled={disabled || generating}
-          onChange={e => handleReferenceChange(e.target.files?.[0] ?? null)}
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          disabled={busy}
+          onChange={e => handlePhotoChange(e.target.files?.[0] ?? null)}
           className="block w-full text-sm text-muted-foreground file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-accent/10 file:text-accent file:font-medium"
         />
-        {referencePreview && (
-          <div className="mt-3 flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={referencePreview}
-              alt="Reference preview"
-              className="w-16 h-16 rounded-full object-cover ring-2 ring-border"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                handleReferenceChange(null);
-                if (fileInputRef.current) fileInputRef.current.value = '';
-              }}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              Remove reference
-            </button>
+        {photoSrc && (
+          <div className="mt-4 space-y-3">
+            <PhotoFrameEditor key={photoSrc} ref={frameRef} src={photoSrc} disabled={busy} />
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleUsePhoto}
+                disabled={busy || !user}
+                className="px-4 py-2.5 bg-accent text-accent-foreground rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-sm"
+              >
+                {uploading ? 'Uploading…' : 'Use this photo'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePhotoChange(null)}
+                disabled={busy}
+                className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+              >
+                Remove photo
+              </button>
+            </div>
+            {usingUploadedPhoto && (
+              <p className="text-xs text-muted-foreground">
+                {isLockMode ? 'This photo is locked as the artist look.' : 'This photo will be used as the artist look.'}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -229,11 +310,14 @@ export function ArtistLookPicker({
           type="text"
           maxLength={500}
           value={lookNotes}
-          disabled={disabled || generating}
+          disabled={busy}
           onChange={e => setLookNotes(e.target.value)}
           placeholder="e.g. silver hair, neon jacket, 80s album-cover lighting"
           className="w-full px-4 py-3 border border-border rounded-xl bg-background/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
         />
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Used only if you generate looks. The framed photo is also sent as an optional reference.
+        </p>
       </div>
 
       <button
@@ -247,7 +331,11 @@ export function ArtistLookPicker({
 
       {available === false && (
         <p className="text-xs text-muted-foreground">
-          Look generation is not configured (set <span className="font-mono">FAL_KEY</span>). You can still create this artist — they&apos;ll use a placeholder avatar until a look is generated.
+          Look generation is not configured (set <span className="font-mono">FAL_KEY</span>). You can still upload a
+          photo
+          {isLockMode
+            ? " and lock it as this artist's look."
+            : " as this artist's look, or create with a placeholder avatar."}
         </p>
       )}
 
@@ -259,7 +347,7 @@ export function ArtistLookPicker({
 
       {looks.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2">Pick one look</p>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Pick one generated look</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {looks.map((url, index) => {
               const isSelected = selectedUrl === url;
@@ -268,7 +356,7 @@ export function ArtistLookPicker({
                   key={url}
                   type="button"
                   onClick={() => onSelectedUrlChange(url)}
-                  disabled={disabled || generating}
+                  disabled={busy}
                   aria-pressed={isSelected}
                   aria-label={`Select look ${index + 1}`}
                   className={`relative aspect-square rounded-xl overflow-hidden ring-2 transition-all ${

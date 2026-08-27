@@ -53,11 +53,12 @@ export function EditArtistName({ artistId, currentName, onUpdate }: EditArtistNa
 
     setSaving(true);
     try {
+      const token = await user.getIdToken();
       const response = await fetch(`/api/artists/${artistId}/name`, {
         method: 'PATCH',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'x-user-id': user.uid, // Pass user ID in header
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ name: trimmed }),
       });

@@ -38,7 +38,7 @@ npm install
    ```
    FAL_KEY=your-fal-api-key
    ```
-   If `FAL_KEY` is unset, look generation is disabled and artist create still works with a placeholder avatar.
+   If `FAL_KEY` is unset, look generation is disabled. Managers can still upload and frame a photo as the artist look (no AI). Artist create also still works with a placeholder avatar.
 
    Optional — artist X posting (OAuth 2.0 user-context). Server-side only; do not commit keys and do not prefix with `NEXT_PUBLIC_`:
    ```
