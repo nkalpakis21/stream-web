@@ -82,10 +82,7 @@ export async function createGeneration(
         },
         body: JSON.stringify({
           prompt: data.prompt.freeText,
-          music_style: (data.artistContext?.styleDNA.genres ?? [])[0],
-          isInstrumental: data.artistContext?.lore
-            ? data.artistContext.lore.toLowerCase().includes('instrumental')
-            : false,
+          artistContext: data.artistContext,
           ...(data.lyrics && { lyrics: data.lyrics }),
         }),
       });

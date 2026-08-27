@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createMusicGPTSong } from '@/lib/ai/providers/musicgpt';
+import {
+  buildMusicGPTStyleFromArtistContext,
+  createMusicGPTSong,
+} from '@/lib/ai/providers/musicgpt';
+import type { AIGenerationRequest } from '@/lib/ai/types';
 
 /**
  * Server-side API route for initiating MusicGPT generation.
@@ -8,7 +12,12 @@ import { createMusicGPTSong } from '@/lib/ai/providers/musicgpt';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { prompt, music_style, isInstrumental, lyrics } = body;
+    const { prompt, lyrics, artistContext, num_outputs } = body as {
+      prompt?: string;
+      lyrics?: string;
+      artistContext?: AIGenerationRequest['artistContext'];
+      num_outputs?: 1 | 2;
+    };
 
     if (!prompt) {
       return NextResponse.json(
@@ -23,11 +32,14 @@ export async function POST(request: Request) {
 
     console.log('[MusicGPT API Route] Webhook URL being set:', webhookUrl);
 
+    const style = buildMusicGPTStyleFromArtistContext(artistContext);
+    const numOutputs: 1 | 2 = num_outputs === 2 ? 2 : 1;
+
     const response = await createMusicGPTSong({
       prompt,
-      music_style,
-      isInstrumental,
       lyrics,
+      ...style,
+      num_outputs: numOutputs,
       webhook_url: webhookUrl,
     });
 

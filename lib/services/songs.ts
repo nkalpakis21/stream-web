@@ -257,66 +257,6 @@ export async function createSongVersion(
 }
 
 /**
- * Fork a song (create a new song based on an existing one)
- */
-export async function forkSong(
-  sourceSongId: string,
-  newOwnerId: string,
-  newArtistId: string,
-  newArtistVersionId: string,
-  newTitle?: string
-): Promise<SongDocument> {
-  const sourceSong = await getSong(sourceSongId);
-  if (!sourceSong) {
-    throw new Error(`Source song ${sourceSongId} not found`);
-  }
-
-  const sourceVersion = await getSongVersion(sourceSong.currentVersionId);
-  if (!sourceVersion) {
-    throw new Error('Source song version not found');
-  }
-
-  return createSong(newOwnerId, {
-    artistId: newArtistId,
-    artistVersionId: newArtistVersionId,
-    title: newTitle || `${sourceVersion.title} (Fork)`,
-    isPublic: true,
-    parentSongId: sourceSongId,
-    collaborationType: 'fork',
-  });
-}
-
-/**
- * Remix a song (similar to fork but with remix type)
- */
-export async function remixSong(
-  sourceSongId: string,
-  newOwnerId: string,
-  newArtistId: string,
-  newArtistVersionId: string,
-  newTitle?: string
-): Promise<SongDocument> {
-  const sourceSong = await getSong(sourceSongId);
-  if (!sourceSong) {
-    throw new Error(`Source song ${sourceSongId} not found`);
-  }
-
-  const sourceVersion = await getSongVersion(sourceSong.currentVersionId);
-  if (!sourceVersion) {
-    throw new Error('Source song version not found');
-  }
-
-  return createSong(newOwnerId, {
-    artistId: newArtistId,
-    artistVersionId: newArtistVersionId,
-    title: newTitle || `${sourceVersion.title} (Remix)`,
-    isPublic: true,
-    parentSongId: sourceSongId,
-    collaborationType: 'remix',
-  });
-}
-
-/**
  * Get all songs by a user
  */
 export async function getUserSongs(

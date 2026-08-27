@@ -8,6 +8,20 @@ const nextConfig = {
     };
     return config;
   },
+  async redirects() {
+    return [
+      {
+        source: '/songs/:id/fork',
+        destination: '/songs/:id',
+        permanent: false,
+      },
+      {
+        source: '/songs/:id/remix',
+        destination: '/songs/:id',
+        permanent: false,
+      },
+    ];
+  },
   images: {
     domains: [
       'firebasestorage.googleapis.com',
