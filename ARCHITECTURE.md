@@ -9,8 +9,7 @@ Stream is an AI-native music platform built with Next.js 14 (App Router), TypeSc
 1. **Immutable Versioning**: All entities (Artists, Songs) support versioning. Versions are immutable and reference their parent.
 2. **Proof-Ready Ownership**: Content hashes are generated for all generations, ready for future blockchain integration.
 3. **Pluggable AI Providers**: AI services are abstracted through a provider interface, allowing easy integration of new providers.
-4. **Public by Default**: Content is public by default, with optional private visibility.
-5. **GitHub-Style Collaboration**: Forking and remixing create new entities with clear lineage tracking.
+4. **Public by Default**: Content is public by default, with optional private visibility. Historical fork/remix lineage documents may still exist in Firestore, but the product no longer creates them.
 
 ## Tech Stack
 
@@ -94,27 +93,9 @@ Providers are registered with the `AIService` singleton. Currently, a stub provi
 - Songs can have multiple versions as they evolve
 - Each version can have multiple generations (different AI outputs)
 
-## Collaboration Model
+## Collaboration Model (deprecated)
 
-### Fork
-
-Creates a new song based on an existing one:
-- New song with `parentSongId` pointing to source
-- `collaborationType: 'fork'`
-- Collaboration record tracks the relationship
-
-### Remix
-
-Similar to fork but with `collaborationType: 'remix'`:
-- Indicates a more creative transformation
-- Same lineage tracking as fork
-
-### Lineage Tracking
-
-The `collaborations` collection tracks all relationships:
-- `sourceSongId` → `targetSongId`
-- Enables building collaboration trees
-- Supports recursive lineage queries
+Fork and remix are no longer user-facing. Existing `collaborations` documents and song `parentSongId` / `collaborationType` fields remain so historical data still loads. The app does not create new forks or remixes.
 
 ## Discovery
 

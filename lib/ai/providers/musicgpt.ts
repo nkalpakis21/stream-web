@@ -8,6 +8,64 @@
 
 import { AIProvider, AIGenerationRequest, AIGenerationResponse } from '../types';
 
+type ArtistContext = NonNullable<AIGenerationRequest['artistContext']>;
+
+/** MusicGPT prompt guidance is ~280 chars; style can be longer, but keep it bounded. */
+const MUSIC_STYLE_MAX_LENGTH = 1000;
+
+/**
+ * Map an artist's full style DNA into MusicGPT request fields.
+ * Previously only genres[0] was sent as music_style.
+ */
+export function buildMusicGPTStyleFromArtistContext(artistContext?: ArtistContext): {
+  music_style?: string;
+  make_instrumental: boolean;
+} {
+  if (!artistContext) {
+    return { make_instrumental: false };
+  }
+
+  const { styleDNA, lore } = artistContext;
+  const parts: string[] = [];
+
+  const genres = (styleDNA.genres ?? []).map(value => value.trim()).filter(Boolean);
+  if (genres.length > 0) {
+    parts.push(genres.join(', '));
+  }
+
+  const moods = (styleDNA.moods ?? []).map(value => value.trim()).filter(Boolean);
+  if (moods.length > 0) {
+    parts.push(`mood: ${moods.join(', ')}`);
+  }
+
+  const tempoMin = styleDNA.tempoRange?.min;
+  const tempoMax = styleDNA.tempoRange?.max;
+  if (typeof tempoMin === 'number' && typeof tempoMax === 'number') {
+    parts.push(`${tempoMin}-${tempoMax} BPM`);
+  }
+
+  const influences = (styleDNA.influences ?? []).map(value => value.trim()).filter(Boolean);
+  if (influences.length > 0) {
+    parts.push(`influences: ${influences.join(', ')}`);
+  }
+
+  const trimmedLore = lore?.trim() ?? '';
+  const coreStyle = parts.join('. ');
+  let music_style = coreStyle;
+  if (trimmedLore) {
+    music_style = coreStyle ? `${coreStyle}. ${trimmedLore}` : trimmedLore;
+  }
+
+  if (music_style.length > MUSIC_STYLE_MAX_LENGTH) {
+    music_style = music_style.slice(0, MUSIC_STYLE_MAX_LENGTH).trimEnd();
+  }
+
+  return {
+    ...(music_style ? { music_style } : {}),
+    make_instrumental: trimmedLore.toLowerCase().includes('instrumental'),
+  };
+}
+
 /**
  * Lazy getters for MusicGPT configuration.
  * These are checked at runtime rather than module load time to avoid
@@ -38,8 +96,13 @@ export async function createMusicGPTSong(payload: {
   prompt: string;
   lyrics?: string;
   music_style?: string;
-  isInstrumental?: boolean;
+  make_instrumental?: boolean;
   webhook_url?: string;
+  /**
+   * MusicGPT defaults to 2 audio conversions per request.
+   * Default to 1 unless the caller explicitly asks for more.
+   */
+  num_outputs?: 1 | 2;
 }) {
   const { MUSICGPT_BASE_URL, MUSICGPT_API_KEY } = getMusicGPTConfig();
   
@@ -55,12 +118,14 @@ export async function createMusicGPTSong(payload: {
   
   const url = `${baseUrl}/MusicAI`;
   
-  // Include webhook_url in payload if provided
+  // Include webhook_url in payload if provided.
+  // num_outputs defaults to 1 so we do not pay for a second unused conversion.
   const requestPayload: Record<string, unknown> = {
     prompt: payload.prompt,
     ...(payload.lyrics && { lyrics: payload.lyrics }),
     ...(payload.music_style && { music_style: payload.music_style }),
-    ...(payload.isInstrumental !== undefined && { isInstrumental: payload.isInstrumental }),
+    make_instrumental: payload.make_instrumental ?? false,
+    num_outputs: payload.num_outputs ?? 1,
     ...(payload.webhook_url && { webhook_url: payload.webhook_url }),
   };
   
@@ -268,14 +333,11 @@ export class MusicGPTProvider implements AIProvider {
   }
 
   async generateSong(request: AIGenerationRequest): Promise<AIGenerationResponse> {
+    const style = buildMusicGPTStyleFromArtistContext(request.artistContext);
     const response = await createMusicGPTSong({
       prompt: request.prompt.freeText,
-      // These mappings can be extended once the exact MusicGPT
-      // API surface for style / lyrics is finalized.
-      music_style: (request.artistContext?.styleDNA.genres ?? [])[0],
-      isInstrumental: request.artistContext?.lore
-        ? request.artistContext.lore.toLowerCase().includes('instrumental')
-        : false,
+      ...style,
+      num_outputs: 1,
     });
 
     // Try a few common keys for the remote task identifier.

@@ -206,9 +206,9 @@ function InvestorsContent() {
             <div className="p-4 bg-card rounded-lg border">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-green-500">✓</span>
-                <span className="font-semibold">Collaboration</span>
+                <span className="font-semibold">Artist Universes</span>
               </div>
-              <p className="text-sm text-muted-foreground">Fork, remix, extend songs</p>
+              <p className="text-sm text-muted-foreground">Browse every song by an AI artist</p>
             </div>
             <div className="p-4 bg-card rounded-lg border">
               <div className="flex items-center gap-2 mb-2">
@@ -261,7 +261,7 @@ function InvestorsContent() {
             { title: 'Ownership First', desc: 'Users own their AI artists and songs' },
             { title: 'Social Native', desc: 'Built for community, not just consumption' },
             { title: 'Crypto Ready', desc: 'Blockchain integration from day one' },
-            { title: 'GitHub for Music', desc: 'Collaboration through forking/remixing' },
+            { title: 'Versioned Catalogs', desc: 'Immutable song versions and ownership tracking' },
             { title: 'AI-Native Discovery', desc: 'Not algorithm-driven playlists' },
             { title: 'Multi-Modal Future', desc: 'Music + videos + management tools' },
           ].map((item, idx) => (
