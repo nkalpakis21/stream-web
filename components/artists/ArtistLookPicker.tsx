@@ -51,6 +51,24 @@ function blobToDataUri(blob: Blob): Promise<string> {
   });
 }
 
+function errorText(error: unknown): string {
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) return error.message;
+  return '';
+}
+
+/** Never mention Fal, FAL_KEY, or missing AI config in the UI. */
+function userFacingGenerateError(status: number | undefined, error: unknown): string {
+  const raw = errorText(error);
+  if (
+    status === 503 ||
+    /FAL_KEY|\bFal\b|fal\.ai|not configured/i.test(raw)
+  ) {
+    return "Couldn't generate looks right now.";
+  }
+  return raw.trim() || 'Failed to generate looks.';
+}
+
 export function ArtistLookPicker({
   artistName,
   lore,
@@ -179,11 +197,7 @@ export function ArtistLookPicker({
       return;
     }
     if (available === false) {
-      setError(
-        isLockMode
-          ? "Look generation is not configured (FAL_KEY). You can still upload a photo and lock it as this artist's look."
-          : "Look generation is not configured (FAL_KEY). You can still upload a photo as this artist's look, or create with a placeholder avatar."
-      );
+      setError("Couldn't generate looks right now.");
       return;
     }
 
@@ -211,14 +225,7 @@ export function ArtistLookPicker({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(
-          data.error ||
-            (response.status === 503
-              ? isLockMode
-                ? "Look generation is not configured (FAL_KEY). You can still upload a photo and lock it as this artist's look."
-                : "Look generation is not configured (FAL_KEY). You can still upload a photo as this artist's look, or create with a placeholder avatar."
-              : 'Failed to generate looks.')
-        );
+        throw new Error(userFacingGenerateError(response.status, data.error));
       }
       const urls = Array.isArray(data.looks)
         ? data.looks.map((look: { url?: string }) => look.url).filter(Boolean)
@@ -239,14 +246,15 @@ export function ArtistLookPicker({
       if (!(uploadedUrl && selectedUrl === uploadedUrl)) {
         onSelectedUrlChange(null);
       }
-      setError(err instanceof Error ? err.message : 'Failed to generate looks.');
+      setError(userFacingGenerateError(undefined, err));
     } finally {
       setGenerating(false);
     }
   };
 
   const busy = disabled || generating || uploading;
-  const generateDisabled = busy || available === false || !artistName.trim();
+  const generateDisabled = busy || !artistName.trim();
+  const showGeneratePath = available === true;
   const usingUploadedPhoto = Boolean(uploadedUrl && selectedUrl === uploadedUrl);
 
   return (
@@ -325,106 +333,87 @@ export function ArtistLookPicker({
         </p>
       )}
 
-      <div className="border-t border-border/50 pt-4">
-        <button
-          type="button"
-          onClick={() => setShowGenerate(open => !open)}
-          aria-expanded={showGenerate}
-          aria-controls={generatePanelId}
-          className="w-full flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-all text-left"
-        >
-          <span className="text-sm font-medium text-foreground">Or generate a look</span>
-          <svg
-            className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${
-              showGenerate ? 'rotate-180' : ''
-            }`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
+      {showGeneratePath && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowGenerate(open => !open)}
+            aria-expanded={showGenerate}
+            aria-controls={generatePanelId}
+            className="text-xs text-muted-foreground hover:text-foreground"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
+            Or generate a look
+          </button>
 
-        {showGenerate && (
-          <div id={generatePanelId} className="pt-4 space-y-4">
-            <div>
-              <label htmlFor={lookNotesId} className="block text-sm font-medium mb-2 text-foreground">
-                Look notes (optional)
-              </label>
-              <input
-                id={lookNotesId}
-                type="text"
-                maxLength={500}
-                value={lookNotes}
-                disabled={busy}
-                onChange={e => setLookNotes(e.target.value)}
-                placeholder="e.g. silver hair, neon jacket, 80s album-cover lighting"
-                className="w-full px-4 py-3 border border-border rounded-xl bg-background/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
-              />
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                Optional notes plus the framed photo are sent as a reference.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleGenerate}
-              disabled={generateDisabled}
-              className="w-full px-4 py-2.5 border border-border rounded-xl hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-sm text-foreground"
-            >
-              {generating ? 'Generating looks…' : 'Generate looks'}
-            </button>
-
-            {available === false && (
-              <p className="text-xs text-muted-foreground">
-                Look generation is not configured (set <span className="font-mono">FAL_KEY</span>). You can still upload
-                a photo
-                {isLockMode
-                  ? " and lock it as this artist's look."
-                  : " as this artist's look, or create with a placeholder avatar."}
-              </p>
-            )}
-
-            {looks.length > 0 && (
+          {showGenerate && (
+            <div id={generatePanelId} className="mt-4 space-y-4">
               <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Pick one generated look</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {looks.map((url, index) => {
-                    const isSelected = selectedUrl === url;
-                    return (
-                      <button
-                        key={url}
-                        type="button"
-                        onClick={() => onSelectedUrlChange(url)}
-                        disabled={busy}
-                        aria-pressed={isSelected}
-                        aria-label={`Select look ${index + 1}`}
-                        className={`relative aspect-square rounded-xl overflow-hidden ring-2 transition-all ${
-                          isSelected ? 'ring-accent scale-[1.02]' : 'ring-transparent hover:ring-border'
-                        } disabled:opacity-60 disabled:cursor-not-allowed`}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt="" className="w-full h-full object-cover" />
-                      </button>
-                    );
-                  })}
-                </div>
-                {allowClear && selectedUrl && (
-                  <button
-                    type="button"
-                    onClick={() => onSelectedUrlChange(null)}
-                    className="mt-2 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Clear selection (create without a look)
-                  </button>
-                )}
+                <label htmlFor={lookNotesId} className="block text-sm font-medium mb-2 text-foreground">
+                  Look notes (optional)
+                </label>
+                <input
+                  id={lookNotesId}
+                  type="text"
+                  maxLength={500}
+                  value={lookNotes}
+                  disabled={busy}
+                  onChange={e => setLookNotes(e.target.value)}
+                  placeholder="e.g. silver hair, neon jacket, 80s album-cover lighting"
+                  className="w-full px-4 py-3 border border-border rounded-xl bg-background/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+                />
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Optional notes plus the framed photo are sent as a reference.
+                </p>
               </div>
-            )}
-          </div>
-        )}
-      </div>
+
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={generateDisabled}
+                className="w-full px-4 py-2.5 border border-border rounded-xl hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-sm text-foreground"
+              >
+                {generating ? 'Generating looks…' : 'Generate looks'}
+              </button>
+
+              {looks.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Pick one generated look</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {looks.map((url, index) => {
+                      const isSelected = selectedUrl === url;
+                      return (
+                        <button
+                          key={url}
+                          type="button"
+                          onClick={() => onSelectedUrlChange(url)}
+                          disabled={busy}
+                          aria-pressed={isSelected}
+                          aria-label={`Select look ${index + 1}`}
+                          className={`relative aspect-square rounded-xl overflow-hidden ring-2 transition-all ${
+                            isSelected ? 'ring-accent scale-[1.02]' : 'ring-transparent hover:ring-border'
+                          } disabled:opacity-60 disabled:cursor-not-allowed`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt="" className="w-full h-full object-cover" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {allowClear && selectedUrl && (
+                    <button
+                      type="button"
+                      onClick={() => onSelectedUrlChange(null)}
+                      className="mt-2 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Clear selection (create without a look)
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
