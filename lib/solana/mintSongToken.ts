@@ -1,5 +1,6 @@
 /**
  * Mint SPL token with Metaplex metadata for a song.
+ * Legacy helper — product song minting is retired. Do not call from product UI.
  * Creates mint, metadata, and mints initial supply to the mint authority.
  */
 

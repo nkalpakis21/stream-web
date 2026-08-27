@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { LaunchCoinToggle } from '@/components/artists/LaunchCoinToggle';
 import { createArtist } from '@/lib/services/artists';
+import { resolvePumpFunForArtistCreate } from '@/lib/solana/launchArtistPumpFunCoin';
 import type { StyleDNA } from '@/types/firestore';
 
 interface CreativeArtistFormProps {
@@ -25,6 +27,7 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
     tempoMin: '60',
     tempoMax: '180',
     isPublic: true,
+    launchCoin: false,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,11 +46,17 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
         influences: formData.influences.split(',').map(i => i.trim()).filter(Boolean),
       };
 
+      const { pumpFun, launchNotice } = await resolvePumpFunForArtistCreate({
+        launchCoin: formData.launchCoin,
+        artistName: formData.name,
+      });
+
       const artist = await createArtist(user.uid, {
         name: formData.name,
         styleDNA,
         lore: formData.lore,
         isPublic: formData.isPublic,
+        pumpFun,
       });
 
       // Reset form
@@ -60,7 +69,12 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
         tempoMin: '60',
         tempoMax: '180',
         isPublic: true,
+        launchCoin: false,
       });
+
+      if (launchNotice) {
+        alert(launchNotice);
+      }
 
       if (onSuccess) {
         onSuccess(artist.id);
@@ -270,6 +284,12 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
                   </div>
             </div>
           </div>
+
+          <LaunchCoinToggle
+            checked={formData.launchCoin}
+            onChange={launchCoin => setFormData({ ...formData, launchCoin })}
+            disabled={loading}
+          />
 
           <div className="flex gap-3 pt-2">
             <button
