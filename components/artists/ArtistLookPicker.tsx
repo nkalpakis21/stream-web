@@ -1,11 +1,17 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/components/providers/AuthProvider';
 import {
   PhotoFrameEditor,
   type PhotoFrameEditorHandle,
 } from '@/components/artists/PhotoFrameEditor';
+import {
+  getFreshIdToken,
+  SIGN_IN_AGAIN_MESSAGE,
+  userFacingApiError,
+} from '@/lib/api/clientAuth';
 
 const MAX_SOURCE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_SOURCE_TYPES = new Set([
@@ -62,6 +68,7 @@ export function ArtistLookPicker({
   const allowClear = !isLockMode;
   const fileInputId = useId();
   const lookNotesId = useId();
+  const generatePanelId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const frameRef = useRef<PhotoFrameEditorHandle>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -73,6 +80,7 @@ export function ArtistLookPicker({
   const [looks, setLooks] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showGenerate, setShowGenerate] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -142,7 +150,7 @@ export function ArtistLookPicker({
     setError(null);
     try {
       const blob = await frameRef.current.exportJpeg();
-      const token = await user.getIdToken();
+      const token = await getFreshIdToken(user);
       const form = new FormData();
       form.append('file', blob, 'look.jpg');
       const response = await fetch('/api/artists/looks/upload', {
@@ -152,12 +160,14 @@ export function ArtistLookPicker({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || typeof data.url !== 'string' || !/^https?:\/\//i.test(data.url)) {
-        throw new Error(data.error || 'Failed to upload photo.');
+        throw new Error(
+          userFacingApiError(response.status, data.error, 'Failed to upload photo.')
+        );
       }
       setUploadedUrl(data.url);
       onSelectedUrlChange(data.url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload photo.');
+      setError(userFacingApiError(undefined, err, 'Failed to upload photo.'));
     } finally {
       setUploading(false);
     }
@@ -246,13 +256,11 @@ export function ArtistLookPicker({
         <p className="text-xs text-muted-foreground mt-1">
           {isLockMode ? (
             <>
-              Upload a photo and frame the face to lock it — no AI required. Generate looks is optional. Songs will keep
-              this face.
+              Upload a photo and frame the face, then use this photo to lock it. Songs will keep this face.
             </>
           ) : (
             <>
-              Upload a photo and frame the face to use it as this artist&apos;s look — no AI required. Generate looks is
-              optional. Songs will keep this face.
+              Upload a photo and frame the face, then use this photo as the artist look. Songs will keep this face.
             </>
           )}
         </p>
@@ -301,85 +309,122 @@ export function ArtistLookPicker({
         )}
       </div>
 
-      <div>
-        <label htmlFor={lookNotesId} className="block text-sm font-medium mb-2 text-foreground">
-          Look notes (optional)
-        </label>
-        <input
-          id={lookNotesId}
-          type="text"
-          maxLength={500}
-          value={lookNotes}
-          disabled={busy}
-          onChange={e => setLookNotes(e.target.value)}
-          placeholder="e.g. silver hair, neon jacket, 80s album-cover lighting"
-          className="w-full px-4 py-3 border border-border rounded-xl bg-background/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
-        />
-        <p className="mt-1.5 text-xs text-muted-foreground">
-          Used only if you generate looks. The framed photo is also sent as an optional reference.
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={handleGenerate}
-        disabled={generateDisabled}
-        className="w-full px-4 py-2.5 border border-border rounded-xl hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-sm text-foreground"
-      >
-        {generating ? 'Generating looks…' : 'Generate looks'}
-      </button>
-
-      {available === false && (
-        <p className="text-xs text-muted-foreground">
-          Look generation is not configured (set <span className="font-mono">FAL_KEY</span>). You can still upload a
-          photo
-          {isLockMode
-            ? " and lock it as this artist's look."
-            : " as this artist's look, or create with a placeholder avatar."}
-        </p>
-      )}
-
       {error && (
         <p className="text-xs text-red-500" role="alert">
-          {error}
+          {error === SIGN_IN_AGAIN_MESSAGE ? (
+            <>
+              Your session expired.{' '}
+              <Link href="/signin" className="underline font-medium hover:opacity-80">
+                Sign in again
+              </Link>{' '}
+              to continue.
+            </>
+          ) : (
+            error
+          )}
         </p>
       )}
 
-      {looks.length > 0 && (
-        <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2">Pick one generated look</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {looks.map((url, index) => {
-              const isSelected = selectedUrl === url;
-              return (
-                <button
-                  key={url}
-                  type="button"
-                  onClick={() => onSelectedUrlChange(url)}
-                  disabled={busy}
-                  aria-pressed={isSelected}
-                  aria-label={`Select look ${index + 1}`}
-                  className={`relative aspect-square rounded-xl overflow-hidden ring-2 transition-all ${
-                    isSelected ? 'ring-accent scale-[1.02]' : 'ring-transparent hover:ring-border'
-                  } disabled:opacity-60 disabled:cursor-not-allowed`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" className="w-full h-full object-cover" />
-                </button>
-              );
-            })}
-          </div>
-          {allowClear && selectedUrl && (
+      <div className="border-t border-border/50 pt-4">
+        <button
+          type="button"
+          onClick={() => setShowGenerate(open => !open)}
+          aria-expanded={showGenerate}
+          aria-controls={generatePanelId}
+          className="w-full flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-all text-left"
+        >
+          <span className="text-sm font-medium text-foreground">Or generate a look</span>
+          <svg
+            className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${
+              showGenerate ? 'rotate-180' : ''
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {showGenerate && (
+          <div id={generatePanelId} className="pt-4 space-y-4">
+            <div>
+              <label htmlFor={lookNotesId} className="block text-sm font-medium mb-2 text-foreground">
+                Look notes (optional)
+              </label>
+              <input
+                id={lookNotesId}
+                type="text"
+                maxLength={500}
+                value={lookNotes}
+                disabled={busy}
+                onChange={e => setLookNotes(e.target.value)}
+                placeholder="e.g. silver hair, neon jacket, 80s album-cover lighting"
+                className="w-full px-4 py-3 border border-border rounded-xl bg-background/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+              />
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Optional notes plus the framed photo are sent as a reference.
+              </p>
+            </div>
+
             <button
               type="button"
-              onClick={() => onSelectedUrlChange(null)}
-              className="mt-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={handleGenerate}
+              disabled={generateDisabled}
+              className="w-full px-4 py-2.5 border border-border rounded-xl hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-sm text-foreground"
             >
-              Clear selection (create without a look)
+              {generating ? 'Generating looks…' : 'Generate looks'}
             </button>
-          )}
-        </div>
-      )}
+
+            {available === false && (
+              <p className="text-xs text-muted-foreground">
+                Look generation is not configured (set <span className="font-mono">FAL_KEY</span>). You can still upload
+                a photo
+                {isLockMode
+                  ? " and lock it as this artist's look."
+                  : " as this artist's look, or create with a placeholder avatar."}
+              </p>
+            )}
+
+            {looks.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Pick one generated look</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {looks.map((url, index) => {
+                    const isSelected = selectedUrl === url;
+                    return (
+                      <button
+                        key={url}
+                        type="button"
+                        onClick={() => onSelectedUrlChange(url)}
+                        disabled={busy}
+                        aria-pressed={isSelected}
+                        aria-label={`Select look ${index + 1}`}
+                        className={`relative aspect-square rounded-xl overflow-hidden ring-2 transition-all ${
+                          isSelected ? 'ring-accent scale-[1.02]' : 'ring-transparent hover:ring-border'
+                        } disabled:opacity-60 disabled:cursor-not-allowed`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    );
+                  })}
+                </div>
+                {allowClear && selectedUrl && (
+                  <button
+                    type="button"
+                    onClick={() => onSelectedUrlChange(null)}
+                    className="mt-2 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Clear selection (create without a look)
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

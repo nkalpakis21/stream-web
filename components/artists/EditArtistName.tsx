@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast, ToastContainer } from '@/components/ui/toast';
 import { Edit2, Check, X, Loader2 } from 'lucide-react';
+import { getFreshIdToken, userFacingApiError } from '@/lib/api/clientAuth';
 
 interface EditArtistNameProps {
   artistId: string;
@@ -53,7 +54,7 @@ export function EditArtistName({ artistId, currentName, onUpdate }: EditArtistNa
 
     setSaving(true);
     try {
-      const token = await user.getIdToken();
+      const token = await getFreshIdToken(user);
       const response = await fetch(`/api/artists/${artistId}/name`, {
         method: 'PATCH',
         headers: {
@@ -63,12 +64,13 @@ export function EditArtistName({ artistId, currentName, onUpdate }: EditArtistNa
         body: JSON.stringify({ name: trimmed }),
       });
 
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to update artist name');
+        throw new Error(
+          userFacingApiError(response.status, data.error, 'Failed to update artist name')
+        );
       }
 
-      const data = await response.json();
       setName(data.artist.name);
       setEditing(false);
       showToast('Artist name updated successfully', 'success');
@@ -77,8 +79,7 @@ export function EditArtistName({ artistId, currentName, onUpdate }: EditArtistNa
       }
     } catch (error) {
       console.error('Failed to update artist name:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update artist name';
-      showToast(errorMessage, 'error');
+      showToast(userFacingApiError(undefined, error, 'Failed to update artist name'), 'error');
     } finally {
       setSaving(false);
     }
