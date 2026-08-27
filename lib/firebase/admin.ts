@@ -17,6 +17,26 @@ import { existsSync, readFileSync } from 'fs';
 
 let _adminApp: admin.app.App | null = null;
 
+/**
+ * Default Storage bucket for Admin uploads. The cert does not always imply a
+ * bucket, so pass this on initializeApp and when calling `.bucket(name)`.
+ */
+function getStorageBucketName(): string | undefined {
+  const raw =
+    process.env.FIREBASE_STORAGE_BUCKET ||
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+    '';
+  const name = raw.replace(/^gs:\/\//, '').trim();
+  return name || undefined;
+}
+
+function adminAppOptions(
+  credential: ReturnType<typeof admin.credential.cert>
+): admin.AppOptions {
+  const storageBucket = getStorageBucketName();
+  return storageBucket ? { credential, storageBucket } : { credential };
+}
+
 function loadServiceAccountFromFile(path: string): object {
   const raw = readFileSync(path, 'utf-8');
   return JSON.parse(raw);
@@ -43,20 +63,22 @@ function getAdminApp(): admin.app.App {
     }
     if (process.env.FIREBASE_SERVICE_ACCOUNT) {
       const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-      _adminApp = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-      });
+      _adminApp = admin.initializeApp(
+        adminAppOptions(admin.credential.cert(serviceAccount))
+      );
     } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      _adminApp = admin.initializeApp({
-        credential: admin.credential.applicationDefault(),
-      });
+      _adminApp = admin.initializeApp(
+        adminAppOptions(admin.credential.applicationDefault())
+      );
     } else {
       const serviceAccountPath = getServiceAccountPath();
       if (serviceAccountPath) {
         const serviceAccount = loadServiceAccountFromFile(serviceAccountPath);
-        _adminApp = admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
-        });
+        _adminApp = admin.initializeApp(
+          adminAppOptions(
+            admin.credential.cert(serviceAccount as admin.ServiceAccount)
+          )
+        );
       } else {
         throw new Error(
           'Firebase Admin not initialized. Set FIREBASE_SERVICE_ACCOUNT, GOOGLE_APPLICATION_CREDENTIALS, FIREBASE_SERVICE_ACCOUNT_PATH, or add serviceAccountKey.dev.json (dev) / serviceAccountKey.json (prod)'
@@ -82,6 +104,19 @@ export async function verifyIdToken(idToken: string): Promise<admin.auth.Decoded
  */
 export function getAdminDb(): admin.firestore.Firestore {
   return getAdminApp().firestore();
+}
+
+/**
+ * Admin Storage bucket for server-side uploads (bypasses client Storage rules).
+ * Prefers an explicit bucket name from env; otherwise uses the app default.
+ */
+export function getAdminBucket() {
+  const app = getAdminApp();
+  const name = getStorageBucketName();
+  if (name) {
+    return app.storage().bucket(name);
+  }
+  return app.storage().bucket();
 }
 
 export function isFirebaseAdminConfigured(): boolean {
