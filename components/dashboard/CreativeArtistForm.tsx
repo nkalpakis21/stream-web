@@ -3,7 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { LaunchCoinToggle } from '@/components/artists/LaunchCoinToggle';
+import { ConnectXToggle } from '@/components/artists/ConnectXToggle';
 import { createArtist } from '@/lib/services/artists';
+import { startArtistXConnect } from '@/lib/x/startConnectClient';
+import { ArtistLookPicker } from '@/components/artists/ArtistLookPicker';
+import { resolvePumpFunForArtistCreate } from '@/lib/solana/launchArtistPumpFunCoin';
 import type { StyleDNA } from '@/types/firestore';
 
 interface CreativeArtistFormProps {
@@ -25,7 +30,11 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
     tempoMin: '60',
     tempoMax: '180',
     isPublic: true,
+    vocalIdentity: '',
+    launchCoin: false,
+    connectX: false,
   });
+  const [avatarURL, setAvatarURL] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,12 +52,22 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
         influences: formData.influences.split(',').map(i => i.trim()).filter(Boolean),
       };
 
+      const { pumpFun, launchNotice } = await resolvePumpFunForArtistCreate({
+        launchCoin: formData.launchCoin,
+        artistName: formData.name,
+      });
+
       const artist = await createArtist(user.uid, {
         name: formData.name,
         styleDNA,
         lore: formData.lore,
+        vocalIdentity: formData.vocalIdentity.trim() || null,
+        avatarURL,
         isPublic: formData.isPublic,
+        pumpFun,
       });
+
+      const shouldConnectX = formData.connectX;
 
       // Reset form
       setFormData({
@@ -60,7 +79,24 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
         tempoMin: '60',
         tempoMax: '180',
         isPublic: true,
+        vocalIdentity: '',
+        launchCoin: false,
+        connectX: false,
       });
+      setAvatarURL(null);
+
+      if (launchNotice) {
+        alert(launchNotice);
+      }
+
+      if (shouldConnectX) {
+        const xError = await startArtistXConnect(user, artist.id);
+        if (xError) {
+          alert(xError);
+        } else {
+          return;
+        }
+      }
 
       if (onSuccess) {
         onSuccess(artist.id);
@@ -143,6 +179,24 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
                 placeholder="Describe your artist's background, style, and personality..."
                 className="w-full px-4 py-3 border border-border rounded-xl bg-background/50 backdrop-blur-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all resize-none"
               />
+            </div>
+
+            <div>
+              <label htmlFor="vocalIdentity" className="block text-sm font-medium mb-2 text-foreground">
+                Vocal identity
+              </label>
+              <input
+                id="vocalIdentity"
+                type="text"
+                maxLength={200}
+                value={formData.vocalIdentity}
+                onChange={e => setFormData({ ...formData, vocalIdentity: e.target.value })}
+                placeholder="e.g. warm smoky alto, late-night R&B"
+                className="w-full px-4 py-3 border border-border rounded-xl bg-background/50 backdrop-blur-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+              />
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Locked for every song. MusicGPT has no custom voice clone on this endpoint yet, so this description is sent as music_style.
+              </p>
             </div>
           </div>
 
@@ -270,6 +324,29 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
                   </div>
             </div>
           </div>
+
+          <ArtistLookPicker
+            artistName={formData.name}
+            lore={formData.lore}
+            genres={formData.genres}
+            moods={formData.moods}
+            influences={formData.influences}
+            selectedUrl={avatarURL}
+            onSelectedUrlChange={setAvatarURL}
+            disabled={loading}
+          />
+
+          <LaunchCoinToggle
+            checked={formData.launchCoin}
+            onChange={launchCoin => setFormData({ ...formData, launchCoin })}
+            disabled={loading}
+          />
+
+          <ConnectXToggle
+            checked={formData.connectX}
+            onChange={connectX => setFormData({ ...formData, connectX })}
+            disabled={loading}
+          />
 
           <div className="flex gap-3 pt-2">
             <button

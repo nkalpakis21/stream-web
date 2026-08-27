@@ -15,6 +15,7 @@ import { getSong, getSongVersions, setPrimarySongVersion } from '@/lib/services/
 import type { SongDocument, SongVersionDocument, GenerationDocument } from '@/types/firestore';
 import { createSongReadyNotification, createArtistNewSongNotification } from '@/lib/services/notifications';
 import { getConversionDataByConversionID } from '@/lib/ai/providers/musicgpt';
+import { maybePostSongLive } from '@/lib/x/postSong';
 
 /**
  * MusicGPT webhook payload structure as documented.
@@ -591,6 +592,18 @@ export async function POST(request: Request) {
       } catch (error) {
         // Log but don't fail if follower notifications fail
         console.error('[MusicGPT Webhook] Failed to create follower notifications:', error);
+      }
+
+      // One X post per public song when it goes live. Idempotent; never fakes a post.
+      if (song.isPublic) {
+        try {
+          const xResult = await maybePostSongLive(song.id);
+          if (!xResult.ok) {
+            console.log('[MusicGPT Webhook] X song-live post:', xResult);
+          }
+        } catch (error) {
+          console.error('[MusicGPT Webhook] X song-live post failed:', error);
+        }
       }
 
       // Revalidate homepage so new song appears

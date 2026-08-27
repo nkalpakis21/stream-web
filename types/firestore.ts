@@ -38,6 +38,78 @@ export interface StyleDNA {
   influences: string[]; // e.g., ["Miles Davis", "Daft Punk"]
 }
 
+/**
+ * Optional artist-level pump.fun coin. All fields are nullable: an artist
+ * can exist with no token. Absent/undefined on older documents is equivalent
+ * to an unlaunched coin.
+ */
+export interface PumpFunCoin {
+  mint: string | null;
+  url: string | null;
+  symbol: string | null;
+  launchedAt: Timestamp | null;
+  creatorWallet: string | null;
+}
+
+export function emptyPumpFunCoin(): PumpFunCoin {
+  return {
+    mint: null,
+    url: null,
+    symbol: null,
+    launchedAt: null,
+    creatorWallet: null,
+  };
+}
+
+/**
+ * Public (non-secret) X connection state for an artist.
+ * Access/refresh tokens are NOT stored here — see artistXAuth (Admin SDK only).
+ */
+export type XConnectionStatus = 'disconnected' | 'connected' | 'paused';
+
+export interface XPostLogEntry {
+  tweetId: string;
+  url: string;
+  songId: string;
+  songTitle: string;
+  text: string;
+  createdAt: Timestamp;
+}
+
+export interface XConnectionPublic {
+  status: XConnectionStatus;
+  /** X handle without @. Null until OAuth completes. */
+  username: string | null;
+  /** X numeric user id. */
+  userId: string | null;
+  connectedAt: Timestamp | null;
+  pausedAt: Timestamp | null;
+  /** Human-readable reason posting was paused (auth, spam, rate limit). */
+  lastError: string | null;
+  lastErrorAt: Timestamp | null;
+  /** Set once after a successful name/bio/avatar sync on connect. */
+  profileSyncedAt: Timestamp | null;
+  /** Last ~20 post bodies so we do not repeat copy. */
+  recentPostTexts: string[];
+  /** Activity log of posts we made (newest first, capped). */
+  posts: XPostLogEntry[];
+}
+
+export function emptyXConnection(): XConnectionPublic {
+  return {
+    status: 'disconnected',
+    username: null,
+    userId: null,
+    connectedAt: null,
+    pausedAt: null,
+    lastError: null,
+    lastErrorAt: null,
+    profileSyncedAt: null,
+    recentPostTexts: [],
+    posts: [],
+  };
+}
+
 export interface AIArtistDocument {
   id: string;
   ownerId: string; // User ID
@@ -46,11 +118,27 @@ export interface AIArtistDocument {
   avatarURL: string | null;
   styleDNA: StyleDNA;
   lore: string; // Bio/backstory
+  /**
+   * Locked vocal/style identity sent to MusicGPT as `music_style` on every song.
+   * MusicGPT MusicAI has no persistent voice_id/clone on our endpoint; this text
+   * is the consistency lock until that exists. Optional for older artists.
+   */
+  vocalIdentity?: string | null;
   isPublic: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   deletedAt: Timestamp | null;
   currentVersionId: string; // Latest version ID
+  /**
+   * Artist-level pump.fun coin. Null/empty when the artist was created
+   * without launching a coin (the default).
+   */
+  pumpFun?: PumpFunCoin | null;
+  /**
+   * Optional public X account for this artist. Absent/undefined on older
+   * documents is equivalent to disconnected. Tokens are never stored here.
+   */
+  x?: XConnectionPublic | null;
 }
 
 export interface AIArtistVersionDocument {
@@ -61,6 +149,8 @@ export interface AIArtistVersionDocument {
   avatarURL: string | null;
   styleDNA: StyleDNA;
   lore: string;
+  /** Locked vocal/style identity; copied from the artist. Optional for older versions. */
+  vocalIdentity?: string | null;
   createdBy: string; // User ID
   createdAt: Timestamp;
   parentVersionId: string | null; // Previous version ID (null for v1)
@@ -103,11 +193,12 @@ export interface SongDocument {
    */
   playCount?: number;
   /**
-   * Solana SPL token mint address for this song (Phase 1 tokenization).
+   * Legacy per-song Metaplex mint address. Kept so existing documents still
+   * load. New tokens are artist-level via pump.fun; do not mint new song tokens.
    */
   tokenMintAddress?: string | null;
   /**
-   * When the token was created. Used for idempotency and audit.
+   * When the legacy song token was created. Kept for existing rows.
    */
   tokenMintCreatedAt?: Timestamp | null;
 }

@@ -6,7 +6,7 @@ An AI-native music platform built with Next.js, TypeScript, and Firebase.
 
 - Generate full-length songs using AI
 - Create and own AI Artists that evolve over time
-- Collaborate through remixing, forking, and extending songs
+- Share songs publicly and discover other AI artists
 - AI-native discovery (not playlist-based)
 - Public sharing by default with optional privacy
 - Immutable versioning and ownership tracking

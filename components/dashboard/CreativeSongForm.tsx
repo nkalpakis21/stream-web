@@ -104,6 +104,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
         artistContext: {
           styleDNA: artistVersion.styleDNA,
           lore: artistVersion.lore,
+          vocalIdentity: artistVersion.vocalIdentity ?? selectedArtist.vocalIdentity ?? null,
         },
         lyrics: formData.lyrics.trim() || undefined,
       });

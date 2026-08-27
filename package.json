@@ -11,6 +11,7 @@
     "postinstall": "node scripts/patch-wallet-adapter.cjs"
   },
   "dependencies": {
+    "@fal-ai/client": "^1.6.2",
     "@metaplex-foundation/mpl-token-metadata": "^3.4.0",
     "@metaplex-foundation/mpl-toolbox": "^0.10.0",
     "@metaplex-foundation/umi": "^1.5.1",
