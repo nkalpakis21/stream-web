@@ -6,9 +6,9 @@
  * parameter on this endpoint — there is no custom vocal model to train, and
  * we do not replace MusicGPT.
  *
- * Until MusicGPT adds a real voice-lock/clone field, we store `vocalIdentity`
- * on the artist at create time and send the same `music_style` string on
- * every song generate so vocal identity stays consistent across songs.
+ * Live MusicGPT requests use `buildMusicGPTStyleFromArtistContext` in
+ * `lib/ai/providers/musicgpt.ts`, which prepends `vocalIdentity` to the
+ * full style DNA string (genres, moods, tempo, influences, lore).
  */
 
 export interface MusicStyleContext {
