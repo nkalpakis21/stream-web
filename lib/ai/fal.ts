@@ -1,10 +1,10 @@
 /**
- * Fal-hosted Flux image generation (create-time artist looks only).
+ * Fal-hosted Flux image generation (artist looks at create or on the artist page).
  *
  * Env: FAL_KEY — Fal.ai API key. Server-side only; never expose to the client.
  * If FAL_KEY is unset, look generation is disabled. Do not invent a key and
  * do not return fake images. Artist create still works with a placeholder /
- * no avatar.
+ * no avatar. Existing artists can lock a look from the artist page.
  *
  * Hosted Flux via Fal only — no model training, no in-house GPUs.
  */

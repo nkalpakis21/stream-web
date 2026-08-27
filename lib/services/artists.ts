@@ -388,6 +388,42 @@ export async function updateArtistName(
 }
 
 /**
+ * Lock an artist look onto `avatarURL`. Owner-only; used from the artist page
+ * after the same Fal look picker as create. Does not generate a new face.
+ */
+export async function updateArtistAvatar(
+  artistId: string,
+  userId: string,
+  avatarURL: string
+): Promise<AIArtistDocument> {
+  const trimmed = avatarURL.trim();
+  if (!trimmed || !/^https?:\/\//i.test(trimmed)) {
+    throw new Error('A valid look URL is required');
+  }
+
+  const artist = await getArtist(artistId);
+  if (!artist) {
+    throw new Error('Artist not found');
+  }
+  if (artist.ownerId !== userId) {
+    throw new Error('Only the owner can update the artist look');
+  }
+
+  if (artist.avatarURL === trimmed) {
+    return artist;
+  }
+
+  await createArtistVersion(artistId, userId, { avatarURL: trimmed });
+
+  const updatedArtist = await getArtist(artistId);
+  if (!updatedArtist) {
+    throw new Error('Failed to retrieve updated artist');
+  }
+
+  return updatedArtist;
+}
+
+/**
  * Get multiple artists by their IDs (batch fetch)
  */
 export async function getArtistsByIds(

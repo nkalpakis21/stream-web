@@ -11,6 +11,11 @@ interface ArtistLookPickerProps {
   selectedUrl: string | null;
   onSelectedUrlChange: (url: string | null) => void;
   disabled?: boolean;
+  /**
+   * `create` is the new-artist form. `lock` is the owner-only artist page:
+   * pick a look to persist `avatarURL`. Same Fal endpoint either way.
+   */
+  mode?: 'create' | 'lock';
 }
 
 function splitCsv(value: string): string[] {
@@ -51,7 +56,11 @@ export function ArtistLookPicker({
   selectedUrl,
   onSelectedUrlChange,
   disabled = false,
+  mode = 'create',
 }: ArtistLookPickerProps) {
+  const isLockMode = mode === 'lock';
+  const autoSelectFirst = !isLockMode;
+  const allowClear = !isLockMode;
   const fileInputId = useId();
   const lookNotesId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -142,7 +151,9 @@ export function ArtistLookPicker({
         throw new Error('No looks were returned. Create the artist without an avatar, or try again.');
       }
       setLooks(urls);
-      onSelectedUrlChange(urls[0]);
+      if (autoSelectFirst) {
+        onSelectedUrlChange(urls[0]);
+      }
     } catch (err) {
       setLooks([]);
       onSelectedUrlChange(null);
@@ -160,7 +171,17 @@ export function ArtistLookPicker({
       <div>
         <p className="text-sm font-medium text-foreground">Artist look</p>
         <p className="text-xs text-muted-foreground mt-1">
-          Generate a small set of portraits from this artist&apos;s lore and style. Pick one to lock it — songs will keep this face. Optional. Regenerating later is not in this flow.
+          {isLockMode ? (
+            <>
+              Generate a small set of portraits from this artist&apos;s lore and style. Pick one to lock it as this
+              artist&apos;s face. Songs will keep this face.
+            </>
+          ) : (
+            <>
+              Generate a small set of portraits from this artist&apos;s lore and style. Pick one to lock it — songs will
+              keep this face. Optional. Regenerating later is not in this flow.
+            </>
+          )}
         </p>
       </div>
 
@@ -247,11 +268,12 @@ export function ArtistLookPicker({
                   key={url}
                   type="button"
                   onClick={() => onSelectedUrlChange(url)}
+                  disabled={disabled || generating}
                   aria-pressed={isSelected}
                   aria-label={`Select look ${index + 1}`}
                   className={`relative aspect-square rounded-xl overflow-hidden ring-2 transition-all ${
                     isSelected ? 'ring-accent scale-[1.02]' : 'ring-transparent hover:ring-border'
-                  }`}
+                  } disabled:opacity-60 disabled:cursor-not-allowed`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={url} alt="" className="w-full h-full object-cover" />
@@ -259,7 +281,7 @@ export function ArtistLookPicker({
               );
             })}
           </div>
-          {selectedUrl && (
+          {allowClear && selectedUrl && (
             <button
               type="button"
               onClick={() => onSelectedUrlChange(null)}

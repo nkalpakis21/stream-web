@@ -3,11 +3,9 @@ import { getArtist } from '@/lib/services/artists';
 import { getArtistSongs } from '@/lib/services/songs';
 import { SongCard } from '@/components/songs/SongCard';
 import { V0Navbar } from '@/components/navigation/V0Navbar';
-import { ArtistHeader } from '@/components/artists/ArtistHeader';
+import { ArtistHero } from '@/components/artists/ArtistHero';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import { formatDistanceToNow } from 'date-fns';
-import Image from 'next/image';
-import { getAvatarGradient, getInitials } from '@/lib/utils/avatar';
 
 // Force dynamic rendering to always fetch fresh data from Firestore
 export const dynamic = 'force-dynamic';
@@ -38,46 +36,8 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
       <V0Navbar />
 
       <main className="max-w-7xl mx-auto px-6 lg:px-8 pt-20 pb-8 lg:pt-24 lg:pb-12">
-        {/* Artist Header */}
-        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12">
-          <div className="flex-shrink-0">
-            <div className="relative w-32 h-32 lg:w-40 lg:h-40 rounded-full overflow-hidden bg-muted ring-4 ring-border shadow-medium">
-              {artist.avatarURL ? (
-                <Image
-                  src={artist.avatarURL}
-                  alt={artist.name}
-                  fill
-                  className="object-cover"
-                  sizes="160px"
-                />
-              ) : (
-                <div 
-                  className="w-full h-full flex items-center justify-center relative"
-                  style={{ background: getAvatarGradient(artist.name) }}
-                >
-                  {/* Subtle pattern overlay */}
-                  <div 
-                    className="absolute inset-0 opacity-10"
-                    style={{ 
-                      backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', 
-                      backgroundSize: '20px 20px' 
-                    }} 
-                  />
-                  {/* Initials */}
-                  <span className="relative text-white font-bold text-5xl lg:text-6xl drop-shadow-lg">
-                    {getInitials(artist.name)}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <ArtistHeader 
-            artist={artist} 
-            timeAgo={timeAgo}
-            isOwner={false} // Will be checked client-side
-          />
-          
+        {/* Artist Header — look picker is owner/manager only (client-side) */}
+        <ArtistHero artist={artist} timeAgo={timeAgo}>
           {/* Style DNA */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-border">
             <div>
@@ -111,7 +71,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
               </div>
             )}
           </div>
-        </div>
+        </ArtistHero>
 
         {/* Songs Section */}
         <section>
