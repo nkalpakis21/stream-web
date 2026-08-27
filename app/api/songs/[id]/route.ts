@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { getSongPath } from '@/lib/firebase/collections';
-import { deleteSong } from '@/lib/services/songs';
+import { deleteSong, getSong } from '@/lib/services/songs';
+import { maybePostSongLive } from '@/lib/x/postSong';
 
 export async function PATCH(
   request: NextRequest,
@@ -45,6 +46,17 @@ export async function PATCH(
     }
     
     await updateDoc(songRef, updates);
+
+    if (body.isPublic === true) {
+      try {
+        const song = await getSong(songId);
+        if (song?.isPublic) {
+          await maybePostSongLive(songId);
+        }
+      } catch (error) {
+        console.error('[API /songs] X song-live post failed:', error);
+      }
+    }
     
     return NextResponse.json({ success: true });
   } catch (error) {

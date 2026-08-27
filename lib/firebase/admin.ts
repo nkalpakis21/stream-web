@@ -75,3 +75,20 @@ export async function verifyIdToken(idToken: string): Promise<admin.auth.Decoded
   const app = getAdminApp();
   return app.auth().verifyIdToken(idToken);
 }
+
+/**
+ * Admin Firestore. Used for server-only data (X OAuth tokens) that must
+ * never be readable through the client SDK / security rules.
+ */
+export function getAdminDb(): admin.firestore.Firestore {
+  return getAdminApp().firestore();
+}
+
+export function isFirebaseAdminConfigured(): boolean {
+  try {
+    getAdminApp();
+    return true;
+  } catch {
+    return false;
+  }
+}

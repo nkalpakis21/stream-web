@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { LaunchCoinToggle } from '@/components/artists/LaunchCoinToggle';
+import { ConnectXToggle } from '@/components/artists/ConnectXToggle';
 import { createArtist } from '@/lib/services/artists';
+import { startArtistXConnect } from '@/lib/x/startConnectClient';
 import { ArtistLookPicker } from '@/components/artists/ArtistLookPicker';
 import { resolvePumpFunForArtistCreate } from '@/lib/solana/launchArtistPumpFunCoin';
 import type { StyleDNA } from '@/types/firestore';
@@ -28,6 +30,7 @@ export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
     isPublic: true,
     vocalIdentity: '',
     launchCoin: false,
+    connectX: false,
   });
   const [avatarURL, setAvatarURL] = useState<string | null>(null);
 
@@ -64,6 +67,15 @@ export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
 
       if (launchNotice) {
         alert(launchNotice);
+      }
+
+      if (formData.connectX) {
+        const xError = await startArtistXConnect(user, artist.id);
+        if (xError) {
+          alert(xError);
+        } else {
+          return;
+        }
       }
 
       // If onSuccess callback provided, use it (for multi-step flow)
@@ -229,6 +241,12 @@ export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
       <LaunchCoinToggle
         checked={formData.launchCoin}
         onChange={launchCoin => setFormData({ ...formData, launchCoin })}
+        disabled={loading}
+      />
+
+      <ConnectXToggle
+        checked={formData.connectX}
+        onChange={connectX => setFormData({ ...formData, connectX })}
         disabled={loading}
       />
 

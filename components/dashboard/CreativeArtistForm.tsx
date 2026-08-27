@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { LaunchCoinToggle } from '@/components/artists/LaunchCoinToggle';
+import { ConnectXToggle } from '@/components/artists/ConnectXToggle';
 import { createArtist } from '@/lib/services/artists';
+import { startArtistXConnect } from '@/lib/x/startConnectClient';
 import { ArtistLookPicker } from '@/components/artists/ArtistLookPicker';
 import { resolvePumpFunForArtistCreate } from '@/lib/solana/launchArtistPumpFunCoin';
 import type { StyleDNA } from '@/types/firestore';
@@ -30,6 +32,7 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
     isPublic: true,
     vocalIdentity: '',
     launchCoin: false,
+    connectX: false,
   });
   const [avatarURL, setAvatarURL] = useState<string | null>(null);
 
@@ -64,6 +67,8 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
         pumpFun,
       });
 
+      const shouldConnectX = formData.connectX;
+
       // Reset form
       setFormData({
         name: '',
@@ -76,11 +81,21 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
         isPublic: true,
         vocalIdentity: '',
         launchCoin: false,
+        connectX: false,
       });
       setAvatarURL(null);
 
       if (launchNotice) {
         alert(launchNotice);
+      }
+
+      if (shouldConnectX) {
+        const xError = await startArtistXConnect(user, artist.id);
+        if (xError) {
+          alert(xError);
+        } else {
+          return;
+        }
       }
 
       if (onSuccess) {
@@ -324,6 +339,12 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
           <LaunchCoinToggle
             checked={formData.launchCoin}
             onChange={launchCoin => setFormData({ ...formData, launchCoin })}
+            disabled={loading}
+          />
+
+          <ConnectXToggle
+            checked={formData.connectX}
+            onChange={connectX => setFormData({ ...formData, connectX })}
             disabled={loading}
           />
 

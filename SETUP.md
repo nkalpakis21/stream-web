@@ -40,6 +40,22 @@ npm install
    ```
    If `FAL_KEY` is unset, look generation is disabled and artist create still works with a placeholder avatar.
 
+   Optional — artist X posting (OAuth 2.0 user-context). Server-side only; do not commit keys and do not prefix with `NEXT_PUBLIC_`:
+   ```
+   X_CLIENT_ID=your-x-oauth-client-id
+   X_CLIENT_SECRET=your-x-oauth-client-secret
+   ```
+   If unset, Connect X is disabled and artist create still works. Streamstar never fakes posts.
+
+   Callback URL to register on the X app (exact match):
+   - Production: `https://streamstar.xyz/api/x/callback` (also add `https://www.streamstar.xyz/api/x/callback` if you serve www)
+   - Develop preview: `https://stream-web-git-develop-nkalpakis.vercel.app/api/x/callback`
+   - Local: `http://localhost:3000/api/x/callback`
+
+   Optional override if the request origin is not a registered callback: `X_REDIRECT_URI=https://streamstar.xyz/api/x/callback`
+
+   Scopes: `tweet.write users.read offline.access tweet.read media.write users.write`
+
 4. Set up Firestore Security Rules:
    ```javascript
    rules_version = '2';

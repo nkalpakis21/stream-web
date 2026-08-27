@@ -80,6 +80,14 @@ service cloud.firestore {
     }
     
     // Other collection rules...
+    // X OAuth tokens and song-live idempotency — Admin SDK only.
+    match /artistXAuth/{artistId} {
+      allow read, write: if false;
+    }
+    match /xSongPosts/{songId} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false; // Deny by default
     }

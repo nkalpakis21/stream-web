@@ -18,6 +18,16 @@ export const COLLECTIONS = {
   conversations: 'conversations',
   messages: 'messages',
   comments: 'comments',
+  /**
+   * Server-only X OAuth tokens keyed by artistId.
+   * Client SDK must never read this collection (rules deny all).
+   */
+  artistXAuth: 'artistXAuth',
+  /**
+   * Idempotency records for song-live X posts. Keyed by songId.
+   * Server-only (rules deny all).
+   */
+  xSongPosts: 'xSongPosts',
 } as const;
 
 export type CollectionName = typeof COLLECTIONS[keyof typeof COLLECTIONS];
