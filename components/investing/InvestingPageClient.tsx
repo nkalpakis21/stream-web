@@ -6,7 +6,7 @@ import { V0Navbar } from '@/components/navigation/V0Navbar';
 import { isWhitelistedInvestorEmail } from '@/lib/investing/whitelist';
 
 const HOW_IT_WORKS = [
-  'Create the artist (voice + look stay consistent)',
+  'Create the artist (voice + look consistency is next)',
   'Generate the catalog',
   'Run the artist (share, follows, community)',
   'Optional: coin on pump.fun',
@@ -162,9 +162,10 @@ function InvestingMemo() {
             <SectionLabel>Product</SectionLabel>
             <div className="space-y-4 text-lg leading-relaxed text-muted-foreground">
               <p>
-                You create an AI artist whose voice and look stay consistent.
-                You generate songs into that artist&apos;s catalog. You are the
-                manager — identity, releases, audience.
+                You create an AI artist and generate songs into that
+                artist&apos;s catalog. You are the manager — identity, releases,
+                audience. Consistent voice and look is the loop we&apos;re
+                building, not what&apos;s live today.
               </p>
               <p>
                 Optional: launch a pump.fun coin for the artist. Distribution on
@@ -198,8 +199,8 @@ function InvestingMemo() {
               <div className="rounded-2xl border border-primary/25 bg-primary/5 p-6">
                 <p className="text-sm font-semibold text-primary mb-3">Live</p>
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  Live at streamstar.xyz: AI artists, generation, catalogs,
-                  social (comments, follows, chat), optional pump.fun path.
+                  AI artists, generation, catalogs, social (comments, follows,
+                  chat). Pump.fun opt-in on create; launch is not live.
                 </p>
               </div>
               <div className="rounded-2xl border border-border/50 bg-card/40 p-6">
@@ -207,7 +208,7 @@ function InvestingMemo() {
                   Not live
                 </p>
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  X.
+                  Consistent voice + look. Pump.fun launch. X.
                 </p>
               </div>
             </div>
