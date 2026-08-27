@@ -23,6 +23,8 @@ export interface AIGenerationRequest {
       influences: string[];
     };
     lore: string;
+    /** Locked vocal/style identity from the artist; mapped to MusicGPT music_style. */
+    vocalIdentity?: string | null;
   };
 }
 

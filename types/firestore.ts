@@ -69,6 +69,12 @@ export interface AIArtistDocument {
   avatarURL: string | null;
   styleDNA: StyleDNA;
   lore: string; // Bio/backstory
+  /**
+   * Locked vocal/style identity sent to MusicGPT as `music_style` on every song.
+   * MusicGPT MusicAI has no persistent voice_id/clone on our endpoint; this text
+   * is the consistency lock until that exists. Optional for older artists.
+   */
+  vocalIdentity?: string | null;
   isPublic: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -89,6 +95,8 @@ export interface AIArtistVersionDocument {
   avatarURL: string | null;
   styleDNA: StyleDNA;
   lore: string;
+  /** Locked vocal/style identity; copied from the artist. Optional for older versions. */
+  vocalIdentity?: string | null;
   createdBy: string; // User ID
   createdAt: Timestamp;
   parentVersionId: string | null; // Previous version ID (null for v1)

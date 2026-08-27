@@ -104,6 +104,12 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                 <p className="text-sm font-medium">{artist.styleDNA.influences.join(', ')}</p>
               </div>
             )}
+            {artist.vocalIdentity && (
+              <div>
+                <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Vocal identity</span>
+                <p className="text-sm font-medium">{artist.vocalIdentity}</p>
+              </div>
+            )}
           </div>
         </div>
 

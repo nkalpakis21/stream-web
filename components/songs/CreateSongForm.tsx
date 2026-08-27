@@ -127,6 +127,7 @@ export function CreateSongForm({ preselectedArtistId, showSuccessMessage }: Crea
         artistContext: {
           styleDNA: artistVersion.styleDNA,
           lore: artistVersion.lore,
+          vocalIdentity: artistVersion.vocalIdentity ?? selectedArtist.vocalIdentity ?? null,
         },
         lyrics: formData.lyrics.trim() || undefined,
       });
