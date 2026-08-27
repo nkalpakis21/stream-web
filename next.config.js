@@ -11,6 +11,11 @@ const nextConfig = {
   async redirects() {
     return [
       {
+        source: '/investors',
+        destination: '/investing',
+        permanent: true,
+      },
+      {
         source: '/songs/:id/fork',
         destination: '/songs/:id',
         permanent: false,
