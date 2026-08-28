@@ -8,11 +8,13 @@ const nextConfig = {
     };
     return config;
   },
-  serverExternalPackages: [
-    '@pump-fun/pump-sdk',
-    '@coral-xyz/anchor',
-    '@pump-fun/pump-swap-sdk',
-  ],
+  experimental: {
+    serverComponentsExternalPackages: [
+      '@pump-fun/pump-sdk',
+      '@coral-xyz/anchor',
+      '@pump-fun/pump-swap-sdk',
+    ],
+  },
   async redirects() {
     return [
       {
