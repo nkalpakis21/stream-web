@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
-import { getAdminBucket, isFirebaseAdminConfigured } from '@/lib/firebase/admin';
+import { getAdminBucket } from '@/lib/firebase/admin';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -40,11 +40,9 @@ function sniffImageType(buffer: Buffer): 'image/jpeg' | 'image/png' | 'image/web
  */
 export async function POST(request: NextRequest) {
   try {
-    const userId = await requireUserId(request);
-
-    if (!isFirebaseAdminConfigured()) {
-      throw new HttpError(503, 'Photo upload is not configured (Firebase Admin).');
-    }
+    const userId = await requireUserId(request, {
+      unavailableMessage: 'Look upload is temporarily unavailable',
+    });
 
     const form = await request.formData().catch(() => null);
     const file = form?.get('file');
