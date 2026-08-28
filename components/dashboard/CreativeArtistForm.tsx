@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { LaunchCoinToggle } from '@/components/artists/LaunchCoinToggle';
 import { ConnectXToggle } from '@/components/artists/ConnectXToggle';
 import { createArtist } from '@/lib/services/artists';
 import { startArtistXConnect } from '@/lib/x/startConnectClient';
 import { ArtistLookPicker } from '@/components/artists/ArtistLookPicker';
+import { getFreshIdToken } from '@/lib/api/clientAuth';
 import { resolvePumpFunForArtistCreate } from '@/lib/solana/launchArtistPumpFunCoin';
 import type { StyleDNA } from '@/types/firestore';
 
@@ -19,6 +21,8 @@ interface CreativeArtistFormProps {
 export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormProps) {
   const { user } = useAuth();
   const router = useRouter();
+  const { connection } = useConnection();
+  const { publicKey, connected, signTransaction } = useWallet();
   const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [formData, setFormData] = useState({
@@ -32,6 +36,8 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
     isPublic: true,
     vocalIdentity: '',
     launchCoin: false,
+    coinName: '',
+    ticker: '',
     connectX: false,
   });
   const [avatarURL, setAvatarURL] = useState<string | null>(null);
@@ -52,9 +58,20 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
         influences: formData.influences.split(',').map(i => i.trim()).filter(Boolean),
       };
 
+      const pumpWallet =
+        connected && publicKey && signTransaction
+          ? { publicKey, signTransaction }
+          : null;
+
       const { pumpFun, launchNotice } = await resolvePumpFunForArtistCreate({
         launchCoin: formData.launchCoin,
-        artistName: formData.name,
+        coinName: formData.coinName.trim() || formData.name,
+        ticker: formData.ticker,
+        imageUrl: avatarURL,
+        description: formData.lore,
+        wallet: pumpWallet,
+        connection,
+        getIdToken: user ? () => getFreshIdToken(user) : undefined,
       });
 
       const artist = await createArtist(user.uid, {
@@ -81,6 +98,8 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
         isPublic: true,
         vocalIdentity: '',
         launchCoin: false,
+        coinName: '',
+        ticker: '',
         connectX: false,
       });
       setAvatarURL(null);
@@ -340,6 +359,12 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
             checked={formData.launchCoin}
             onChange={launchCoin => setFormData({ ...formData, launchCoin })}
             disabled={loading}
+            artistName={formData.name}
+            coinName={formData.coinName}
+            onCoinNameChange={coinName => setFormData({ ...formData, coinName })}
+            ticker={formData.ticker}
+            onTickerChange={ticker => setFormData({ ...formData, ticker })}
+            lookUrl={avatarURL}
           />
 
           <ConnectXToggle
@@ -359,7 +384,7 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
                   <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  Creating...
+                  {formData.launchCoin ? 'Creating and launching…' : 'Creating...'}
                 </span>
               ) : (
                 'Create Artist'

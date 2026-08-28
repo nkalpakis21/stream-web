@@ -13,6 +13,7 @@ import { SongPlayCardClient } from '@/components/songs/SongPlayCardClient';
 import { ShareButton } from '@/components/songs/ShareButton';
 import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
 import { SongTokenCard } from '@/components/songs/SongTokenCard';
+import { ArtistPumpFunBuyLink } from '@/components/artists/ArtistPumpFunBuyLink';
 import { V0Navbar } from '@/components/navigation/V0Navbar';
 import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
 import { getLyricsForSong } from '@/lib/services/lyrics';
@@ -169,12 +170,15 @@ export default async function SongPage({ params }: SongPageProps) {
             </h1>
             <div className="flex flex-col items-center gap-3">
               {artist && (
-                <Link
-                  href={`/artists/${artist.id}`}
-                  className="text-base sm:text-lg text-muted-foreground hover:text-accent transition-colors"
-                >
-                  by {artist.name}
-                </Link>
+                <div className="flex items-center gap-3 flex-wrap justify-center">
+                  <Link
+                    href={`/artists/${artist.id}`}
+                    className="text-base sm:text-lg text-muted-foreground hover:text-accent transition-colors"
+                  >
+                    by {artist.name}
+                  </Link>
+                  <ArtistPumpFunBuyLink pumpFun={artist.pumpFun} />
+                </div>
               )}
               <ShareButton 
                 url={`${process.env.NEXT_PUBLIC_APP_URL || 'https://stream.app'}/songs/${song.id}`}
