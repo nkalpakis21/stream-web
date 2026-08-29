@@ -35,8 +35,6 @@ export function ConnectXToggle({
     };
   }, []);
 
-  const configured = available !== false;
-
   return (
     <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-2">
       <div className="flex items-start gap-3">
@@ -44,7 +42,7 @@ export function ConnectXToggle({
           id="connectX"
           type="checkbox"
           checked={checked}
-          disabled={disabled}
+          disabled={disabled || available === false}
           onChange={e => onChange(e.target.checked)}
           className="mt-0.5 w-4 h-4 rounded border-border text-accent focus:ring-2 focus:ring-accent focus:ring-offset-0"
         />
@@ -57,12 +55,10 @@ export function ConnectXToggle({
       </div>
       <p className="text-xs text-muted-foreground pl-7">
         {available === false
-          ? 'X is not configured (set X_CLIENT_ID and X_CLIENT_SECRET). You can still create this artist without X.'
+          ? 'X isn’t available right now. You can still create this artist without it.'
           : checked
-            ? configured
-              ? 'After create, you will authorize X as this artist’s account (not a Streamstar company account). Streamstar will post when a public song goes live.'
-              : 'X is not configured. The artist will be created without X.'
-            : 'Off by default. Connect later from the artist page. Posts as the artist’s own X account when a song goes live.'}
+            ? 'After create, you’ll connect this artist’s own X. Posts when a public song goes live.'
+            : 'Off by default. You can create the artist without X.'}
       </p>
     </div>
   );

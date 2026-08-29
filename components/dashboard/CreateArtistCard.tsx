@@ -31,7 +31,7 @@ export function CreateArtistCard({ onClick }: CreateArtistCardProps) {
         </div>
       </div>
       <h3 className="font-medium text-sm text-foreground group-hover:text-accent transition-colors line-clamp-1">
-        Create New Artist
+        New artist
       </h3>
     </button>
   );

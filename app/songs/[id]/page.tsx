@@ -118,7 +118,6 @@ export default async function SongPage({ params }: SongPageProps) {
 
   const versions = allVersions;
 
-  const latestGeneration = generations.find(g => g.status === 'completed');
   const hasPendingGeneration = generations.some(g => g.status === 'pending' || g.status === 'processing');
   const timeAgo = formatDistanceToNow(song.createdAt.toDate(), {
     addSuffix: true,
@@ -156,6 +155,7 @@ export default async function SongPage({ params }: SongPageProps) {
           artistName={artist?.name || 'Unknown Artist'}
           albumCoverUrl={coverImageUrl}
           audioUrl={primaryAudioUrl}
+          pending={hasPendingGeneration}
           versions={serializedVersions.map(v => ({
             id: v.id,
             audioURL: v.audioURL,
@@ -198,16 +198,6 @@ export default async function SongPage({ params }: SongPageProps) {
             <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3">
               Created {timeAgo}
             </p>
-            
-            {/* Metadata - Hidden on mobile, shown on larger screens */}
-            {latestGeneration?.contentHash && (
-              <div className="hidden sm:block pt-2">
-                <span className="text-xs text-muted-foreground uppercase tracking-wide">Content Hash</span>
-                <p className="text-xs font-mono text-muted-foreground mt-1 break-all max-w-xs">
-                  {latestGeneration.contentHash}
-                </p>
-              </div>
-            )}
         </div>
 
         {/* Version Cards */}
