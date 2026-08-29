@@ -78,8 +78,9 @@ function quoteFromPair(pair: DexPair): ArtistCoinQuote | null {
 }
 
 /**
- * Live quotes keyed by mint. Incomplete Dexscreener rows are omitted —
- * Heat hides the cluster rather than inventing PRICE / 24H / MCAP.
+ * Live quotes keyed by mint. Incomplete Dexscreener rows are omitted.
+ * Heat paints those gaps as $0 / 0% / $0 via formatHeatCoinCluster;
+ * other surfaces still hide the cluster.
  */
 export async function fetchCoinQuotes(mints: string[]): Promise<Map<string, ArtistCoinQuote>> {
   const unique = Array.from(

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
 import { getSongVersions } from '@/lib/services/songs';
 import { createDebouncedPlayTracker } from '@/lib/utils/playTracking';
-import { formatCoinCluster, type ArtistCoinQuote } from '@/lib/brand/coinStats';
+import { formatCoinCluster, formatHeatCoinCluster, type ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { EmptyAction } from '@/components/states/EmptyAction';
 import './heat.css';
 
@@ -19,8 +19,12 @@ export interface HeatTrack {
   coin: ArtistCoinQuote | null;
 }
 
-function CoinClusterText({ quote }: { quote: ArtistCoinQuote }) {
-  const { price, change, mcap, tone } = formatCoinCluster(quote);
+function CoinClusterText({
+  cluster,
+}: {
+  cluster: ReturnType<typeof formatCoinCluster>;
+}) {
+  const { price, change, mcap, tone } = cluster;
   return (
     <>
       {price}
@@ -44,7 +48,7 @@ export function FeaturedCoinMeta({
   if (!quote) return null;
   return (
     <Link href={`/artists/${artistId}`} className="heat-featured-meta">
-      <CoinClusterText quote={quote} />
+      <CoinClusterText cluster={formatCoinCluster(quote)} />
     </Link>
   );
 }
@@ -68,7 +72,7 @@ function HeatRow({ track, rank, queue }: { track: HeatTrack; rank: number; queue
   const isCurrent = nowPlaying?.songId === track.id || (!!audioUrl && nowPlaying?.audioUrl === audioUrl);
   const showPause = Boolean(isCurrent && isPlaying);
   const quote = track.coin;
-  const cluster = quote ? formatCoinCluster(quote) : null;
+  const cluster = formatHeatCoinCluster(quote);
   const rankClass = rank <= 3 ? ` r${rank}` : '';
 
   const startPlayback = async () => {
@@ -132,32 +136,20 @@ function HeatRow({ track, rank, queue }: { track: HeatTrack; rank: number; queue
                 {track.artistName}
               </p>
             </button>
-            {quote ? (
-              <Link href={`/artists/${track.artistId}`} className="heat-cluster-inline">
-                <CoinClusterText quote={quote} />
-              </Link>
-            ) : null}
+            <Link href={`/artists/${track.artistId}`} className="heat-cluster-inline">
+              <CoinClusterText cluster={cluster} />
+            </Link>
           </div>
         </div>
-        {cluster ? (
-          <>
-            <Link href={`/artists/${track.artistId}`} className="heat-price">
-              {cluster.price}
-            </Link>
-            <Link href={`/artists/${track.artistId}`} className={`heat-chg is-${cluster.tone}`}>
-              {cluster.change}
-            </Link>
-            <Link href={`/artists/${track.artistId}`} className="heat-mcap">
-              {cluster.mcap}
-            </Link>
-          </>
-        ) : (
-          <>
-            <span className="heat-price" />
-            <span className="heat-chg" />
-            <span className="heat-mcap" />
-          </>
-        )}
+        <Link href={`/artists/${track.artistId}`} className="heat-price">
+          {cluster.price}
+        </Link>
+        <Link href={`/artists/${track.artistId}`} className={`heat-chg is-${cluster.tone}`}>
+          {cluster.change}
+        </Link>
+        <Link href={`/artists/${track.artistId}`} className="heat-mcap">
+          {cluster.mcap}
+        </Link>
         <button
           type="button"
           className="heat-play"

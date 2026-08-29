@@ -1,6 +1,7 @@
 /**
- * Honest artist-coin quotes for Heat / featured meta.
- * Show PRICE / 24H / MCAP only when all three values exist.
+ * Honest artist-coin quotes for featured meta, Discover, player chip, and artist module.
+ * Those surfaces hide PRICE / 24H / MCAP unless all three live values exist.
+ * Heat tape is the exception — use formatHeatCoinCluster so empty rows still paint zeros.
  * Never invent volume, holders, or per-track mcaps.
  */
 
@@ -82,6 +83,14 @@ export function formatCoinCluster(quote: ArtistCoinQuote) {
     mcap: formatCoinMcap(quote.marketCap),
     tone: coinChangeTone(quote.change24h),
   };
+}
+
+/** Heat tape only. Missing or incomplete quotes still paint PRICE / 24H / MCAP. */
+export function formatHeatCoinCluster(quote: ArtistCoinQuote | null) {
+  if (!quote) {
+    return { price: '$0', change: '0%', mcap: '$0', tone: 'flat' as const };
+  }
+  return formatCoinCluster(quote);
 }
 
 /** Same compact $ format as mcap. Empty when the value is not a real number. */
