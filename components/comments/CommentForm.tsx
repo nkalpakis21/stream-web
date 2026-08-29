@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { createComment } from '@/lib/services/comments';
 import { useToast, ToastContainer } from '@/components/ui/toast';
 import { Send, X } from 'lucide-react';
+import { AuthGateCard } from '@/components/auth/AuthGateCard';
 
 interface CommentFormProps {
   targetType: 'artist' | 'song';
@@ -32,6 +34,7 @@ export function CommentForm({
   onCancel,
 }: CommentFormProps) {
   const { user } = useAuth();
+  const pathname = usePathname();
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const { toasts, showToast, dismissToast } = useToast();
@@ -75,9 +78,11 @@ export function CommentForm({
 
   if (!user) {
     return (
-      <div className="p-4 text-center text-muted-foreground text-sm">
-        Please sign in to comment
-      </div>
+      <AuthGateCard
+        headline="Sign in to comment"
+        why="Join the conversation on this page."
+        returnTo={pathname}
+      />
     );
   }
 

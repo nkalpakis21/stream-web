@@ -11,6 +11,7 @@ import { getUserSongs } from '@/lib/services/songs';
 import { getUserArtists } from '@/lib/services/artists';
 import { getArtistNamesForSongs } from '@/lib/services/songs';
 import type { SongDocument, AIArtistDocument } from '@/types/firestore';
+import { authHref, currentReturnTo } from '@/lib/auth/returnTo';
 
 type DashboardTab = 'overview' | 'artists' | 'songs';
 
@@ -31,7 +32,8 @@ function DashboardContent() {
     if (authLoading) return;
 
     if (!user) {
-      router.push('/signin');
+      const search = searchParams.toString();
+      router.replace(authHref('/signin', currentReturnTo('/dashboard', search ? `?${search}` : '')));
       return;
     }
 
@@ -58,7 +60,7 @@ function DashboardContent() {
     };
 
     loadData();
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, searchParams]);
 
   const handleTabChange = (tab: DashboardTab) => {
     router.push(`/dashboard?tab=${tab}`);

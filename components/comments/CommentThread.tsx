@@ -9,6 +9,9 @@ import { useUserDisplayName, useUsersDisplayNames } from '@/hooks/useUserDisplay
 import type { CommentDocument } from '@/types/firestore';
 import { formatDistanceToNow } from 'date-fns';
 import { Reply } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { authHref } from '@/lib/auth/returnTo';
 
 interface CommentThreadProps {
   comment: Omit<CommentDocument, 'createdAt' | 'updatedAt' | 'deletedAt'> & {
@@ -32,6 +35,7 @@ export function CommentThread({
   onCommentUpdated,
 }: CommentThreadProps) {
   const { user } = useAuth();
+  const pathname = usePathname();
   const [replies, setReplies] = useState<SerializedCommentDocument[]>([]);
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [loadingReplies, setLoadingReplies] = useState(false);
@@ -101,7 +105,7 @@ export function CommentThread({
             {comment.content}
           </p>
 
-          {user && (
+          {user ? (
             <div className="flex items-center gap-4">
               <button
                 onClick={() => {
@@ -124,6 +128,14 @@ export function CommentThread({
                 </button>
               )}
             </div>
+          ) : (
+            <Link
+              href={authHref('/signin', pathname)}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Reply className="w-3 h-3" />
+              Reply
+            </Link>
           )}
 
           {showReplyForm && (

@@ -9,6 +9,8 @@ import { SongCard } from '@/components/songs/SongCard';
 import { getArtistNamesForSongs } from '@/lib/services/songs';
 import type { SongDocument } from '@/types/firestore';
 import { InfiniteScrollSentinel } from '@/components/discover/InfiniteScrollSentinel';
+import { AuthGateCard } from '@/components/auth/AuthGateCard';
+import Link from 'next/link';
 
 interface PaginatedResponse {
   songs: Array<{
@@ -23,7 +25,7 @@ interface PaginatedResponse {
 }
 
 export function FeedPageClient() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [songs, setSongs] = useState<SongDocument[]>([]);
   const [artistNames, setArtistNames] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -277,13 +279,21 @@ export function FeedPageClient() {
     };
   }, [user, songs]);
 
-  if (!user) {
+  if (authLoading) {
     return (
       <div className="py-16 text-center">
-        <p className="text-muted-foreground text-lg mb-4">
-          Please sign in to view your feed
-        </p>
+        <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin mx-auto" />
       </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <AuthGateCard
+        headline="Sign in to view your feed"
+        why="See new songs from artists you follow."
+        returnTo="/feed"
+      />
     );
   }
 
@@ -315,9 +325,15 @@ export function FeedPageClient() {
   if (songs.length === 0) {
     return (
       <div className="py-16 text-center">
-        <p className="text-muted-foreground text-lg mb-4">
+        <p className="text-muted-foreground text-lg mb-6">
           Your feed is empty. Follow some artists to see their songs here!
         </p>
+        <Link
+          href="/artists"
+          className="inline-flex items-center justify-center px-6 py-3 bg-accent text-accent-foreground rounded-xl font-medium hover:opacity-90 transition-all shadow-lg"
+        >
+          Follow artists
+        </Link>
       </div>
     );
   }

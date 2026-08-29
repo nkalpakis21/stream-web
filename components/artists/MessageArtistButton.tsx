@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast, ToastContainer } from '@/components/ui/toast';
 import { MessageCircle, Loader2 } from 'lucide-react';
+import { authHref } from '@/lib/auth/returnTo';
 
 interface MessageArtistButtonProps {
   artistId: string;
@@ -20,7 +22,8 @@ export function MessageArtistButton({ artistId, ownerId }: MessageArtistButtonPr
   const isOwnArtist = user?.uid === ownerId;
 
   const handleClick = async () => {
-    if (!user || loading || isOwnArtist) return;
+    if (loading || isOwnArtist) return;
+    if (!user) return;
 
     setLoading(true);
     try {
@@ -60,13 +63,29 @@ export function MessageArtistButton({ artistId, ownerId }: MessageArtistButtonPr
     return null; // Don't show button for own artist
   }
 
+  const buttonClass =
+    'flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-background hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+
+  if (!user) {
+    return (
+      <Link
+        href={authHref('/signin', `/artists/${artistId}`)}
+        className={buttonClass}
+        aria-label="Sign in to message artist"
+      >
+        <MessageCircle className="w-4 h-4" />
+        <span className="text-sm">Message</span>
+      </Link>
+    );
+  }
+
   return (
     <>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <button
         onClick={handleClick}
-        disabled={loading || !user}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-background hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={loading}
+        className={buttonClass}
         aria-label="Message artist owner"
       >
         {loading ? (

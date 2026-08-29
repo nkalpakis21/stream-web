@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation';
 import { FeedPageClient } from '@/components/feed/FeedPageClient';
 
 // Force dynamic rendering to always fetch fresh data
