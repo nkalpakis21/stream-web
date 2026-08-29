@@ -10,6 +10,7 @@ import { getArtistNamesForSongs } from '@/lib/services/songs';
 import type { SongDocument } from '@/types/firestore';
 import { InfiniteScrollSentinel } from '@/components/discover/InfiniteScrollSentinel';
 import { AuthGateCard } from '@/components/auth/AuthGateCard';
+import { SongCardSkeleton, SongCardSkeletonGrid } from '@/components/discover/SongCardSkeleton';
 import Link from 'next/link';
 
 interface PaginatedResponse {
@@ -281,9 +282,10 @@ export function FeedPageClient() {
 
   if (authLoading) {
     return (
-      <div className="py-16 text-center">
-        <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin mx-auto" />
-      </div>
+      <SongCardSkeletonGrid
+        count={12}
+        className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+      />
     );
   }
 
@@ -299,9 +301,10 @@ export function FeedPageClient() {
 
   if (loading) {
     return (
-      <div className="py-16 text-center">
-        <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin mx-auto" />
-      </div>
+      <SongCardSkeletonGrid
+        count={12}
+        className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+      />
     );
   }
 
@@ -358,8 +361,10 @@ export function FeedPageClient() {
       )}
 
       {loadingMore && (
-        <div className="py-8 text-center">
-          <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin mx-auto" />
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SongCardSkeleton key={`more-${i}`} />
+          ))}
         </div>
       )}
     </div>

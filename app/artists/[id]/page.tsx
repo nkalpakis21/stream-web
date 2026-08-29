@@ -5,6 +5,7 @@ import { SongCard } from '@/components/songs/SongCard';
 import { ArtistHero } from '@/components/artists/ArtistHero';
 import { hasLaunchedCoin } from '@/lib/brand/coin';
 import { CommentsSection } from '@/components/comments/CommentsSection';
+import { EmptyAction } from '@/components/states/EmptyAction';
 import { formatDistanceToNow } from 'date-fns';
 
 // Force dynamic rendering to always fetch fresh data from Firestore
@@ -96,7 +97,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
             </div>
           ) : (
             <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
-              <p className="text-muted-foreground">No songs yet.</p>
+              <EmptyAction message="No songs yet." href="/discover" label="Discover" />
             </div>
           )}
         </section>

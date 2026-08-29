@@ -9,6 +9,8 @@ import type { CommentDocument } from '@/types/firestore';
 import { MessageSquare } from 'lucide-react';
 import { AuthGateCard } from '@/components/auth/AuthGateCard';
 import { usePathname } from 'next/navigation';
+import { EmptyAction } from '@/components/states/EmptyAction';
+import { CommentSkeletonList } from '@/components/comments/CommentSkeleton';
 
 interface CommentsSectionProps {
   targetType: 'artist' | 'song';
@@ -99,13 +101,16 @@ export function CommentsSection({ targetType, targetId }: CommentsSectionProps) 
       </div>
 
       {loading && comments.length === 0 ? (
-        <div className="py-8 text-center">
-          <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin mx-auto" />
-        </div>
+        <CommentSkeletonList />
       ) : comments.length === 0 ? (
-        <div className="py-8 text-center text-muted-foreground">
-          <p>No comments yet. Be the first to comment!</p>
-        </div>
+        user ? (
+          <div className="py-8">
+            <EmptyAction
+              label="Write a comment"
+              onClick={() => document.getElementById('comment-composer')?.focus()}
+            />
+          </div>
+        ) : null
       ) : (
         <div className="space-y-6">
           {comments.map(comment => (

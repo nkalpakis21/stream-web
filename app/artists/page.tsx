@@ -1,5 +1,6 @@
 import { getPublicArtists } from '@/lib/services/artists';
 import { ArtistCard } from '@/components/artists/ArtistCard';
+import { EmptyAction } from '@/components/states/EmptyAction';
 // Force dynamic rendering to always fetch fresh data from Firestore
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,7 @@ export default async function ArtistsPage() {
           </div>
         ) : (
           <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
-            <p className="text-muted-foreground text-lg">No artists yet. Create your first AI artist!</p>
+            <EmptyAction message="No artists yet." href="/discover" label="Discover" />
           </div>
         )}
       </main>

@@ -93,6 +93,7 @@ export function CommentForm({
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
+          id={parentCommentId ? undefined : 'comment-composer'}
           placeholder={parentCommentId ? 'Write a reply...' : 'Write a comment...'}
           rows={3}
           className="w-full resize-none rounded-lg border border-border bg-background px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
