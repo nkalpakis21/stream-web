@@ -86,7 +86,7 @@ function DashboardContent() {
             Studio
           </h1>
           <p className="text-muted-foreground">
-            Create artists and generate songs. Listeners stay on Discover.
+            Create artists and generate songs.
           </p>
         </div>
 

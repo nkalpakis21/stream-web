@@ -90,10 +90,6 @@ export function OverviewTab({
       {artists.length === 0 && songs.length === 0 && (
         <div className="text-center py-16 rounded-2xl border border-white/10 bg-card/40">
           <div className="max-w-md mx-auto">
-            <h3 className="text-xl font-semibold mb-2">Studio is the second door</h3>
-            <p className="text-muted-foreground mb-6">
-              Listeners stay on Discover. Create an artist here, then generate a song.
-            </p>
             <Link
               href="/dashboard?tab=artists&new=1"
               className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-full hover:opacity-90 transition-opacity font-medium"
