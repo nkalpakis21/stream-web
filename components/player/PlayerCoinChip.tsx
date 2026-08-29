@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { formatCoinCluster, type ArtistCoinQuote } from '@/lib/brand/coinStats';
+import { formatHeatCoinCluster, type ArtistCoinQuote } from '@/lib/brand/coinStats';
 
 interface CoinQuoteResponse {
   quote?: ArtistCoinQuote | null;
 }
 
+/** Persistent player chip. Always paints PRICE / 24H / mcap-if-fits, including $0 / 0% / $0. */
 export function PlayerCoinChip({ artistId }: { artistId?: string }) {
   const [quote, setQuote] = useState<ArtistCoinQuote | null>(null);
 
@@ -34,15 +35,15 @@ export function PlayerCoinChip({ artistId }: { artistId?: string }) {
     };
   }, [artistId]);
 
-  if (!artistId || !quote) return null;
+  if (!artistId) return null;
 
-  const { price, change, mcap, tone } = formatCoinCluster(quote);
+  const { price, change, mcap, tone } = formatHeatCoinCluster(quote);
 
   return (
     <Link href={`/artists/${artistId}`} className="listen-player-chip" aria-label={`${price} ${change}`}>
       <span className="listen-player-chip-price">{price}</span>
       <span className={`listen-player-chip-chg is-${tone}`}>{change}</span>
-      {mcap ? <span className="listen-player-chip-mcap">{mcap}</span> : null}
+      <span className="listen-player-chip-mcap">{mcap}</span>
     </Link>
   );
 }
