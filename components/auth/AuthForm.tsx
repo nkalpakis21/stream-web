@@ -100,7 +100,7 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
               onChange={e => setPassword(e.target.value)}
               className="w-full px-4 py-3 border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
               placeholder="••••••••"
-              minLength={6}
+              minLength={isSignUp ? 8 : undefined}
             />
           </div>
 

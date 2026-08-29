@@ -7,6 +7,8 @@ import { CommentForm } from './CommentForm';
 import { getComments, getReplies } from '@/lib/services/comments';
 import type { CommentDocument } from '@/types/firestore';
 import { MessageSquare } from 'lucide-react';
+import { AuthGateCard } from '@/components/auth/AuthGateCard';
+import { usePathname } from 'next/navigation';
 
 interface CommentsSectionProps {
   targetType: 'artist' | 'song';
@@ -22,6 +24,7 @@ type SerializedCommentDocument = Omit<CommentDocument, 'createdAt' | 'updatedAt'
 
 export function CommentsSection({ targetType, targetId }: CommentsSectionProps) {
   const { user } = useAuth();
+  const pathname = usePathname();
   const [comments, setComments] = useState<SerializedCommentDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
@@ -79,15 +82,21 @@ export function CommentsSection({ targetType, targetId }: CommentsSectionProps) 
         )}
       </div>
 
-      {user && (
-        <div className="mb-8">
+      <div className="mb-8">
+        {user ? (
           <CommentForm
             targetType={targetType}
             targetId={targetId}
             onCommentAdded={handleCommentAdded}
           />
-        </div>
-      )}
+        ) : (
+          <AuthGateCard
+            headline="Sign in to comment"
+            why="Join the conversation."
+            returnTo={pathname}
+          />
+        )}
+      </div>
 
       {loading && comments.length === 0 ? (
         <div className="py-8 text-center">

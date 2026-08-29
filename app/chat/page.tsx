@@ -7,9 +7,10 @@ import { ChatView } from '@/components/chat/ChatView';
 import { NewChatModal } from '@/components/chat/NewChatModal';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast, ToastContainer } from '@/components/ui/toast';
+import { AuthGateCard } from '@/components/auth/AuthGateCard';
 
 function ChatPageContent() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -117,15 +118,33 @@ function ChatPageContent() {
     router.push(`/chat?conversationId=${conversationId}`, { scroll: false });
   };
 
-  if (!user) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-background">
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
           <div className="text-center">
-            <p className="text-lg text-muted-foreground mb-4">
-              Please sign in to use chat
+            <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin mx-auto" />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+          <div className="mb-8">
+            <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-2">Chat</h1>
+            <p className="text-lg text-muted-foreground">
+              Direct messages and group chats
             </p>
           </div>
+          <AuthGateCard
+            headline="Sign in to use chat"
+            why="Message artists and keep your conversations in one place."
+            returnTo="/chat"
+          />
         </main>
       </div>
     );
