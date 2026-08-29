@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type MouseEvent } from 'react';
 import { CoverImage } from '@/components/media/CoverImage';
 import Link from 'next/link';
 import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
@@ -113,43 +113,56 @@ function HeatRow({ track, rank, queue }: { track: HeatTrack; rank: number; queue
     void startPlayback();
   };
 
+  const onArtistNav = (event: MouseEvent) => {
+    event.stopPropagation();
+  };
+
+  const onPlayControl = (event: MouseEvent) => {
+    event.stopPropagation();
+    onPlay();
+  };
+
   return (
     <li>
-      <div className={`heat-row${rankClass}${isCurrent && isPlaying ? ' is-playing' : ''}`}>
+      <div
+        className={`heat-row${rankClass}${isCurrent && isPlaying ? ' is-playing' : ''}`}
+        onClick={onPlay}
+      >
         <span className="rank">{rank}</span>
-        <button type="button" className="heat-hit heat-thumb" onClick={onPlay} aria-label={`Play ${track.title}`}>
-          <CoverImage src={track.coverUrl} title={track.title} sizes="36px" rounded="rounded-[6px]" />
-        </button>
+        <span className="heat-thumb">
+          <CoverImage src={track.coverUrl} title={track.title} sizes="40px" rounded="rounded-[6px]" />
+        </span>
         <div className="heat-meta">
-          <button type="button" className="heat-hit" onClick={onPlay}>
-            <p className="heat-track" data-entity="track">
-              {track.title}
-            </p>
-          </button>
+          <p className="heat-track" data-entity="track">
+            {track.title}
+          </p>
           <div className="heat-artist-line">
-            <button type="button" className="heat-hit" onClick={onPlay}>
-              <p className="heat-artist" data-entity="artist">
-                {track.artistName}
-              </p>
-            </button>
-            <Link href={`/artists/${track.artistId}`} className="heat-cluster-inline">
+            <Link
+              href={`/artists/${track.artistId}`}
+              className="heat-artist"
+              data-entity="artist"
+              onClick={onArtistNav}
+            >
+              {track.artistName}
+            </Link>
+            <Link href={`/artists/${track.artistId}`} className="heat-cluster-inline" onClick={onArtistNav}>
               <CoinClusterText cluster={cluster} />
             </Link>
           </div>
         </div>
-        <Link href={`/artists/${track.artistId}`} className="heat-price">
+        <Link href={`/artists/${track.artistId}`} className="heat-price" onClick={onArtistNav}>
           {cluster.price}
         </Link>
-        <Link href={`/artists/${track.artistId}`} className={`heat-chg is-${cluster.tone}`}>
+        <Link href={`/artists/${track.artistId}`} className={`heat-chg is-${cluster.tone}`} onClick={onArtistNav}>
           {cluster.change}
         </Link>
-        <Link href={`/artists/${track.artistId}`} className="heat-mcap">
+        <Link href={`/artists/${track.artistId}`} className="heat-mcap" onClick={onArtistNav}>
           {cluster.mcap}
         </Link>
         <button
           type="button"
           className="heat-play"
-          onClick={onPlay}
+          onClick={onPlayControl}
           aria-label={showPause ? `Pause ${track.title}` : `Play ${track.title}`}
         >
           {loading ? (
