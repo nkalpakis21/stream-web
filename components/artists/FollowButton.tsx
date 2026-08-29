@@ -71,15 +71,14 @@ export function FollowButton({ artistId, ownerId, className = '' }: FollowButton
     }
   };
 
-  // Don't show button if not logged in or if it's own artist
-  if (!user || isOwnArtist) {
+  if (isOwnArtist) {
     return null;
   }
 
   return (
     <button
       onClick={handleFollow}
-      disabled={loading || following === null}
+      disabled={loading || Boolean(user && following === null)}
       className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
         following
           ? 'border-accent/30 bg-accent/10 text-accent hover:bg-accent/20'

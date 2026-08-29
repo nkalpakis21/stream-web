@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { Timestamp } from 'firebase/firestore';
 import { getSong } from '@/lib/services/songs';
 import { getSongVersion } from '@/lib/services/songVersions';
 import { getSongGenerations } from '@/lib/services/generations';
@@ -9,17 +8,15 @@ import { formatDistanceToNow } from 'date-fns';
 import { getSongVersions } from '@/lib/services/songs';
 import { VersionCards } from '@/components/songs/VersionCards';
 import { DeveloperSection } from '@/components/songs/DeveloperSection';
-import { SongPlayCardClient } from '@/components/songs/SongPlayCardClient';
 import { ShareButton } from '@/components/songs/ShareButton';
 import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
 import { SongTokenCard } from '@/components/songs/SongTokenCard';
 import { ArtistPumpFunBuyLink } from '@/components/artists/ArtistPumpFunBuyLink';
 import { ArtistCoinBuy } from '@/components/artists/ArtistCoinBuy';
-import { V0Navbar } from '@/components/navigation/V0Navbar';
 import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
+import { SongStage } from '@/components/songs/SongStage';
 import { getLyricsForSong } from '@/lib/services/lyrics';
 import { CommentsSection } from '@/components/comments/CommentsSection';
-import Link from 'next/link';
 
 // Force dynamic rendering to always fetch fresh data from Firestore
 export const dynamic = 'force-dynamic';
@@ -35,7 +32,7 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
   
   if (!song || song.deletedAt) {
     return {
-      title: 'Song Not Found | Stream ⭐',
+      title: 'Song not found',
     };
   }
 
@@ -64,10 +61,10 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
 
   const title = song.title;
   const artistName = artist?.name || 'Unknown Artist';
-  const description = `Listen to ${title} by ${artistName} on Stream ⭐`;
+  const description = `Listen to ${title} by ${artistName} on Streamstar`;
 
   return {
-    title: `${title} | Stream ⭐`,
+    title,
     description,
     openGraph: {
       title,
@@ -151,42 +148,41 @@ export default async function SongPage({ params }: SongPageProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      <V0Navbar />
-
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-4 sm:pb-8 lg:pb-12">
-        {/* Song Card with Play Functionality */}
-        <div className="flex flex-col items-center mb-6 sm:mb-12">
-          <SongPlayCardClient
-            songTitle={song.title}
-            artistName={artist?.name || 'Unknown Artist'}
-            albumCoverUrl={coverImageUrl}
-            audioUrl={primaryAudioUrl}
-            songId={song.id}
-          />
-          
-          {/* Song Info Below Card */}
-          <div className="mt-4 sm:mt-6 text-center w-full px-2">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-1 sm:mb-2 text-foreground">
-              {song.title}
-            </h1>
-            <div className="flex flex-col items-center gap-3">
-              {artist && (
-                <div className="flex items-center gap-3 flex-wrap justify-center">
-                  <Link
-                    href={`/artists/${artist.id}`}
-                    className="text-base sm:text-lg text-muted-foreground hover:text-accent transition-colors"
-                  >
-                    by {artist.name}
-                  </Link>
-                  <ArtistPumpFunBuyLink pumpFun={artist.pumpFun} />
-                </div>
-              )}
-              <ShareButton 
-                url={`${process.env.NEXT_PUBLIC_APP_URL || 'https://stream.app'}/songs/${song.id}`}
-                title={song.title}
-                artistName={artist?.name}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+        <SongStage
+          songId={song.id}
+          songTitle={song.title}
+          artistId={artist?.id || null}
+          artistName={artist?.name || 'Unknown Artist'}
+          albumCoverUrl={coverImageUrl}
+          audioUrl={primaryAudioUrl}
+          versions={serializedVersions.map(v => ({
+            id: v.id,
+            audioURL: v.audioURL,
+            isPrimary: v.isPrimary,
+          }))}
+        >
+          {lyrics && (
+            <div className="mt-8">
+              <LyricsSectionWrapper
+                lyrics={lyrics}
+                songTitle={song.title}
+                artistName={artist?.name || 'Unknown Artist'}
+                albumCoverUrl={coverImageUrl}
+                audioUrl={primaryAudioUrl}
               />
             </div>
+          )}
+        </SongStage>
+        <div className="mt-6 mb-10 flex flex-col items-start gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <ShareButton 
+                  url={`${process.env.NEXT_PUBLIC_APP_URL || 'https://stream.app'}/songs/${song.id}`}
+                  title={song.title}
+                  artistName={artist?.name}
+                />
+                <ArtistPumpFunBuyLink pumpFun={artist?.pumpFun} />
+              </div>
             <SongOwnerActions
               songId={song.id}
               songTitle={song.title}
@@ -198,43 +194,21 @@ export default async function SongPage({ params }: SongPageProps) {
                 tokenMintAddress={song.tokenMintAddress}
               />
             )}
-            <div className="flex justify-center mt-3">
-              <ArtistCoinBuy url={artist?.pumpFun?.url} />
-            </div>
+            <ArtistCoinBuy url={artist?.pumpFun?.url} />
             <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3">
               Created {timeAgo}
             </p>
             
             {/* Metadata - Hidden on mobile, shown on larger screens */}
-            <div className="hidden sm:flex flex-wrap gap-4 justify-center pt-4 mt-4 border-t border-border">
-              <div>
-                <span className="text-xs text-muted-foreground uppercase tracking-wide">Version</span>
-                <p className="text-sm font-medium mt-1">{songVersion.versionNumber}</p>
+            {latestGeneration?.contentHash && (
+              <div className="hidden sm:block pt-2">
+                <span className="text-xs text-muted-foreground uppercase tracking-wide">Content Hash</span>
+                <p className="text-xs font-mono text-muted-foreground mt-1 break-all max-w-xs">
+                  {latestGeneration.contentHash}
+                </p>
               </div>
-              {latestGeneration?.contentHash && (
-                <div>
-                  <span className="text-xs text-muted-foreground uppercase tracking-wide">Content Hash</span>
-                  <p className="text-xs font-mono text-muted-foreground mt-1 break-all max-w-xs">
-                    {latestGeneration.contentHash}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+            )}
         </div>
-
-        {/* Lyrics Section - Prominently displayed */}
-        {lyrics && (
-          <div className="mb-16">
-            <LyricsSectionWrapper
-              lyrics={lyrics}
-              songTitle={song.title}
-              artistName={artist?.name || 'Unknown Artist'}
-              albumCoverUrl={coverImageUrl}
-              audioUrl={primaryAudioUrl}
-            />
-          </div>
-        )}
 
         {/* Version Cards */}
         <VersionCards

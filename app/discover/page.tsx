@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from 'react';
 import { SongCard } from '@/components/songs/SongCard';
-import { V0Navbar } from '@/components/navigation/V0Navbar';
 import { InfiniteScrollSentinel } from '@/components/discover/InfiniteScrollSentinel';
 import { SongCardSkeleton } from '@/components/discover/SongCardSkeleton';
 import { useInfiniteSongs } from '@/hooks/useInfiniteSongs';
@@ -14,6 +13,7 @@ export default function DiscoverPage() {
   const {
     songs,
     artistNames,
+    coinBySong,
     loading,
     loadingMore,
     hasMore,
@@ -43,11 +43,9 @@ export default function DiscoverPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <V0Navbar />
-
-      <main className="max-w-7xl mx-auto px-6 lg:px-8 pt-20 pb-8 lg:pt-24 lg:pb-12">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         <section className="mb-12">
-          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-8">Discover Music</h1>
+          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-8">Discover</h1>
           
           <form onSubmit={handleSearch} className="mb-6">
             <div className="flex gap-3">
@@ -127,9 +125,10 @@ export default function DiscoverPage() {
                     animationFillMode: 'both',
                   }}
                 >
-                  <SongCard 
-                    song={song} 
+                  <SongCard
+                    song={song}
                     artistName={artistNames.get(song.id)}
+                    hasCoin={coinBySong.get(song.id) ?? false}
                   />
                 </div>
               ))}

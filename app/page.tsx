@@ -1,37 +1,83 @@
-import { getPublicSongs, getTopSongs, getArtistNamesForSongs } from '@/lib/services/songs';
-import { V0Navbar } from '@/components/navigation/V0Navbar';
-import { Hero } from '@/components/homepage/v0/Hero';
-import { LatestSongs } from '@/components/homepage/v0/LatestSongs';
-import { Features } from '@/components/homepage/v0/Features';
-import { CtaSection } from '@/components/homepage/v0/CtaSection';
+import { getPublicSongs, getTopSongs, getArtistNamesForSongs, getSongVersions } from '@/lib/services/songs';
+import { getArtistsData } from '@/lib/services/artists';
+import { hasLaunchedCoin } from '@/lib/brand/coin';
+import { HomeListenShell } from '@/components/homepage/HomeListenShell';
+import type { SongDocument } from '@/types/firestore';
 
-const SONGS_PER_SECTION = 24;
+const HEAT_LIMIT = 8;
+const LIVE_LIMIT = 12;
 
 export const revalidate = 120;
 
+async function firstPlayableAudio(songs: SongDocument[]): Promise<{ song: SongDocument; audioUrl: string } | null> {
+  for (const song of songs) {
+    const versions = await getSongVersions(song.id);
+    const audio =
+      versions.find(v => v.isPrimary && v.audioURL)?.audioURL ||
+      versions.find(v => v.audioURL)?.audioURL ||
+      null;
+    if (audio) {
+      return { song, audioUrl: audio };
+    }
+  }
+  return null;
+}
+
 export default async function HomePage() {
   const [latestSongs, topSongs] = await Promise.all([
-    getPublicSongs(SONGS_PER_SECTION),
-    getTopSongs(SONGS_PER_SECTION),
+    getPublicSongs(LIVE_LIMIT),
+    getTopSongs(HEAT_LIMIT),
   ]);
 
-  const [latestArtistMap, topArtistMap] = await Promise.all([
-    getArtistNamesForSongs(latestSongs),
-    getArtistNamesForSongs(topSongs),
+  const heat = topSongs.length > 0 ? topSongs : latestSongs.slice(0, HEAT_LIMIT);
+  const live = latestSongs.length > 0 ? latestSongs : topSongs;
+  const featured = await firstPlayableAudio(heat.length ? heat : live);
+
+  const allSongs = [...heat, ...live, ...(featured ? [featured.song] : [])];
+  const unique = Array.from(new Map(allSongs.map(s => [s.id, s])).values());
+
+  const [artistNames, artists] = await Promise.all([
+    getArtistNamesForSongs(unique),
+    getArtistsData(unique.map(s => s.artistId)),
   ]);
+
+  const coinByArtist = new Map<string, boolean>();
+  artists.forEach((artist, id) => {
+    coinByArtist.set(id, hasLaunchedCoin(artist.pumpFun));
+  });
 
   return (
     <main className="min-h-screen bg-background">
-      <V0Navbar />
-      <Hero />
-      <LatestSongs
-        latestSongs={latestSongs}
-        topSongs={topSongs}
-        latestArtistMap={latestArtistMap}
-        topArtistMap={topArtistMap}
+      <HomeListenShell
+        featured={
+          featured
+            ? {
+                songId: featured.song.id,
+                title: featured.song.title,
+                artistName: artistNames.get(featured.song.id) || 'Artist',
+                coverUrl: featured.song.albumCoverThumbnail || featured.song.albumCoverPath,
+                audioUrl: featured.audioUrl,
+                hasCoin: coinByArtist.get(featured.song.artistId) ?? false,
+              }
+            : null
+        }
+        heat={heat.map(song => ({
+          id: song.id,
+          title: song.title,
+          artistName: artistNames.get(song.id) || 'Artist',
+          coverUrl: song.albumCoverThumbnail || song.albumCoverPath,
+          playCount: song.playCount ?? 0,
+          hasCoin: coinByArtist.get(song.artistId) ?? false,
+        }))}
+        live={live.map(song => ({
+          id: song.id,
+          title: song.title,
+          artistName: artistNames.get(song.id) || 'Artist',
+          coverUrl: song.albumCoverThumbnail || song.albumCoverPath,
+          playCount: song.playCount ?? 0,
+          hasCoin: coinByArtist.get(song.artistId) ?? false,
+        }))}
       />
-      <Features />
-      <CtaSection />
     </main>
   );
 }

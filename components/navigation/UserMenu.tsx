@@ -130,7 +130,7 @@ export function UserMenu() {
           
           {/* Menu */}
           <div
-            className="absolute right-0 top-[calc(100%+0.75rem)] w-[260px] bg-card border border-border/60 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+            className="absolute right-0 top-[calc(100%+0.75rem)] w-[min(260px,calc(100vw-2rem))] bg-card border border-border/60 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
           >
             {/* User Info Header */}
             <div className="px-4 py-3 border-b border-border/40">

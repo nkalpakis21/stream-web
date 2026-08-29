@@ -29,7 +29,7 @@ export function ArtistHeader({ artist, timeAgo, isOwner: propIsOwner }: ArtistHe
         ) : (
           <h1 className="text-4xl lg:text-5xl font-bold tracking-tight">{artist.name}</h1>
         )}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <ArtistPumpFunBuyLink pumpFun={artist.pumpFun} />
           <MessageArtistButton artistId={artist.id} ownerId={artist.ownerId} />
           <FollowButton artistId={artist.id} ownerId={artist.ownerId} />

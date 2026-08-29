@@ -45,7 +45,7 @@ export function Nav() {
         <div className="flex justify-between items-center h-14">
           {/* Logo */}
           <Link href="/" className={logoClass}>
-            Stream ⭐
+            Streamstar
           </Link>
 
           {/* Desktop Navigation */}
