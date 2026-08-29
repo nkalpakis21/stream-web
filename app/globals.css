@@ -229,6 +229,72 @@ html.listen [data-entity='artist'] {
   width: 100%;
 }
 
+/* STR-38 song-stage cluster — Heat numbers + Buy. Zeros when missing. */
+.song-stage-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.song-stage-cluster-meta {
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  color: var(--mute, #8b8896);
+}
+
+.song-stage-cluster-meta .is-up {
+  color: var(--heat, #c8f542);
+  font-weight: 700;
+}
+
+.song-stage-cluster-meta .is-down {
+  color: var(--down, #ff4d6a);
+  font-weight: 700;
+}
+
+.song-stage-cluster .btn-heat {
+  height: 40px;
+  padding: 0 16px;
+}
+
+.song-stage-duration {
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--mute, #8b8896);
+  font-variant-numeric: tabular-nums;
+}
+
+.song-stage-chip {
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  border: 1px solid var(--line, #2a2a38);
+  background: transparent;
+  color: var(--mute, #8b8896);
+  cursor: pointer;
+}
+
+.song-stage-chip.is-selected {
+  background: var(--surface-2, #1c1c28);
+  border-color: transparent;
+  color: var(--ink, #f5f4f8);
+}
+
+html.listen .lyrics-listen {
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

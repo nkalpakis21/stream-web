@@ -9,6 +9,8 @@ import type { CommentDocument } from '@/types/firestore';
 import { MessageSquare } from 'lucide-react';
 import { AuthGateCard } from '@/components/auth/AuthGateCard';
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
+import { authHref } from '@/lib/auth/returnTo';
 import { EmptyAction } from '@/components/states/EmptyAction';
 import { CommentSkeletonList } from '@/components/comments/CommentSkeleton';
 
@@ -91,6 +93,16 @@ export function CommentsSection({ targetType, targetId }: CommentsSectionProps) 
             targetId={targetId}
             onCommentAdded={handleCommentAdded}
           />
+        ) : targetType === 'song' ? (
+          <p className="text-sm text-muted-foreground">
+            Join the conversation.{' '}
+            <Link
+              href={authHref('/signin', pathname)}
+              className="font-semibold text-foreground underline-offset-4 hover:underline"
+            >
+              Sign in to comment
+            </Link>
+          </p>
         ) : (
           <AuthGateCard
             headline="Sign in to comment"

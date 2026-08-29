@@ -127,6 +127,14 @@ function parseTimestampedLyrics(
 }
 
 /**
+ * Strip leading [Section] tags before paint. Product: `^\[[^\]]+\]`.
+ * Applied per line so verse/chorus markers never show.
+ */
+export function stripLyricSectionTags(raw: string): string {
+  return raw.replace(/^\[[^\]]+\]\s*/gm, '');
+}
+
+/**
  * Split raw lyrics into lines
  * Preserves empty lines and formatting
  */
