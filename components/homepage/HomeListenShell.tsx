@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { PlayableArt } from '@/components/songs/PlayableArt';
+import { EmptyAction } from '@/components/states/EmptyAction';
 
 export interface ListenTrack {
   id: string;
@@ -98,7 +99,9 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
             </Link>
           </div>
           {heat.length === 0 ? (
-            <p className="py-8 text-sm text-muted-foreground">No tracks yet.</p>
+            <div className="py-8">
+              <EmptyAction message="No tracks yet." href="/discover" label="Discover" />
+            </div>
           ) : (
             <ol className="flex flex-col">
               {heat.map((track, index) => (
@@ -144,9 +147,9 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
           </Link>
         </div>
         {live.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border py-12 text-center text-muted-foreground">
-            No public tracks yet.
-          </p>
+          <div className="rounded-2xl border border-dashed border-border py-12">
+            <EmptyAction message="No public tracks yet." href="/discover" label="Discover" />
+          </div>
         ) : (
           <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 md:grid-cols-4 lg:grid-cols-6">
             {live.map(track => (

@@ -31,9 +31,7 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
   const song = await getSong(params.id);
   
   if (!song || song.deletedAt) {
-    return {
-      title: 'Song not found',
-    };
+    notFound();
   }
 
   // Get all versions to find primary version

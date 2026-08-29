@@ -3,7 +3,8 @@
 import { useState, useCallback } from 'react';
 import { SongCard } from '@/components/songs/SongCard';
 import { InfiniteScrollSentinel } from '@/components/discover/InfiniteScrollSentinel';
-import { SongCardSkeleton } from '@/components/discover/SongCardSkeleton';
+import { SongCardSkeleton, SongCardSkeletonGrid } from '@/components/discover/SongCardSkeleton';
+import { EmptyAction } from '@/components/states/EmptyAction';
 import { useInfiniteSongs } from '@/hooks/useInfiniteSongs';
 
 export default function DiscoverPage() {
@@ -89,11 +90,7 @@ export default function DiscoverPage() {
 
         {/* Initial Loading State */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <SongCardSkeleton key={i} />
-            ))}
-          </div>
+          <SongCardSkeletonGrid />
         ) : error ? (
           <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
             <p className="text-muted-foreground text-lg mb-4">
@@ -108,9 +105,11 @@ export default function DiscoverPage() {
           </div>
         ) : songs.length === 0 ? (
           <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
-            <p className="text-muted-foreground text-lg">
-              No songs found. Try a different search or create your own!
-            </p>
+            {activeQuery ? (
+              <EmptyAction message="No songs found." label="Browse recent" onClick={handleLoadRecent} />
+            ) : (
+              <EmptyAction message="No songs found." href="/" label="Play" />
+            )}
           </div>
         ) : (
           <>
