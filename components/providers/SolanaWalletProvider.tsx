@@ -11,6 +11,7 @@ import { clusterApiUrl } from '@solana/web3.js';
 
 import '@solana/wallet-adapter-react-ui/styles.css';
 import { WalletSessionEffects } from '@/hooks/useWalletSession';
+import { WalletPickerLayer } from '@/components/wallet/WalletConnectControl';
 
 export function SolanaWalletProvider({ children }: { children: React.ReactNode }) {
   const endpoint = useMemo(() => {
@@ -39,6 +40,7 @@ export function SolanaWalletProvider({ children }: { children: React.ReactNode }
       >
         <WalletModalProvider>
           <WalletSessionEffects />
+          <WalletPickerLayer />
           {children}
         </WalletModalProvider>
       </WalletProvider>
