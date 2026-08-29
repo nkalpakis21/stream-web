@@ -93,8 +93,6 @@ export function UserMenu() {
     router.push('/');
   };
 
-  const isActive = (href: string) => pathname === href;
-
   return (
     <div className="relative" ref={menuRef}>
       {/* Avatar Button */}
@@ -176,6 +174,20 @@ export function UserMenu() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
                 Chat
+              </Link>
+              <Link
+                href="/me"
+                onClick={() => setIsOpen(false)}
+                className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors duration-200 ${
+                  pathname?.startsWith('/me')
+                    ? 'text-foreground bg-muted/40'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/20'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 8a3 3 0 100 6 3 3 0 000-6zm6 1.5a3 3 0 100 6 3 3 0 000-6z" />
+                </svg>
+                Your coins
               </Link>
               <Link
                 href="/dashboard"

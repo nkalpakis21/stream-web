@@ -1,8 +1,11 @@
+import { isStudioPath } from '@/lib/listen/surface';
+
 export const DEFAULT_AFTER_AUTH = '/discover';
 
 /**
  * Only allow in-app relative paths. Reject protocol-relative, absolute,
- * and auth-page loops so return URLs cannot bounce or open-redirect.
+ * auth-page loops, and Studio so the first session lands in Discover
+ * (You + UserMenu still open Studio after the user is signed in).
  */
 export function getSafeReturnTo(value: string | null | undefined): string {
   if (!value) return DEFAULT_AFTER_AUTH;
@@ -11,6 +14,9 @@ export function getSafeReturnTo(value: string | null | undefined): string {
 
   const pathOnly = value.split('?')[0] ?? value;
   if (pathOnly === '/signin' || pathOnly === '/signup') {
+    return DEFAULT_AFTER_AUTH;
+  }
+  if (isStudioPath(pathOnly)) {
     return DEFAULT_AFTER_AUTH;
   }
 

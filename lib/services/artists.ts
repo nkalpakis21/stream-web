@@ -23,6 +23,7 @@ import {
   getArtistPath,
   getArtistVersionPath,
 } from '@/lib/firebase/collections';
+import { hasLaunchedCoin } from '@/lib/brand/coin';
 import {
   emptyPumpFunCoin,
   emptyXConnection,
@@ -473,6 +474,49 @@ export async function getArtistsData(
   });
 
   return artistsMap;
+}
+
+/**
+ * Artists whose launched coin mint is in `mints`.
+ * Only documents that pass hasLaunchedCoin are returned.
+ * Dedupes by mint (first match wins) so a bag cannot double-count.
+ */
+export async function getLaunchedArtistsByMints(
+  mints: string[]
+): Promise<AIArtistDocument[]> {
+  const unique = Array.from(
+    new Set(mints.map(mint => mint.trim()).filter(Boolean))
+  );
+  if (unique.length === 0) return [];
+
+  const found: AIArtistDocument[] = [];
+  try {
+    for (let i = 0; i < unique.length; i += 10) {
+      const batch = unique.slice(i, i + 10);
+      const q = query(
+        collection(db, COLLECTIONS.artists),
+        where('pumpFun.mint', 'in', batch)
+      );
+      const snapshot = await getDocs(q);
+      snapshot.docs.forEach(docSnap => {
+        const data = docSnap.data() as AIArtistDocument;
+        found.push({ ...data, id: data.id || docSnap.id });
+      });
+    }
+  } catch (error: unknown) {
+    console.error('[getLaunchedArtistsByMints] Query failed:', error);
+    return [];
+  }
+
+  const byMint = new Map<string, AIArtistDocument>();
+  for (const artist of found) {
+    if (artist.deletedAt) continue;
+    if (!hasLaunchedCoin(artist.pumpFun)) continue;
+    const mint = artist.pumpFun?.mint?.trim();
+    if (!mint || byMint.has(mint)) continue;
+    byMint.set(mint, artist);
+  }
+  return Array.from(byMint.values());
 }
 
 /**
