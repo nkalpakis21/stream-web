@@ -1,7 +1,8 @@
 'use client';
 
 import { useWallet } from '@solana/wallet-adapter-react';
-import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { WalletConnectControl } from '@/components/wallet/WalletConnectControl';
+import { WALLET_COPY, connectedLabel } from '@/lib/wallet/copy';
 import {
   defaultTickerFromName,
   MAX_COIN_NAME_LENGTH,
@@ -22,8 +23,9 @@ interface LaunchCoinToggleProps {
 }
 
 /**
- * Opt-in control for launching an artist-level pump.fun coin.
- * Off by default. Name, ticker, and locked look are the coin; wallet signs once in Streamstar.
+ * Opt-in control for launching an artist-level coin.
+ * Off by default. Name, ticker, and locked look are the coin; wallet signs once.
+ * Connect chrome is Streamstar-styled — no chain jargon on the default path.
  */
 export function LaunchCoinToggle({
   checked,
@@ -37,7 +39,6 @@ export function LaunchCoinToggle({
   lookUrl,
 }: LaunchCoinToggleProps) {
   const { connected, publicKey } = useWallet();
-  const { setVisible } = useWalletModal();
 
   const handleToggle = (next: boolean) => {
     onChange(next);
@@ -51,9 +52,7 @@ export function LaunchCoinToggle({
     }
   };
 
-  const walletLabel = publicKey
-    ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
-    : null;
+  const address = publicKey?.toBase58() ?? null;
 
   return (
     <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
@@ -67,7 +66,7 @@ export function LaunchCoinToggle({
           className="mt-0.5 w-4 h-4 rounded border-border text-accent focus:ring-2 focus:ring-accent focus:ring-offset-0"
         />
         <label htmlFor="launchCoin" className="text-sm text-foreground cursor-pointer">
-          Launch a pump.fun coin for this artist
+          Launch a coin for this artist
           <span className="ml-2 text-xs font-medium text-muted-foreground">
             Optional
           </span>
@@ -81,9 +80,8 @@ export function LaunchCoinToggle({
       ) : (
         <div className="pl-7 space-y-4">
           <p className="text-xs text-muted-foreground">
-            Stay here to launch. Connect your wallet (nav), sign once, and keep a
-            little SOL for network fees. No first buy. Fans get a Buy link out to
-            pump.fun.
+            Stay here to launch. {WALLET_COPY.launchHint} No first buy. Fans get a
+            Buy link out.
           </p>
 
           <div>
@@ -139,23 +137,13 @@ export function LaunchCoinToggle({
             </p>
           </div>
 
-          <div className="flex items-center justify-between gap-3">
+          {connected && address ? (
             <p className="text-xs text-muted-foreground">
-              {connected && walletLabel
-                ? `Wallet connected (${walletLabel}). You’ll sign once.`
-                : 'Connect your wallet in the nav, or here, then sign once.'}
+              {connectedLabel(address)}. {WALLET_COPY.launchHint}
             </p>
-            {!connected && (
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={() => setVisible(true)}
-                className="shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-50 transition-colors"
-              >
-                Connect wallet
-              </button>
-            )}
-          </div>
+          ) : (
+            <WalletConnectControl disabled={disabled} />
+          )}
         </div>
       )}
     </div>

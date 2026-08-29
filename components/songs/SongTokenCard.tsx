@@ -8,6 +8,7 @@ import {
   getAccount,
   getAssociatedTokenAddressSync,
 } from '@solana/spl-token';
+import { WalletConnectControl } from '@/components/wallet/WalletConnectControl';
 
 interface TokenMetadata {
   name: string;
@@ -157,8 +158,13 @@ export function SongTokenCard({ songId, tokenMintAddress }: SongTokenCardProps) 
             rel="noopener noreferrer"
             className="inline-block mt-2 text-xs text-accent hover:underline"
           >
-            View on Solana Explorer
+            View on explorer
           </a>
+          {!publicKey && (
+            <div className="mt-3">
+              <WalletConnectControl />
+            </div>
+          )}
         </div>
       </div>
     </div>
