@@ -1,6 +1,7 @@
 import { composeProfileBio, composeProfileName } from './compose';
 import { getXUserMe, syncXProfile } from './client';
 import { firestoreNow, getArtistAdmin, updateArtistX } from './artistStore';
+import { isProfileSyncUnavailableError } from './profileSyncUnavailable';
 import { deleteXAuth, saveXAuth } from './tokens';
 import type { XTokenSet } from './oauth';
 
@@ -57,14 +58,16 @@ export async function completeXConnect(input: {
   });
 
   const now = firestoreNow();
+  const profileSyncUnavailableOnly = isProfileSyncUnavailableError(sync.detail);
   await updateArtistX(input.artistId, {
     status: 'connected',
     username: me.username,
     userId: me.id,
     connectedAt: now,
     pausedAt: null,
-    lastError: sync.ok ? null : sync.detail,
-    lastErrorAt: sync.ok ? null : now,
+    lastError:
+      sync.ok || profileSyncUnavailableOnly ? null : sync.detail,
+    lastErrorAt: sync.ok || profileSyncUnavailableOnly ? null : now,
     profileSyncedAt: sync.ok ? now : null,
   });
 
