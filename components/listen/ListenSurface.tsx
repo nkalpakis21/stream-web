@@ -2,10 +2,7 @@
 
 import { useLayoutEffect } from 'react';
 import { usePathname } from 'next/navigation';
-
-function isStudioPath(pathname: string) {
-  return pathname === '/dashboard' || pathname.startsWith('/dashboard/') || pathname === '/create' || pathname.startsWith('/create/');
-}
+import { isStudioPath } from '@/lib/listen/surface';
 
 /** Marks the document as listen (default) so Studio can opt out of listen tokens. */
 export function ListenSurface() {

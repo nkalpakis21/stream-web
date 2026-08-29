@@ -18,6 +18,7 @@ type SerializedSongVersionDocument = Omit<SongVersionDocument, 'createdAt'> & {
 interface VersionCardsProps {
   songTitle: string;
   artistName: string;
+  artistId?: string;
   albumCoverUrl: string | null;
   initialVersions: SerializedSongVersionDocument[];
   hasPendingGeneration: boolean;
@@ -28,6 +29,7 @@ interface VersionCardsProps {
 export function VersionCards({
   songTitle,
   artistName,
+  artistId,
   albumCoverUrl,
   initialVersions,
   hasPendingGeneration,
@@ -186,6 +188,7 @@ export function VersionCards({
                 <SongPlayCardClient
                   songTitle={versionTitle}
                   artistName={artistName}
+                  artistId={artistId}
                   albumCoverUrl={albumCoverUrl}
                   audioUrl={version.audioURL}
                   songId={songId}

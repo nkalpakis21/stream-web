@@ -32,6 +32,7 @@ export function SongCard({
         songId={song.id}
         title={song.title}
         artistName={artistName || 'Artist'}
+        artistId={song.artistId}
         coverUrl={coverImageUrl}
         hasCoin={showMetrics ? false : hasCoin}
         durationSeconds={song.duration}

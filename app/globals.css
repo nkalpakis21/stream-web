@@ -82,6 +82,12 @@ html.listen .listen-title {
   }
 }
 
+@media (min-width: 768px) {
+  html.listen:has(.listen-player) .listen-chrome {
+    padding-bottom: var(--player-h, 80px);
+  }
+}
+
 /* Never uppercase song or artist names */
 html.listen [data-entity='track'],
 html.listen [data-entity='artist'] {

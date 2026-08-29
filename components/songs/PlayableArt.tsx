@@ -18,6 +18,7 @@ interface PlayableArtProps {
   songId: string;
   title: string;
   artistName: string;
+  artistId?: string;
   coverUrl: string | null;
   audioUrl?: string | null;
   hasCoin?: boolean;
@@ -30,6 +31,7 @@ export function PlayableArt({
   songId,
   title,
   artistName,
+  artistId,
   coverUrl,
   audioUrl: audioUrlProp,
   hasCoin = false,
@@ -73,6 +75,7 @@ export function PlayableArt({
       songId,
       songTitle: title,
       artistName,
+      artistId,
       albumCoverUrl: coverUrl,
       audioUrl: url,
     });

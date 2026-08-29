@@ -47,6 +47,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                   songId={featured.songId}
                   title={featured.title}
                   artistName={featured.artistName}
+                  artistId={featured.artistId}
                   coverUrl={featured.coverUrl}
                   audioUrl={featured.audioUrl}
                   hasCoin={featured.hasCoin}
