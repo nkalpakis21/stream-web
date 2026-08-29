@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { authHref } from '@/lib/auth/returnTo';
 
 const tabs = [
   {
@@ -40,7 +41,8 @@ const tabs = [
 export function MobileTabBar() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const youHref = user ? '/dashboard' : '/signin';
+  const youHref = user ? '/dashboard' : authHref('/signin', pathname);
+  const youLabel = user ? 'You' : 'Log in';
   const youActive = pathname.startsWith('/dashboard') || pathname.startsWith('/me') || pathname.startsWith('/signin') || pathname.startsWith('/signup');
 
   return (
@@ -48,11 +50,12 @@ export function MobileTabBar() {
       data-mobile-nav
       className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/98 md:hidden supports-[backdrop-filter]:bg-card/95 supports-[backdrop-filter]:backdrop-blur-xl"
       aria-label="Mobile"
+      style={{
+        height: 'calc(var(--tab-h, 56px) + env(safe-area-inset-bottom, 0px))',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
     >
-      <div
-        className="flex items-center justify-around px-1"
-        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))', minHeight: 'var(--tab-h, 56px)' }}
-      >
+      <div className="flex h-[var(--tab-h,56px)] items-center justify-around px-1">
         {tabs.map((tab) => {
           const active = tab.match(pathname);
           return (
@@ -77,7 +80,7 @@ export function MobileTabBar() {
           <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
-          You
+          {youLabel}
         </Link>
       </div>
     </nav>

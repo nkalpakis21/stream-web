@@ -26,8 +26,10 @@ function CoinClusterText({ quote }: { quote: ArtistCoinQuote }) {
       {price}
       {' · '}
       <span className={`is-${tone}`}>{change}</span>
-      {' · '}
-      {mcap}
+      <span className="heat-cluster-mcap">
+        {' · '}
+        {mcap}
+      </span>
     </>
   );
 }

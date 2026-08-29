@@ -122,6 +122,11 @@
   min-width: 0;
 }
 
+.heat-artist-line .heat-hit {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .heat-artist {
   margin: 0;
   overflow: hidden;
@@ -204,6 +209,7 @@
 
 .heat-cluster-inline {
   display: none;
+  flex: 0 0 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -263,5 +269,39 @@
 
   .heat-cluster-inline {
     display: inline;
+  }
+}
+
+/* Phone Heat: rank, thumb, title/artist cluster, play. No desktop tape headers. */
+@media (max-width: 767px) {
+  .heat-headers {
+    display: none;
+  }
+
+  .heat-cols,
+  .heat-row {
+    grid-template-columns: 24px 36px minmax(0, 1fr) 44px;
+  }
+
+  .heat-h-price,
+  .heat-h-chg,
+  .heat-h-mcap,
+  .heat-row > .heat-price,
+  .heat-row > .heat-chg,
+  .heat-row > .heat-mcap {
+    display: none;
+  }
+
+  .heat-cluster-inline {
+    display: inline;
+  }
+}
+
+/* 375: keep price + 24h on the artist line; drop mcap when the row is tight. */
+@media (max-width: 375px) {
+  .heat-cluster-inline .heat-cluster-mcap,
+  .heat-h-mcap,
+  .heat-row > .heat-mcap {
+    display: none;
   }
 }
