@@ -18,7 +18,7 @@ export default function SignUpPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!authLoading && user) {
-      router.push('/dashboard');
+      router.push('/discover');
     }
   }, [user, authLoading, router]);
 
@@ -41,7 +41,7 @@ export default function SignUpPage() {
 
     try {
       await signUpWithEmail(email, password);
-      router.push('/dashboard');
+      router.push('/discover');
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.');
     } finally {
@@ -54,7 +54,7 @@ export default function SignUpPage() {
     setLoading(true);
     try {
       await signInWithGoogle();
-      router.push('/dashboard');
+      router.push('/discover');
     } catch (err: any) {
       setError(err.message || 'Google authentication failed. Please try again.');
     } finally {

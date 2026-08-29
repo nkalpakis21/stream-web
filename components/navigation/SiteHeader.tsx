@@ -11,7 +11,6 @@ const navLinks = [
   { href: '/discover', label: 'Discover' },
   { href: '/artists', label: 'Artists' },
   { href: '/feed', label: 'Feed', requireAuth: true },
-  { href: '/chat', label: 'Chat', requireAuth: true },
 ];
 
 export function SiteHeader() {
@@ -51,20 +50,20 @@ export function SiteHeader() {
           })}
         </nav>
 
-        <div className="hidden md:flex items-center gap-3">
+        <div className="flex items-center gap-3">
           {user ? (
             <UserMenu />
           ) : (
             <>
               <Link
                 href="/signin"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground"
+                className="hidden text-sm font-medium text-muted-foreground hover:text-foreground md:inline"
               >
                 Log in
               </Link>
               <Link
                 href="/signup"
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+                className="hidden rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 md:inline"
               >
                 Get started
               </Link>
