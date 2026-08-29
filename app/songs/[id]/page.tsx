@@ -7,9 +7,8 @@ import { getArtist } from '@/lib/services/artists';
 import { formatDistanceToNow } from 'date-fns';
 import { getSongVersions } from '@/lib/services/songs';
 import { VersionCards } from '@/components/songs/VersionCards';
-import { DeveloperSection } from '@/components/songs/DeveloperSection';
 import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
-import { SongTokenCard } from '@/components/songs/SongTokenCard';
+import { publicUrl, coverArtAlt } from '@/lib/brand/site';
 import { ArtistCoinBuy } from '@/components/artists/ArtistCoinBuy';
 import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
 import { SongStage } from '@/components/songs/SongStage';
@@ -52,10 +51,10 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
   const coverImageUrl = song.albumCoverThumbnail || song.albumCoverPath;
   
   // Ensure the image URL is absolute for Open Graph
-  const ogImageUrl = coverImageUrl 
-    ? (coverImageUrl.startsWith('http') 
-        ? coverImageUrl 
-        : `${process.env.NEXT_PUBLIC_APP_URL || 'https://stream.app'}${coverImageUrl}`)
+  const ogImageUrl = coverImageUrl
+    ? (coverImageUrl.startsWith('http')
+        ? coverImageUrl
+        : publicUrl(coverImageUrl))
     : undefined;
 
   const title = song.title;
@@ -69,12 +68,13 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
       title,
       description: `by ${artistName}`,
       type: 'music.song',
+      url: publicUrl(`/songs/${params.id}`),
       images: ogImageUrl ? [
         {
           url: ogImageUrl,
           width: 1200,
           height: 1200,
-          alt: title,
+          alt: coverArtAlt(title),
         },
       ] : [],
     },
@@ -129,13 +129,6 @@ export default async function SongPage({ params }: SongPageProps) {
     createdAt: version.createdAt.toMillis(), // Convert Timestamp to milliseconds
   }));
 
-  // Serialize generations for client component
-  const serializedGenerations = generations.map(gen => ({
-    ...gen,
-    createdAt: gen.createdAt.toMillis(),
-    completedAt: gen.completedAt ? gen.completedAt.toMillis() : null,
-  }));
-
   const coverImageUrl = song.albumCoverThumbnail || song.albumCoverPath;
   
   // Use primary version audio URL (already found above)
@@ -149,7 +142,7 @@ export default async function SongPage({ params }: SongPageProps) {
   const quotes = mint ? await fetchCoinQuotes([mint]) : new Map<string, ArtistCoinQuote>();
   const coin = mint ? quotes.get(mint) ?? null : null;
   const buyUrl = launched ? (artist?.pumpFun?.url?.trim() || null) : null;
-  const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://stream.app'}/songs/${song.id}`;
+  const shareUrl = publicUrl(`/songs/${song.id}`);
 
   return (
     <div className="min-h-screen bg-background">
@@ -191,12 +184,6 @@ export default async function SongPage({ params }: SongPageProps) {
               songTitle={song.title}
               ownerId={song.ownerId}
             />
-            {song.tokenMintAddress && (
-              <SongTokenCard
-                songId={song.id}
-                tokenMintAddress={song.tokenMintAddress}
-              />
-            )}
             <ArtistCoinBuy url={artist?.pumpFun?.url} />
             <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3">
               Created {timeAgo}
@@ -214,9 +201,6 @@ export default async function SongPage({ params }: SongPageProps) {
           songId={song.id}
           ownerId={song.ownerId}
         />
-
-        {/* Developer Section */}
-        <DeveloperSection generations={serializedGenerations} songId={song.id} />
 
         {/* Comments Section */}
         <CommentsSection targetType="song" targetId={song.id} />

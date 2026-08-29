@@ -1,9 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
+import { CoverImage } from '@/components/media/CoverImage';
 import { getSongVersions } from '@/lib/services/songs';
 import { createDebouncedPlayTracker } from '@/lib/utils/playTracking';
 
@@ -95,19 +95,13 @@ export function PlayableArt({
       className={`rounded-[12px] ${className}`}
       style={playingCover ? { boxShadow: '0 0 0 2px var(--accent)' } : undefined}
     >
-      <div className="relative aspect-square overflow-hidden rounded-[12px] bg-muted">
+      <div className="relative aspect-square overflow-hidden rounded-[12px]">
         {href ? (
           <Link href={href} className="absolute inset-0" aria-label={`${title} by ${artistName}`}>
-            {coverUrl ? (
-              <Image src={coverUrl} alt="" fill className="object-cover" sizes="(max-width: 768px) 50vw, 25vw" unoptimized />
-            ) : (
-              <span className="flex h-full w-full items-center justify-center bg-secondary" />
-            )}
+            <CoverImage src={coverUrl} title={title} sizes="(max-width: 768px) 50vw, 25vw" />
           </Link>
-        ) : coverUrl ? (
-          <Image src={coverUrl} alt="" fill className="object-cover" sizes="(max-width: 768px) 50vw, 25vw" unoptimized />
         ) : (
-          <div className="h-full w-full bg-secondary" />
+          <CoverImage src={coverUrl} title={title} sizes="(max-width: 768px) 50vw, 25vw" />
         )}
 
         <button

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { DiscoverSongCard } from '@/components/discover/DiscoverSongCard';
 import { InfiniteScrollSentinel } from '@/components/discover/InfiniteScrollSentinel';
@@ -21,7 +22,7 @@ function DiscoverPill({
     <button
       type="button"
       onClick={onClick}
-      className="h-11 rounded-full px-5 text-sm font-semibold transition-colors"
+      className="min-h-11 rounded-full px-5 text-sm font-semibold transition-colors"
       style={
         active
           ? { background: 'var(--accent)', color: 'var(--accent-ink)' }
@@ -33,10 +34,20 @@ function DiscoverPill({
   );
 }
 
-export default function DiscoverPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeQuery, setActiveQuery] = useState('');
-  const [sort, setSort] = useState<DiscoverSort>('new');
+function parseSort(value: string | null): DiscoverSort {
+  return value === 'heat' ? 'heat' : 'new';
+}
+
+function DiscoverPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlQuery = (searchParams.get('q') || '').trim();
+  const urlSort = parseSort(searchParams.get('sort'));
+
+  const [searchQuery, setSearchQuery] = useState(urlQuery);
+  const [activeQuery, setActiveQuery] = useState(urlQuery);
+  const [sort, setSort] = useState<DiscoverSort>(urlSort);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     songs,
@@ -51,31 +62,70 @@ export default function DiscoverPage() {
     reset,
   } = useInfiniteSongs({ query: activeQuery, sort });
 
+  const writeUrl = useCallback((nextQuery: string, nextSort: DiscoverSort) => {
+    const params = new URLSearchParams();
+    if (nextQuery) params.set('q', nextQuery);
+    else if (nextSort === 'heat') params.set('sort', 'heat');
+    else params.set('sort', 'new');
+    const qs = params.toString();
+    router.replace(qs ? `/discover?${qs}` : '/discover', { scroll: false });
+  }, [router]);
+
+  useEffect(() => {
+    setSearchQuery(urlQuery);
+    setActiveQuery(urlQuery);
+    setSort(urlSort);
+  }, [urlQuery, urlSort]);
+
+  const commitSearch = useCallback((value: string) => {
+    const next = value.trim();
+    if (!next) return;
+    setActiveQuery(next);
+    setSearchQuery(next);
+    writeUrl(next, sort);
+  }, [sort, writeUrl]);
+
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    setActiveQuery(searchQuery.trim());
-  }, [searchQuery]);
+    commitSearch(searchQuery);
+  }, [commitSearch, searchQuery]);
+
+  const handleChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const next = value.trim();
+      if (!next) return;
+      setActiveQuery(next);
+      writeUrl(next, sort);
+    }, 350);
+  }, [sort, writeUrl]);
 
   const handlePill = useCallback((next: DiscoverSort) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     setSearchQuery('');
     setActiveQuery('');
     setSort(next);
-  }, []);
+    writeUrl('', next);
+  }, [writeUrl]);
 
-  const handleLoadRecent = useCallback(() => {
+  const handleClear = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     setSearchQuery('');
     setActiveQuery('');
-    setSort('new');
-  }, []);
+    writeUrl('', sort);
+  }, [sort, writeUrl]);
+
+  const canSearch = Boolean(searchQuery.trim());
 
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         <section className="mb-12">
           <h1 className="listen-h1 mb-8">Discover</h1>
-          
-          <form onSubmit={handleSearch} className="mb-6">
-            <label className="relative block">
+
+          <form onSubmit={handleSearch} className="mb-6 flex gap-2">
+            <label className="relative block min-w-0 flex-1">
               <span className="sr-only">Search</span>
               <Search
                 className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2"
@@ -85,7 +135,7 @@ export default function DiscoverPage() {
               <input
                 type="search"
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={e => handleChange(e.target.value)}
                 placeholder="Songs, artists, titles."
                 className="h-12 w-full border bg-card pl-12 pr-5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:border-transparent transition-all"
                 style={{
@@ -96,6 +146,13 @@ export default function DiscoverPage() {
                 }}
               />
             </label>
+            <button
+              type="submit"
+              disabled={!canSearch}
+              className="listen-btn-primary disabled:opacity-50"
+            >
+              Search
+            </button>
           </form>
 
           <div className="flex flex-wrap gap-2">
@@ -113,7 +170,7 @@ export default function DiscoverPage() {
             </p>
             <button
               onClick={reset}
-              className="px-6 py-2 bg-accent text-accent-foreground rounded-full hover:opacity-90 transition-opacity font-medium"
+              className="listen-btn-primary"
             >
               Try Again
             </button>
@@ -121,9 +178,16 @@ export default function DiscoverPage() {
         ) : songs.length === 0 ? (
           <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
             {activeQuery ? (
-              <EmptyAction message="No songs found." label="Browse recent" onClick={handleLoadRecent} />
+              <div className="space-y-4">
+                <p className="text-muted-foreground text-lg">
+                  0 results for {activeQuery}
+                </p>
+                <button type="button" onClick={handleClear} className="listen-btn-ghost">
+                  Clear
+                </button>
+              </div>
             ) : (
-              <EmptyAction message="No songs found." href="/" label="Play" />
+              <EmptyAction message="No songs yet." href="/" label="Home" />
             )}
           </div>
         ) : (
@@ -146,7 +210,7 @@ export default function DiscoverPage() {
                   />
                 </div>
               ))}
-              
+
               {loadingMore && (
                 <>
                   {Array.from({ length: 4 }).map((_, i) => (
@@ -171,24 +235,17 @@ export default function DiscoverPage() {
                 </div>
               </div>
             )}
-
-            {!hasMore && songs.length > 0 && (
-              <div className="py-12 text-center">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-border" />
-                  </div>
-                  <div className="relative">
-                    <span className="px-4 bg-background text-sm text-muted-foreground">
-                      You&apos;ve reached the end
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
           </>
         )}
       </main>
     </div>
+  );
+}
+
+export default function DiscoverPage() {
+  return (
+    <Suspense fallback={<SongCardSkeletonGrid showCluster />}>
+      <DiscoverPageInner />
+    </Suspense>
   );
 }

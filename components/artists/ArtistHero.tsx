@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { ArtistHeader } from '@/components/artists/ArtistHeader';
@@ -12,7 +11,8 @@ import { useToast, ToastContainer } from '@/components/ui/toast';
 import { LaunchExistingArtistCoin } from '@/components/artists/LaunchExistingArtistCoin';
 import { updateArtistAvatar } from '@/lib/services/artists';
 import { hasLaunchedCoin } from '@/lib/brand/coin';
-import { getAvatarGradient, getInitials } from '@/lib/utils/avatar';
+import { CoverImage } from '@/components/media/CoverImage';
+import { AiMark } from '@/components/brand/AiMark';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import type { AIArtistDocument, PumpFunCoin } from '@/types/firestore';
 
@@ -73,28 +73,22 @@ export function ArtistHero({ artist, coin = null, children }: ArtistHeroProps) {
         <div className="flex min-w-0 flex-1 gap-5">
           <div className="h-[120px] w-[120px] flex-shrink-0 overflow-hidden rounded-full bg-muted">
             <div className="relative h-full w-full">
-              {avatarURL ? (
-                <Image
-                  key={avatarURL}
-                  src={avatarURL}
-                  alt={artist.name}
-                  fill
-                  className="object-cover"
-                  sizes="120px"
-                />
-              ) : (
-                <div
-                  className="relative flex h-full w-full items-center justify-center"
-                  style={{ background: getAvatarGradient(artist.name) }}
-                >
-                  <span className="relative text-3xl font-bold text-white drop-shadow-lg">
-                    {getInitials(artist.name)}
-                  </span>
-                </div>
-              )}
+              <CoverImage
+                key={avatarURL || 'placeholder'}
+                src={avatarURL}
+                title={artist.name}
+                sizes="120px"
+                rounded="rounded-full"
+                unoptimized={false}
+              />
             </div>
           </div>
-          <ArtistHeader artist={{ ...artist, pumpFun }} />
+          <div className="min-w-0 flex-1">
+            <div className="mb-2">
+              <AiMark />
+            </div>
+            <ArtistHeader artist={{ ...artist, pumpFun }} />
+          </div>
         </div>
 
         {coin ? (

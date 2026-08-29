@@ -3,14 +3,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { collection, onSnapshot, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-import { SongPlayCardClient } from './SongPlayCardClient';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { setPrimarySongVersion } from '@/lib/services/songs';
 import { useToast, ToastContainer } from '@/components/ui/toast';
-import { Star, StarOff } from 'lucide-react';
 import type { SongVersionDocument } from '@/types/firestore';
 
-// Serialized version for client components
 type SerializedSongVersionDocument = Omit<SongVersionDocument, 'createdAt'> & {
   createdAt: number;
 };
@@ -27,10 +24,6 @@ interface VersionCardsProps {
 }
 
 export function VersionCards({
-  songTitle,
-  artistName,
-  artistId,
-  albumCoverUrl,
   initialVersions,
   hasPendingGeneration,
   songId,
@@ -40,19 +33,15 @@ export function VersionCards({
   const [versions, setVersions] = useState<SerializedSongVersionDocument[]>(initialVersions);
   const [updatingPrimary, setUpdatingPrimary] = useState<string | null>(null);
   const { toasts, showToast, dismissToast } = useToast();
-
   const isOwner = user?.uid === ownerId;
 
-  // Live updates for new song versions created by the webhook
   useEffect(() => {
     if (!songId) return;
-
     const q = query(
       collection(db, 'songVersions'),
       where('songId', '==', songId),
       orderBy('versionNumber', 'asc')
     );
-
     const unsubscribe = onSnapshot(q, snapshot => {
       const next: SerializedSongVersionDocument[] = snapshot.docs.map(doc => {
         const data = doc.data() as SongVersionDocument;
@@ -63,13 +52,10 @@ export function VersionCards({
       });
       setVersions(next);
     });
-
     return unsubscribe;
   }, [songId]);
 
   const playableVersions = versions.filter(v => v.audioURL && v.audioURL.trim() !== '');
-  const hasAnyAudio = playableVersions.length > 0;
-
   const primaryVersionId = useMemo(
     () => versions.find(v => v.isPrimary)?.id ?? null,
     [versions]
@@ -80,173 +66,56 @@ export function VersionCards({
     setUpdatingPrimary(versionId);
     try {
       await setPrimarySongVersion(songId, versionId);
-      showToast('Primary version updated successfully', 'success');
+      showToast('Primary version updated', 'success');
     } catch (error) {
-      console.error('Failed to set primary version', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to set primary version. Please try again.';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to set primary version.';
       showToast(errorMessage, 'error');
     } finally {
       setUpdatingPrimary(null);
     }
   };
 
-  // Get version label (A, B, C, etc.)
-  const getVersionLabel = (index: number) => {
-    return String.fromCharCode('A'.charCodeAt(0) + index);
-  };
-
-  if (!hasAnyAudio && !hasPendingGeneration) {
-    return (
-      <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
-        <div className="max-w-sm mx-auto">
-          <svg
-            className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
-            />
-          </svg>
-          <p className="text-muted-foreground">No audio versions yet.</p>
-        </div>
-      </div>
-    );
+  if (!isOwner && !hasPendingGeneration) {
+    return null;
   }
 
   return (
     <>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-      <section className="mb-8 sm:mb-12">
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Versions</h2>
+      {hasPendingGeneration ? (
+        <div
+          className="mb-8 rounded-2xl border px-5 py-6"
+          style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}
+        >
+          <h3 className="text-base font-semibold text-foreground">Making the track</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            A new version is on the way. It will appear here when it is ready.
+          </p>
         </div>
-
-      {/* Prominent Generating Banner - Apple Style */}
-      {hasPendingGeneration && (
-        <div className="mb-6 sm:mb-8 relative overflow-hidden rounded-2xl border-2 border-accent/30 bg-gradient-to-br from-accent/10 via-accent/5 to-transparent shadow-lg backdrop-blur-sm">
-          {/* Animated gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-accent/10 to-transparent animate-shimmer" />
-          
-          {/* Content */}
-          <div className="relative p-6 sm:p-8 flex items-center gap-4 sm:gap-6">
-            {/* Animated Icon */}
-            <div className="flex-shrink-0 relative">
-              <div className="absolute inset-0 bg-accent/20 rounded-full blur-xl animate-pulse" />
-              <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-accent to-accent/80 flex items-center justify-center shadow-lg">
-                <svg
-                  className="w-6 h-6 sm:w-7 sm:h-7 text-accent-foreground animate-spin"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+      ) : null}
+      {isOwner && playableVersions.length > 1 ? (
+        <section className="mb-8">
+          <h2 className="mb-4 text-xl font-bold tracking-tight">Versions</h2>
+          <div className="flex flex-wrap gap-2">
+            {playableVersions.map((version, index) => {
+              const label = String.fromCharCode(65 + index);
+              const isPrimary = version.id === primaryVersionId;
+              return (
+                <button
+                  key={version.id}
+                  type="button"
+                  onClick={() => handleSetPrimary(version.id)}
+                  disabled={updatingPrimary === version.id || isPrimary}
+                  className={`song-stage-chip ${isPrimary ? 'is-selected' : ''}`}
+                  aria-label={isPrimary ? 'Current primary version' : `Set Version ${label} as primary`}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2.5}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-              </div>
-            </div>
-
-            {/* Text Content */}
-            <div className="flex-1 min-w-0">
-              <h3 className="text-lg sm:text-xl font-bold text-foreground mb-1">
-                Generating Your Song
-              </h3>
-              <p className="text-sm sm:text-base text-muted-foreground">
-                Your AI artist is creating a new version. This usually takes 1-3 minutes.
-              </p>
-            </div>
-
-            {/* Pulsing Indicator */}
-            <div className="flex-shrink-0 hidden sm:flex items-center gap-2">
-              <div className="flex gap-1.5">
-                <div className="w-2 h-2 bg-accent rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 bg-accent rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 bg-accent rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
-              </div>
-            </div>
+                  {isPrimary ? `Primary · Version ${label}` : `Set primary · Version ${label}`}
+                </button>
+              );
+            })}
           </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
-        {playableVersions.map((version, index) => {
-          const label = getVersionLabel(index);
-          const versionTitle = `${songTitle} (Version ${label})`;
-          const isPrimary = version.id === primaryVersionId;
-
-          return (
-            <div key={version.id} className="flex flex-col items-center group">
-              <div className="relative w-full">
-                <SongPlayCardClient
-                  songTitle={versionTitle}
-                  artistName={artistName}
-                  artistId={artistId}
-                  albumCoverUrl={albumCoverUrl}
-                  audioUrl={version.audioURL}
-                  songId={songId}
-                />
-                {isPrimary && (
-                  <div className="absolute top-2 right-2 z-10">
-                    <div className="bg-accent/90 backdrop-blur-sm rounded-full p-1.5 shadow-lg">
-                      <Star className="w-3 h-3 text-accent-foreground fill-accent-foreground" />
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="mt-2 sm:mt-3 text-center w-full">
-                <div className="flex items-center justify-center gap-2">
-                  <span className="text-xs sm:text-sm font-medium text-foreground">Version {label}</span>
-                  {isPrimary && (
-                    <span className="px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-full bg-accent/20 text-accent border border-accent/30 flex items-center gap-1">
-                      <Star className="w-2.5 h-2.5 fill-accent" />
-                      Primary
-                    </span>
-                  )}
-                </div>
-                {isOwner && (
-                  <button
-                    onClick={() => handleSetPrimary(version.id)}
-                    disabled={updatingPrimary === version.id || isPrimary}
-                    className={`mt-1.5 text-[10px] sm:text-xs px-2 sm:px-3 py-1 rounded-full border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 mx-auto ${
-                      isPrimary
-                        ? 'border-accent/30 bg-accent/10 text-accent cursor-default'
-                        : 'border-border hover:bg-muted hover:border-accent/20 text-muted-foreground hover:text-foreground'
-                    }`}
-                    aria-label={isPrimary ? 'Current primary version' : 'Set as primary version'}
-                  >
-                    {updatingPrimary === version.id ? (
-                      <>
-                        <span className="w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        Updating…
-                      </>
-                    ) : isPrimary ? (
-                      <>
-                        <Star className="w-2.5 h-2.5 fill-accent" />
-                        Primary
-                      </>
-                    ) : (
-                      <>
-                        <StarOff className="w-2.5 h-2.5" />
-                        Set Primary
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      </section>
+        </section>
+      ) : null}
     </>
   );
 }
-

@@ -24,7 +24,7 @@ export function ArtistPumpFunBuyLink({
       target="_blank"
       rel="noopener noreferrer"
       className={`listen-btn-buy ${className}`}
-      aria-label="Buy on pump.fun"
+      aria-label="Buy coin"
     >
       Buy
     </a>

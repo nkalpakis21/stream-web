@@ -8,6 +8,7 @@ import type { SongDocument } from '@/types/firestore';
 
 const HEAT_LIMIT = 8;
 const LIVE_LIMIT = 12;
+const LIVE_FETCH = 24;
 
 export const revalidate = 120;
 
@@ -27,12 +28,14 @@ async function firstPlayableAudio(songs: SongDocument[]): Promise<{ song: SongDo
 
 export default async function HomePage() {
   const [latestSongs, topSongs] = await Promise.all([
-    getPublicSongs(LIVE_LIMIT),
+    getPublicSongs(LIVE_FETCH),
     getTopSongs(HEAT_LIMIT),
   ]);
 
   const heat = topSongs.length > 0 ? topSongs : latestSongs.slice(0, HEAT_LIMIT);
-  const live = latestSongs.length > 0 ? latestSongs : topSongs;
+  const heatIds = new Set(heat.map(song => song.id));
+  const liveExclusive = latestSongs.filter(song => !heatIds.has(song.id));
+  const live = (liveExclusive.length > 0 ? liveExclusive : latestSongs).slice(0, LIVE_LIMIT);
   const catalog = heat.length ? heat : live;
   const allSongs = [...heat, ...live];
   const unique = Array.from(new Map(allSongs.map(s => [s.id, s])).values());

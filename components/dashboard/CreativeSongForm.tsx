@@ -7,6 +7,7 @@ import { getUserArtists } from '@/lib/services/artists';
 import { createSong } from '@/lib/services/songs';
 import { createGeneration } from '@/lib/services/generations';
 import type { AIArtistDocument } from '@/types/firestore';
+import { useToast, ToastContainer } from '@/components/ui/toast';
 
 interface CreativeSongFormProps {
   preselectedArtistId?: string;
@@ -20,6 +21,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
   const [loading, setLoading] = useState(false);
   const [artists, setArtists] = useState<AIArtistDocument[]>([]);
   const [loadingArtists, setLoadingArtists] = useState(true);
+  const { toasts, showToast, dismissToast } = useToast();
   const [formData, setFormData] = useState({
     title: '',
     artistId: preselectedArtistId || '',
@@ -57,23 +59,23 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
     if (!user) return;
 
     if (artists.length === 0) {
-      alert('Please create an AI artist first');
+      showToast('Create an artist first', 'error');
       return;
     }
 
     const selectedArtist = artists.find(a => a.id === formData.artistId);
     if (!selectedArtist || selectedArtist.ownerId !== user.uid) {
-      alert('Please select a valid artist');
+      showToast('Please select a valid artist', 'error');
       return;
     }
 
     if (formData.prompt.length > 300 || formData.prompt.trim().length === 0) {
-      alert('Please enter a valid prompt (max 300 characters)');
+      showToast('Please enter a valid prompt (max 300 characters)', 'error');
       return;
     }
 
     if (formData.lyrics.length > 2000) {
-      alert('Lyrics cannot exceed 2000 characters');
+      showToast('Lyrics cannot exceed 2000 characters', 'error');
       return;
     }
 
@@ -121,7 +123,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
       router.push(`/songs/${song.id}`);
     } catch (error) {
       console.error('Failed to create song:', error);
-      alert('Failed to create song. Please try again.');
+      showToast('Failed to create song. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -157,6 +159,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-card via-card to-accent/5 shadow-lg">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {/* Decorative gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent pointer-events-none" />
       

@@ -1,11 +1,46 @@
+import type { Metadata } from 'next';
 import { getPublicArtists } from '@/lib/services/artists';
+import { getPublicSongs } from '@/lib/services/songs';
 import { ArtistCard } from '@/components/artists/ArtistCard';
 import { EmptyAction } from '@/components/states/EmptyAction';
-// Force dynamic rendering to always fetch fresh data from Firestore
+import { hasLaunchedCoin } from '@/lib/brand/coin';
+import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
+import type { SongDocument } from '@/types/firestore';
+import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
+
 export const dynamic = 'force-dynamic';
 
+export const metadata: Metadata = {
+  title: 'All artists',
+  description: 'Artists on Streamstar.',
+};
+
 export default async function ArtistsPage() {
-  const artists = await getPublicArtists(50);
+  const [artists, songs] = await Promise.all([
+    getPublicArtists(50),
+    getPublicSongs(80),
+  ]);
+
+  const playableByArtist = new Map<string, SongDocument>();
+  songs.forEach(song => {
+    if (!playableByArtist.has(song.artistId)) {
+      playableByArtist.set(song.artistId, song);
+    }
+  });
+
+  const mintByArtist = new Map<string, string>();
+  artists.forEach(artist => {
+    const mint = artist.pumpFun?.mint?.trim();
+    if (hasLaunchedCoin(artist.pumpFun) && mint) {
+      mintByArtist.set(artist.id, mint);
+    }
+  });
+  const quotes = await fetchCoinQuotes(Array.from(mintByArtist.values()));
+  const coinByArtist = new Map<string, ArtistCoinQuote>();
+  mintByArtist.forEach((mint, artistId) => {
+    const quote = quotes.get(mint);
+    if (quote) coinByArtist.set(artistId, quote);
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -18,9 +53,14 @@ export default async function ArtistsPage() {
         </div>
 
         {artists.length > 0 ? (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
             {artists.map(artist => (
-              <ArtistCard key={artist.id} artist={artist} />
+              <ArtistCard
+                key={artist.id}
+                artist={artist}
+                playable={playableByArtist.get(artist.id) || null}
+                coin={coinByArtist.get(artist.id) || null}
+              />
             ))}
           </div>
         ) : (

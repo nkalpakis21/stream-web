@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Image from 'next/image';
+import { CoverImage } from '@/components/media/CoverImage';
 import Link from 'next/link';
 import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
 import { getSongVersions } from '@/lib/services/songs';
@@ -118,11 +118,7 @@ function HeatRow({ track, rank, queue }: { track: HeatTrack; rank: number; queue
       <div className={`heat-row${rankClass}${isCurrent && isPlaying ? ' is-playing' : ''}`}>
         <span className="rank">{rank}</span>
         <button type="button" className="heat-hit heat-thumb" onClick={onPlay} aria-label={`Play ${track.title}`}>
-          {track.coverUrl ? (
-            <Image src={track.coverUrl} alt="" fill className="object-cover" sizes="36px" unoptimized />
-          ) : (
-            <span className="block h-full w-full" />
-          )}
+          <CoverImage src={track.coverUrl} title={track.title} sizes="36px" rounded="rounded-[6px]" />
         </button>
         <div className="heat-meta">
           <button type="button" className="heat-hit" onClick={onPlay}>
@@ -179,7 +175,7 @@ export function HeatTape({ tracks }: { tracks: HeatTrack[] }) {
       <h2 className="heat-title">Heat</h2>
       {tracks.length === 0 ? (
         <div className="py-8">
-          <EmptyAction message="No tracks yet." href="/discover" label="Discover" />
+          <EmptyAction message="No songs yet." href="/discover" label="Discover" />
         </div>
       ) : (
         <>
