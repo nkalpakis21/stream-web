@@ -144,7 +144,7 @@ export function UserMenu() {
 
             {/* Wallet — quiet, no chain jargon */}
             <div className="px-4 py-3 border-b border-border/40">
-              <WalletConnectSection />
+              <WalletConnectSection onPickerOpen={() => setIsOpen(false)} />
             </div>
 
             {/* Menu Items */}
