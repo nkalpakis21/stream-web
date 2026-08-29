@@ -14,7 +14,7 @@ import '@solana/wallet-adapter-react-ui/styles.css';
 export function SolanaWalletProvider({ children }: { children: React.ReactNode }) {
   const endpoint = useMemo(() => {
     return (
-      process.env.NEXT_PUBLIC_SOLANA_RPC_URL || clusterApiUrl('devnet')
+      process.env.NEXT_PUBLIC_SOLANA_RPC_URL || clusterApiUrl('mainnet-beta')
     );
   }, []);
 
@@ -32,7 +32,7 @@ export function SolanaWalletProvider({ children }: { children: React.ReactNode }
           console.error(
             '[Solana Wallet] Connection error:',
             err,
-            '\nTroubleshooting: In Phantom, go to Settings → Connected Apps and disconnect this site, then try again. Also ensure Phantom is on the same network (devnet/mainnet) as this app.'
+            '\nTroubleshooting: In Phantom, go to Settings → Connected Apps and disconnect this site, then try again. Also ensure Phantom is on mainnet (same network as this app).'
           );
         }}
       >

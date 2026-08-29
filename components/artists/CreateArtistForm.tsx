@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { LaunchCoinToggle } from '@/components/artists/LaunchCoinToggle';
 import { ConnectXToggle } from '@/components/artists/ConnectXToggle';
 import { createArtist } from '@/lib/services/artists';
 import { startArtistXConnect } from '@/lib/x/startConnectClient';
 import { ArtistLookPicker } from '@/components/artists/ArtistLookPicker';
+import { getFreshIdToken } from '@/lib/api/clientAuth';
 import { resolvePumpFunForArtistCreate } from '@/lib/solana/launchArtistPumpFunCoin';
 import type { StyleDNA } from '@/types/firestore';
 
@@ -18,6 +20,8 @@ interface CreateArtistFormProps {
 export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
   const { user } = useAuth();
   const router = useRouter();
+  const { connection } = useConnection();
+  const { publicKey, connected, signTransaction } = useWallet();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -30,6 +34,8 @@ export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
     isPublic: true,
     vocalIdentity: '',
     launchCoin: false,
+    coinName: '',
+    ticker: '',
     connectX: false,
   });
   const [avatarURL, setAvatarURL] = useState<string | null>(null);
@@ -50,9 +56,20 @@ export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
         influences: formData.influences.split(',').map(i => i.trim()).filter(Boolean),
       };
 
+      const pumpWallet =
+        connected && publicKey && signTransaction
+          ? { publicKey, signTransaction }
+          : null;
+
       const { pumpFun, launchNotice } = await resolvePumpFunForArtistCreate({
         launchCoin: formData.launchCoin,
-        artistName: formData.name,
+        coinName: formData.coinName.trim() || formData.name,
+        ticker: formData.ticker,
+        imageUrl: avatarURL,
+        description: formData.lore,
+        wallet: pumpWallet,
+        connection,
+        getIdToken: user ? () => getFreshIdToken(user) : undefined,
       });
 
       const artist = await createArtist(user.uid, {
@@ -242,6 +259,12 @@ export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
         checked={formData.launchCoin}
         onChange={launchCoin => setFormData({ ...formData, launchCoin })}
         disabled={loading}
+        artistName={formData.name}
+        coinName={formData.coinName}
+        onCoinNameChange={coinName => setFormData({ ...formData, coinName })}
+        ticker={formData.ticker}
+        onTickerChange={ticker => setFormData({ ...formData, ticker })}
+        lookUrl={avatarURL}
       />
 
       <ConnectXToggle
@@ -255,7 +278,11 @@ export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
         disabled={loading}
         className="w-full px-6 py-3 bg-accent text-accent-foreground rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-soft"
       >
-        {loading ? 'Creating...' : 'Create Artist'}
+        {loading
+          ? formData.launchCoin
+            ? 'Creating and launching…'
+            : 'Creating...'
+          : 'Create Artist'}
       </button>
     </form>
   );
