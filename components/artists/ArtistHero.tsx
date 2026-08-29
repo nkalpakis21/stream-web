@@ -7,9 +7,11 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { ArtistHeader } from '@/components/artists/ArtistHeader';
 import { ArtistLookPicker } from '@/components/artists/ArtistLookPicker';
 import { useToast, ToastContainer } from '@/components/ui/toast';
+import { LaunchExistingArtistCoin } from '@/components/artists/LaunchExistingArtistCoin';
 import { updateArtistAvatar } from '@/lib/services/artists';
+import { hasLaunchedCoin } from '@/lib/brand/coin';
 import { getAvatarGradient, getInitials } from '@/lib/utils/avatar';
-import type { AIArtistDocument } from '@/types/firestore';
+import type { AIArtistDocument, PumpFunCoin } from '@/types/firestore';
 
 interface ArtistHeroProps {
   artist: AIArtistDocument;
@@ -22,13 +24,21 @@ export function ArtistHero({ artist, timeAgo, children }: ArtistHeroProps) {
   const router = useRouter();
   const isOwner = Boolean(user && user.uid === artist.ownerId);
   const [avatarURL, setAvatarURL] = useState<string | null>(artist.avatarURL);
+  const [pumpFun, setPumpFun] = useState<PumpFunCoin | null | undefined>(
+    artist.pumpFun
+  );
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
   const [locking, setLocking] = useState(false);
   const { toasts, showToast, dismissToast } = useToast();
+  const showLaunch = isOwner && !hasLaunchedCoin(pumpFun);
 
   useEffect(() => {
     setAvatarURL(artist.avatarURL);
   }, [artist.avatarURL]);
+
+  useEffect(() => {
+    setPumpFun(artist.pumpFun);
+  }, [artist.pumpFun]);
 
   const handleSelectedUrlChange = (url: string | null) => {
     setSelectedUrl(url);
@@ -88,7 +98,7 @@ export function ArtistHero({ artist, timeAgo, children }: ArtistHeroProps) {
           </div>
         </div>
 
-        <ArtistHeader artist={artist} timeAgo={timeAgo} />
+        <ArtistHeader artist={{ ...artist, pumpFun }} timeAgo={timeAgo} />
 
         {children}
       </div>
@@ -106,6 +116,21 @@ export function ArtistHero({ artist, timeAgo, children }: ArtistHeroProps) {
             onSelectedUrlChange={handleSelectedUrlChange}
             disabled={locking}
           />
+          {showLaunch && (
+            <div className="mt-6 pt-6 border-t border-border">
+              <LaunchExistingArtistCoin
+                artistId={artist.id}
+                artistName={artist.name}
+                lore={artist.lore}
+                lookUrl={avatarURL}
+                disabled={locking}
+                onLaunched={(coin: PumpFunCoin) => {
+                  setPumpFun(coin);
+                  router.refresh();
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
     </>

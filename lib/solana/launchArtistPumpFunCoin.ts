@@ -263,3 +263,35 @@ export async function resolvePumpFunForArtistCreate(
     launchNotice: result.ok ? null : result.reason,
   };
 }
+
+/**
+ * Launch on an existing artist. Returns a confirmed coin or a create-style
+ * failure notice. Never invents mint/url/symbol — the caller persists only
+ * after success. The artist document is left unchanged on failure.
+ */
+export async function launchPumpFunForExistingArtist(
+  input: Omit<ResolvePumpFunForArtistCreateInput, 'launchCoin'>
+): Promise<{ coin: PumpFunCoin | null; launchNotice: string | null }> {
+  if (!input.wallet || !input.connection || !input.getIdToken) {
+    return {
+      coin: null,
+      launchNotice: `Connect your wallet in the nav, then try again next time. ${LAUNCH_FAILED_NOTICE}`,
+    };
+  }
+
+  const result = await launchArtistPumpFunCoin({
+    coinName: input.coinName,
+    ticker: input.ticker,
+    imageUrl: input.imageUrl || '',
+    description: input.description,
+    wallet: input.wallet,
+    connection: input.connection,
+    getIdToken: input.getIdToken,
+  });
+
+  if (!result.ok) {
+    return { coin: null, launchNotice: result.reason };
+  }
+
+  return { coin: result.coin, launchNotice: null };
+}
