@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { Search } from 'lucide-react';
-import { SongCard } from '@/components/songs/SongCard';
+import { DiscoverSongCard } from '@/components/discover/DiscoverSongCard';
 import { InfiniteScrollSentinel } from '@/components/discover/InfiniteScrollSentinel';
 import { SongCardSkeleton, SongCardSkeletonGrid } from '@/components/discover/SongCardSkeleton';
 import { EmptyAction } from '@/components/states/EmptyAction';
@@ -41,6 +41,7 @@ export default function DiscoverPage() {
   const {
     songs,
     artistNames,
+    coinBySong,
     quoteBySong,
     loading,
     loadingMore,
@@ -104,7 +105,7 @@ export default function DiscoverPage() {
         </section>
 
         {loading ? (
-          <SongCardSkeletonGrid />
+          <SongCardSkeletonGrid showCluster />
         ) : error ? (
           <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
             <p className="text-muted-foreground text-lg mb-4">
@@ -137,10 +138,11 @@ export default function DiscoverPage() {
                     animationFillMode: 'both',
                   }}
                 >
-                  <SongCard
+                  <DiscoverSongCard
                     song={song}
                     artistName={artistNames.get(song.id)}
                     coin={quoteBySong.get(song.id) ?? null}
+                    hasCoin={coinBySong.get(song.id) ?? false}
                   />
                 </div>
               ))}
@@ -148,7 +150,7 @@ export default function DiscoverPage() {
               {loadingMore && (
                 <>
                   {Array.from({ length: 4 }).map((_, i) => (
-                    <SongCardSkeleton key={`skeleton-${i}`} />
+                    <SongCardSkeleton key={`skeleton-${i}`} showCluster />
                   ))}
                 </>
               )}

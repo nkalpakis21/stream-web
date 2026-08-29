@@ -1,0 +1,59 @@
+'use client';
+
+import Link from 'next/link';
+import type { SongDocument } from '@/types/firestore';
+import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
+import { PlayableArt } from '@/components/songs/PlayableArt';
+import { DiscoverCoinRow } from '@/components/discover/DiscoverCoinRow';
+
+interface DiscoverSongCardProps {
+  song: SongDocument;
+  artistName?: string;
+  coin?: ArtistCoinQuote | null;
+  hasCoin?: boolean;
+}
+
+export function DiscoverSongCard({
+  song,
+  artistName,
+  coin = null,
+  hasCoin = false,
+}: DiscoverSongCardProps) {
+  const coverImageUrl = song.albumCoverThumbnail || song.albumCoverPath;
+
+  return (
+    <article className="block rounded-[12px] bg-card">
+      <PlayableArt
+        songId={song.id}
+        title={song.title}
+        artistName={artistName || 'Artist'}
+        artistId={song.artistId}
+        coverUrl={coverImageUrl}
+        hasCoin={hasCoin}
+        durationSeconds={song.duration}
+        href={`/songs/${song.id}`}
+      />
+      <div className="p-3">
+        <Link href={`/songs/${song.id}`} className="block">
+          <h3
+            className="font-semibold line-clamp-2"
+            style={{ fontSize: 14, lineHeight: '20px', color: 'var(--ink)' }}
+            data-entity="track"
+          >
+            {song.title}
+          </h3>
+        </Link>
+        {artistName ? (
+          <p
+            className="mt-0.5 line-clamp-1"
+            style={{ fontSize: 12, lineHeight: '16px', color: 'var(--mute)' }}
+            data-entity="artist"
+          >
+            {artistName}
+          </p>
+        ) : null}
+        <DiscoverCoinRow artistId={song.artistId} quote={coin} />
+      </div>
+    </article>
+  );
+}

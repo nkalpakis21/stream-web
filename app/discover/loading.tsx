@@ -12,7 +12,7 @@ export default function DiscoverLoading() {
             <div className="h-11 w-16 rounded-full bg-muted" />
           </div>
         </div>
-        <SongCardSkeletonGrid />
+        <SongCardSkeletonGrid showCluster />
       </main>
     </div>
   );
