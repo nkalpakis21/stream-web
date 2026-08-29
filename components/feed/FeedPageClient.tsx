@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { collection, query, where, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
@@ -8,9 +8,22 @@ import { COLLECTIONS } from '@/lib/firebase/collections';
 import { SongCard } from '@/components/songs/SongCard';
 import { getArtistNamesForSongs } from '@/lib/services/songs';
 import type { SongDocument } from '@/types/firestore';
+import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { InfiniteScrollSentinel } from '@/components/discover/InfiniteScrollSentinel';
 import { AuthGateCard } from '@/components/auth/AuthGateCard';
 import { SongCardSkeleton, SongCardSkeletonGrid } from '@/components/discover/SongCardSkeleton';
+import { FeedCoinRow, FeedCoinRowSkeleton } from '@/components/feed/FeedCoinRow';
+import {
+  collectLaunchedMints,
+  interleaveFeedEntries,
+  launchedFollowedCoins,
+  type FeedCoinArtist,
+  type FeedEntry,
+} from '@/lib/feed/coinActivity';
+import {
+  listenPrimaryClass,
+  listenSecondaryClass,
+} from '@/components/states/BrandDeadEnd';
 import Link from 'next/link';
 
 interface PaginatedResponse {
@@ -28,6 +41,7 @@ interface PaginatedResponse {
 export function FeedPageClient() {
   const { user, loading: authLoading } = useAuth();
   const [songs, setSongs] = useState<SongDocument[]>([]);
+  const [coinArtists, setCoinArtists] = useState<FeedCoinArtist[]>([]);
   const [artistNames, setArtistNames] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -98,7 +112,40 @@ export function FeedPageClient() {
     }
   }, [user]);
 
-  // Load initial songs
+  const loadFollowedCoins = useCallback(async (userId: string) => {
+    try {
+      const followedRes = await fetch(
+        `/api/artists/followed?userId=${encodeURIComponent(userId)}`
+      );
+      if (!followedRes.ok) {
+        return [] as FeedCoinArtist[];
+      }
+      const followedData = (await followedRes.json()) as {
+        artists?: unknown[];
+      };
+      const artists = Array.isArray(followedData.artists)
+        ? followedData.artists
+        : [];
+      const mints = collectLaunchedMints(artists);
+      let quotes: Record<string, ArtistCoinQuote | undefined> = {};
+      if (mints.length > 0) {
+        const quoteRes = await fetch(
+          `/api/coin-quotes?mints=${encodeURIComponent(mints.join(','))}`
+        );
+        if (quoteRes.ok) {
+          const quoteData = (await quoteRes.json()) as {
+            quotes?: Record<string, ArtistCoinQuote>;
+          };
+          quotes = quoteData.quotes || {};
+        }
+      }
+      return launchedFollowedCoins(artists, quotes);
+    } catch {
+      return [] as FeedCoinArtist[];
+    }
+  }, []);
+
+  // Load initial songs + followed launched-coin rows
   const loadInitial = useCallback(async () => {
     if (!user || hasLoadedInitialRef.current) return;
 
@@ -108,10 +155,21 @@ export function FeedPageClient() {
     hasLoadedInitialRef.current = true;
 
     try {
-      const data = await fetchSongs(null, true);
-      
-      if (!data || currentUserIdRef.current !== user.uid) {
+      const [data, coins] = await Promise.all([
+        fetchSongs(null, true),
+        loadFollowedCoins(user.uid),
+      ]);
+
+      if (currentUserIdRef.current !== user.uid) {
         return; // Stale request
+      }
+
+      if (currentUserIdRef.current === user.uid) {
+        setCoinArtists(coins);
+      }
+
+      if (!data) {
+        return;
       }
 
       const deserializedSongs = data.songs.map(s => deserializeSong(s));
@@ -133,7 +191,7 @@ export function FeedPageClient() {
         setLoading(false);
       }
     }
-  }, [user, fetchSongs, deserializeSong]);
+  }, [user, fetchSongs, deserializeSong, loadFollowedCoins]);
 
   // Load more songs (pagination)
   const loadMore = useCallback(async () => {
@@ -293,7 +351,7 @@ export function FeedPageClient() {
     return (
       <AuthGateCard
         headline="Sign in to view your feed"
-        why="See new songs from artists you follow."
+        why="See new music and coins from artists you follow."
         returnTo="/feed"
       />
     );
@@ -301,10 +359,16 @@ export function FeedPageClient() {
 
   if (loading) {
     return (
-      <SongCardSkeletonGrid
-        count={12}
-        className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
-      />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <FeedCoinRowSkeleton />
+          <FeedCoinRowSkeleton />
+        </div>
+        <SongCardSkeletonGrid
+          count={12}
+          className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+        />
+      </div>
     );
   }
 
@@ -325,33 +389,29 @@ export function FeedPageClient() {
     );
   }
 
-  if (songs.length === 0) {
+  if (songs.length === 0 && coinArtists.length === 0) {
     return (
-      <div className="py-16 text-center">
-        <p className="text-muted-foreground text-lg mb-6">
-          Your feed is empty. Follow some artists to see their songs here!
+      <div className="flex flex-col items-center gap-4 py-16 text-center">
+        <p className="text-sm text-muted-foreground">
+          Nothing from artists you follow yet
         </p>
-        <Link
-          href="/artists"
-          className="inline-flex items-center justify-center px-6 py-3 bg-accent text-accent-foreground rounded-xl font-medium hover:opacity-90 transition-all shadow-lg"
-        >
-          Follow artists
-        </Link>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link href="/discover" className={listenPrimaryClass}>
+            Discover
+          </Link>
+          <Link href="/artists" className={listenSecondaryClass}>
+            Artists
+          </Link>
+        </div>
       </div>
     );
   }
 
+  const entries = interleaveFeedEntries(songs, coinArtists);
+
   return (
     <div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-        {songs.map(song => (
-          <SongCard 
-            key={song.id} 
-            song={song} 
-            artistName={artistNames.get(song.id)}
-          />
-        ))}
-      </div>
+      <FeedStream entries={entries} artistNames={artistNames} />
 
       {hasMore && !loadingMore && (
         <InfiniteScrollSentinel
@@ -367,6 +427,65 @@ export function FeedPageClient() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function FeedStream({
+  entries,
+  artistNames,
+}: {
+  entries: FeedEntry[];
+  artistNames: Map<string, string>;
+}) {
+  const blocks: Array<
+    | { type: 'coin'; artist: FeedCoinArtist }
+    | { type: 'songs'; songs: SongDocument[] }
+  > = [];
+
+  for (const entry of entries) {
+    if (entry.kind === 'coin') {
+      blocks.push({ type: 'coin', artist: entry.artist });
+      continue;
+    }
+    const last = blocks[blocks.length - 1];
+    if (last && last.type === 'songs') {
+      last.songs.push(entry.song);
+    } else {
+      blocks.push({ type: 'songs', songs: [entry.song] });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {blocks.map(block => {
+        if (block.type === 'coin') {
+          return (
+            <FeedCoinRow
+              key={`coin:${block.artist.id}`}
+              artistId={block.artist.id}
+              name={block.artist.name}
+              avatarURL={block.artist.avatarURL}
+              quote={block.artist.quote}
+              buyUrl={block.artist.buyUrl}
+            />
+          );
+        }
+        return (
+          <div
+            key={`songs:${block.songs[0]?.id ?? 'none'}`}
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+          >
+            {block.songs.map(song => (
+              <SongCard
+                key={song.id}
+                song={song}
+                artistName={artistNames.get(song.id)}
+              />
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
