@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { PlayableArt } from '@/components/songs/PlayableArt';
 import { EmptyAction } from '@/components/states/EmptyAction';
 import { FeaturedCoinMeta, HeatTape } from '@/components/homepage/HeatTape';
+import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 
 export interface ListenTrack {
@@ -35,6 +36,18 @@ interface HomeListenShellProps {
   live: ListenTrack[];
 }
 
+function NowPlayingBadge({ songId }: { songId: string }) {
+  const { nowPlaying, isPlaying } = useSongPlayer();
+  const live = Boolean(isPlaying && nowPlaying?.songId === songId);
+  if (!live) return null;
+
+  return (
+    <span className="absolute left-3 top-3 z-20 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+      Now playing
+    </span>
+  );
+}
+
 export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) {
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
@@ -53,9 +66,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                   hasCoin={featured.hasCoin}
                   href={`/songs/${featured.songId}`}
                 />
-                <span className="absolute left-3 top-3 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-                  Now playing
-                </span>
+                <NowPlayingBadge songId={featured.songId} />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium uppercase tracking-wide text-primary">Listen</p>
@@ -115,7 +126,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
         </div>
         {live.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border py-12">
-            <EmptyAction message="No public tracks yet." href="/discover" label="Discover" />
+            <EmptyAction message="No songs yet." href="/discover" label="Discover" />
           </div>
         ) : (
           <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 md:grid-cols-4 lg:grid-cols-6">

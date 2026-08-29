@@ -179,7 +179,7 @@ export function HeatTape({ tracks }: { tracks: HeatTrack[] }) {
       <h2 className="heat-title">Heat</h2>
       {tracks.length === 0 ? (
         <div className="py-8">
-          <EmptyAction message="No tracks yet." href="/discover" label="Discover" />
+          <EmptyAction message="No songs yet." href="/discover" label="Discover" />
         </div>
       ) : (
         <>

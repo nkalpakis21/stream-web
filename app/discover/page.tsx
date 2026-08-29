@@ -53,19 +53,15 @@ export default function DiscoverPage() {
 
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    setActiveQuery(searchQuery.trim());
+    const next = searchQuery.trim();
+    if (!next) return;
+    setActiveQuery(next);
   }, [searchQuery]);
 
   const handlePill = useCallback((next: DiscoverSort) => {
     setSearchQuery('');
     setActiveQuery('');
     setSort(next);
-  }, []);
-
-  const handleLoadRecent = useCallback(() => {
-    setSearchQuery('');
-    setActiveQuery('');
-    setSort('new');
   }, []);
 
   return (
@@ -121,9 +117,11 @@ export default function DiscoverPage() {
         ) : songs.length === 0 ? (
           <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
             {activeQuery ? (
-              <EmptyAction message="No songs found." label="Browse recent" onClick={handleLoadRecent} />
+              <EmptyAction message="No songs yet." label="Heat" onClick={() => handlePill('heat')} />
+            ) : sort === 'heat' ? (
+              <EmptyAction message="No songs yet." href="/discover" label="Discover" />
             ) : (
-              <EmptyAction message="No songs found." href="/" label="Play" />
+              <EmptyAction message="No songs yet." label="Heat" onClick={() => handlePill('heat')} />
             )}
           </div>
         ) : (
