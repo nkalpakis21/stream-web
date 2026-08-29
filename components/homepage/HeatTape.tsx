@@ -184,7 +184,7 @@ function HeatRow({ track, rank, queue }: { track: HeatTrack; rank: number; queue
 
 export function HeatTape({ tracks }: { tracks: HeatTrack[] }) {
   return (
-    <section className="heat-tape rounded-2xl border border-white/10 bg-card/60 p-4 sm:p-5">
+    <section className="heat-tape rounded-xl border border-white/10 bg-card/60 p-4 sm:p-5">
       <h2 className="heat-title">Heat</h2>
       {tracks.length === 0 ? (
         <div className="py-8">

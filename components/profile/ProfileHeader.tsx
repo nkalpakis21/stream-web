@@ -113,14 +113,14 @@ export function ProfileHeader({ user, stats }: ProfileHeaderProps) {
                     onChange={(e) => setEditValue(e.target.value)}
                     placeholder="Enter display name"
                     maxLength={30}
-                    className="flex-1 px-4 py-2 text-3xl sm:text-4xl font-semibold tracking-tight border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                    className="flex-1 px-4 py-2 text-3xl sm:text-4xl font-semibold tracking-tight border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                     disabled={saving}
                     autoFocus
                   />
                   <button
                     onClick={handleSaveDisplayName}
                     disabled={saving || !editValue.trim()}
-                    className="p-2 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-2 bg-accent text-accent-foreground rounded-xl hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Save display name"
                   >
                     {saving ? (
@@ -152,7 +152,7 @@ export function ProfileHeader({ user, stats }: ProfileHeaderProps) {
                     setEditValue(displayName || '');
                     setEditingDisplayName(true);
                   }}
-                  className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted opacity-0 group-hover:opacity-100"
+                  className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted opacity-0 group-hover:opacity-100"
                   aria-label="Edit display name"
                 >
                   <Edit2 className="w-4 h-4" />

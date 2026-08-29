@@ -105,7 +105,7 @@ export function DisplayNameForm({ onUpdate }: DisplayNameFormProps) {
   return (
     <>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-      <div className="p-4 border border-border rounded-lg bg-card">
+      <div className="p-4 border border-border rounded-xl bg-card">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-1">Display Name</h3>
@@ -124,7 +124,7 @@ export function DisplayNameForm({ onUpdate }: DisplayNameFormProps) {
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Enter display name"
                 maxLength={30}
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 disabled={saving}
                 autoFocus
               />
@@ -136,7 +136,7 @@ export function DisplayNameForm({ onUpdate }: DisplayNameFormProps) {
               <button
                 onClick={handleSave}
                 disabled={saving || !displayName.trim()}
-                className="px-3 py-1.5 text-sm bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                className="px-3 py-1.5 text-sm bg-accent text-accent-foreground rounded-xl hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
                 {saving ? (
                   <>
@@ -178,7 +178,7 @@ export function DisplayNameForm({ onUpdate }: DisplayNameFormProps) {
             </div>
             <button
               onClick={() => setEditing(true)}
-              className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted"
+              className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted"
               aria-label="Edit display name"
             >
               <Edit2 className="w-4 h-4" />

@@ -82,13 +82,13 @@ export function CommentActions({
           value={editContent}
           onChange={(e) => setEditContent(e.target.value)}
           rows={3}
-          className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+          className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
           maxLength={2000}
         />
         <div className="flex items-center gap-2">
           <button
             onClick={handleUpdate}
-            className="px-3 py-1.5 text-xs bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors flex items-center gap-1"
+            className="px-3 py-1.5 text-xs bg-accent text-accent-foreground rounded-xl hover:bg-accent/90 transition-colors flex items-center gap-1"
           >
             <Check className="w-3 h-3" />
             Save

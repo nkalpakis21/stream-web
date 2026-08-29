@@ -274,7 +274,7 @@ html.listen [data-entity='artist'] {
 
 .song-stage-chip {
   min-height: 44px;
-  border-radius: 999px;
+  border-radius: var(--radius, 12px);
   padding: 10px 16px;
   font-family: var(--font-figtree), system-ui, sans-serif;
   font-size: 14px;
@@ -332,7 +332,7 @@ html.listen .lyrics-listen {
     --border: 20 5.9% 90%;
     --input: 20 5.9% 90%;
     --ring: 239 84% 67%;
-    --radius: 0.5rem;
+    --radius: 12px;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;

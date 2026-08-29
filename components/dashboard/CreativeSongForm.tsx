@@ -139,8 +139,8 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
 
   if (artists.length === 0) {
     return (
-      <div className="text-center py-12 rounded-2xl border border-border bg-card">
-        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+      <div className="text-center py-12 rounded-xl border border-border bg-card">
+        <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
           <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
@@ -158,7 +158,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
   }
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-card via-card to-accent/5 shadow-lg">
+    <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-card via-card to-accent/5 shadow-lg">
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {/* Decorative gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent pointer-events-none" />
@@ -180,7 +180,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
           {onCancel && (
             <button
               onClick={onCancel}
-              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+              className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

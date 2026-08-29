@@ -46,7 +46,7 @@ export function DashboardTabs({ activeTab, onTabChange }: DashboardTabsProps) {
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`flex min-h-11 items-center gap-2 px-6 py-3 text-sm font-medium rounded-t-lg transition-all duration-200 relative ${
+            className={`flex min-h-11 items-center gap-2 px-6 py-3 text-sm font-medium rounded-t-xl transition-all duration-200 relative ${
               isActive
                 ? 'text-accent'
                 : 'text-muted-foreground hover:text-foreground'

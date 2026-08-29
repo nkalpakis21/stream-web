@@ -128,7 +128,7 @@ export function PlayableArt({
             {clock}
           </span>
         ) : hasCoin ? (
-          <span className="absolute bottom-2 right-2 z-10 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-medium text-primary">
+          <span className="absolute bottom-2 right-2 z-10 rounded-xl bg-black/70 px-2 py-0.5 text-[10px] font-medium text-primary">
             Coin
           </span>
         ) : null}

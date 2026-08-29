@@ -102,7 +102,7 @@ export function ArtistHero({ artist, coin = null, children }: ArtistHeroProps) {
       {children}
 
       {isOwner && (
-        <div className="mb-12 max-w-2xl rounded-2xl border border-border bg-muted/20 p-6">
+        <div className="mb-12 max-w-2xl rounded-xl border border-border bg-muted/20 p-6">
           <ArtistLookPicker
             mode="lock"
             artistName={artist.name}

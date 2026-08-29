@@ -42,7 +42,7 @@ function NowPlayingBadge({ songId }: { songId: string }) {
   if (!live) return null;
 
   return (
-    <span className="absolute left-3 top-3 z-20 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+    <span className="absolute left-3 top-3 z-20 rounded-xl bg-black/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
       Now playing
     </span>
   );
@@ -79,7 +79,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(400px,0.9fr)]">
-        <section className="rounded-2xl border border-white/10 bg-card/60 p-4 sm:p-6">
+        <section className="rounded-xl border border-white/10 bg-card/60 p-4 sm:p-6">
           {featured ? (
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
               <div className="relative w-full max-w-[360px] sm:w-[320px] sm:max-w-none">
@@ -163,7 +163,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
           </Link>
         </div>
         {live.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border py-12">
+          <div className="rounded-xl border border-dashed border-border py-12">
             <EmptyAction message="No songs yet." href="/discover" label="Discover" />
           </div>
         ) : (
@@ -178,7 +178,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                 <div className="relative aspect-square overflow-hidden rounded-xl">
                   <CoverImage src={track.coverUrl} title={track.title} sizes="200px" />
                   {track.hasCoin && (
-                    <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-medium text-primary">
+                    <span className="absolute right-2 top-2 rounded-xl bg-black/70 px-2 py-0.5 text-[10px] font-medium text-primary">
                       Coin
                     </span>
                   )}

@@ -111,7 +111,7 @@ export function UserMenu() {
           </div>
         </button>
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-accent rounded-full min-w-[18px] shadow-md ring-2 ring-background z-10">
+          <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-accent rounded-xl min-w-[18px] shadow-md ring-2 ring-background z-10">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -216,7 +216,7 @@ export function UserMenu() {
                 </svg>
                 Notifications
                 {unreadCount > 0 && (
-                  <span className="ml-auto inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-accent rounded-full min-w-[18px]">
+                  <span className="ml-auto inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-accent rounded-xl min-w-[18px]">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}

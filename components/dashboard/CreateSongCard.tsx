@@ -12,7 +12,7 @@ export function CreateSongCard({ onClick }: CreateSongCardProps) {
     >
       <div className="relative w-full aspect-square bg-gradient-to-br from-muted/50 to-muted/30 overflow-hidden flex items-center justify-center">
         <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground group-hover:text-accent transition-colors">
-          <div className="w-16 h-16 rounded-full bg-accent/10 group-hover:bg-accent/20 flex items-center justify-center transition-colors">
+          <div className="w-16 h-16 rounded-xl bg-accent/10 group-hover:bg-accent/20 flex items-center justify-center transition-colors">
             <svg
               className="w-8 h-8 text-accent"
               fill="none"

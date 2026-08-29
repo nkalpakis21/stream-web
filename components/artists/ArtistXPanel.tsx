@@ -239,7 +239,7 @@ export function ArtistXPanel({
             type="button"
             onClick={startConnect}
             disabled={busy || loading || available === false}
-            className="px-3 py-1.5 text-sm rounded-lg bg-accent text-accent-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-sm rounded-xl bg-accent text-accent-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {busy ? 'Connecting…' : 'Connect X'}
           </button>
@@ -249,7 +249,7 @@ export function ArtistXPanel({
             type="button"
             onClick={() => setPaused(true)}
             disabled={busy}
-            className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-muted/50 disabled:opacity-50"
+            className="px-3 py-1.5 text-sm rounded-xl border border-border hover:bg-muted/50 disabled:opacity-50"
           >
             Pause posting
           </button>
@@ -259,7 +259,7 @@ export function ArtistXPanel({
             type="button"
             onClick={() => setPaused(false)}
             disabled={busy}
-            className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-muted/50 disabled:opacity-50"
+            className="px-3 py-1.5 text-sm rounded-xl border border-border hover:bg-muted/50 disabled:opacity-50"
           >
             Resume posting
           </button>
@@ -270,7 +270,7 @@ export function ArtistXPanel({
               type="button"
               onClick={startConnect}
               disabled={busy || available === false}
-              className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-muted/50 disabled:opacity-50"
+              className="px-3 py-1.5 text-sm rounded-xl border border-border hover:bg-muted/50 disabled:opacity-50"
             >
               Reconnect
             </button>
@@ -278,7 +278,7 @@ export function ArtistXPanel({
               type="button"
               onClick={disconnect}
               disabled={busy}
-              className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-muted/50 disabled:opacity-50"
+              className="px-3 py-1.5 text-sm rounded-xl border border-border hover:bg-muted/50 disabled:opacity-50"
             >
               Disconnect
             </button>
