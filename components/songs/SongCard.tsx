@@ -28,11 +28,11 @@ export function SongCard({ song, artistName, size = 'default', hasCoin = false }
       />
       <div className={isCompact ? 'p-2' : 'p-3'}>
         <Link href={`/songs/${song.id}`} className="block">
-          <h3 className={`font-semibold line-clamp-2 text-card-foreground ${isCompact ? 'text-xs' : 'text-sm'}`}>
+          <h3 className={`font-semibold line-clamp-2 text-card-foreground ${isCompact ? 'text-xs' : 'text-sm'}`} data-entity="track">
             {song.title}
           </h3>
           {artistName && (
-            <p className={`mt-0.5 line-clamp-1 text-muted-foreground ${isCompact ? 'text-[10px]' : 'text-xs'}`}>
+            <p className={`mt-0.5 line-clamp-1 text-muted-foreground ${isCompact ? 'text-[10px]' : 'text-xs'}`} data-entity="artist">
               {artistName}
             </p>
           )}

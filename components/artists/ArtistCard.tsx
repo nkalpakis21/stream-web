@@ -42,7 +42,7 @@ export function ArtistCard({ artist }: ArtistCardProps) {
           </div>
         )}
       </div>
-      <h3 className="font-medium text-sm text-foreground group-hover:text-accent transition-colors line-clamp-1">
+      <h3 className="font-medium text-sm text-foreground group-hover:text-accent transition-colors line-clamp-1" data-entity="artist">
         {artist.name}
       </h3>
     </Link>

@@ -27,7 +27,7 @@ export function ArtistHeader({ artist, timeAgo, isOwner: propIsOwner }: ArtistHe
         {isOwner ? (
           <EditArtistName artistId={artist.id} currentName={artist.name} />
         ) : (
-          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight">{artist.name}</h1>
+          <h1 className="listen-h1" data-entity="artist">{artist.name}</h1>
         )}
         <div className="flex flex-wrap items-center gap-3">
           <ArtistPumpFunBuyLink pumpFun={artist.pumpFun} />

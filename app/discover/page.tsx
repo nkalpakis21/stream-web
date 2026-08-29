@@ -45,7 +45,7 @@ export default function DiscoverPage() {
     <div className="min-h-screen bg-background">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         <section className="mb-12">
-          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-8">Discover</h1>
+          <h1 className="listen-h1 mb-8">Discover</h1>
           
           <form onSubmit={handleSearch} className="mb-6">
             <div className="flex gap-3">
@@ -56,10 +56,7 @@ export default function DiscoverPage() {
                 placeholder="Search by prompt, genre, mood, or description..."
                 className="flex-1 px-5 py-3 border border-border rounded-full bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
               />
-              <button
-                type="submit"
-                className="px-6 py-3 bg-accent text-accent-foreground rounded-full hover:opacity-90 transition-opacity font-medium shadow-soft"
-              >
+              <button type="submit" className="listen-btn-primary">
                 Search
               </button>
             </div>

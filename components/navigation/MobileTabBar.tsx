@@ -51,7 +51,7 @@ export function MobileTabBar() {
     >
       <div
         className="flex items-center justify-around px-1"
-        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))', minHeight: '64px' }}
+        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))', minHeight: 'var(--tab-h, 56px)' }}
       >
         {tabs.map((tab) => {
           const active = tab.match(pathname);

@@ -326,8 +326,8 @@ export function SpotifyPlayer({
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <div className="text-foreground text-sm sm:text-base font-medium truncate">{songTitle}</div>
-              <div className="text-muted-foreground text-xs sm:text-sm truncate">{artistName}</div>
+              <div className="text-foreground text-sm sm:text-base font-medium truncate" data-entity="track">{songTitle}</div>
+              <div className="text-muted-foreground text-xs sm:text-sm truncate" data-entity="artist">{artistName}</div>
             </div>
           </div>
 
@@ -361,7 +361,7 @@ export function SpotifyPlayer({
                 onChange={handleVolumeChange}
                 className="w-24 h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-accent [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-accent [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
                 style={{
-                  background: `linear-gradient(to right, hsl(var(--accent)) 0%, hsl(var(--accent)) ${volume * 100}%, hsl(var(--muted)) ${volume * 100}%, hsl(var(--muted)) 100%)`
+                  background: `linear-gradient(to right, var(--listen-accent, hsl(var(--accent))) 0%, var(--listen-accent, hsl(var(--accent))) ${volume * 100}%, var(--listen-surface-2, hsl(var(--muted))) ${volume * 100}%, var(--listen-surface-2, hsl(var(--muted))) 100%)`
                 }}
                 aria-label="Volume"
               />

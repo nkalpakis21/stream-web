@@ -51,26 +51,21 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium uppercase tracking-wide text-primary">Listen</p>
-                <h1 className="mt-1 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                <h1 className="listen-h1 mt-1 text-foreground" data-entity="track">
                   {featured.title}
                 </h1>
                 <Link
                   href={`/songs/${featured.songId}`}
                   className="mt-1 block text-muted-foreground hover:text-foreground"
+                  data-entity="artist"
                 >
                   {featured.artistName}
                 </Link>
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <Link
-                    href={`/songs/${featured.songId}`}
-                    className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground"
-                  >
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  <Link href={`/songs/${featured.songId}`} className="listen-btn-primary">
                     Play
                   </Link>
-                  <Link
-                    href="/discover"
-                    className="rounded-full border border-border px-5 py-2.5 text-sm font-medium text-foreground"
-                  >
+                  <Link href="/discover" className="listen-btn-ghost">
                     Discover
                   </Link>
                 </div>
@@ -78,12 +73,9 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
             </div>
           ) : (
             <div className="py-10 text-center">
-              <h1 className="text-3xl font-bold tracking-tight">Nothing playing yet</h1>
+              <h1 className="listen-h1">Nothing playing yet</h1>
               <p className="mt-2 text-muted-foreground">Real tracks from Streamstar will land here.</p>
-              <Link
-                href="/discover"
-                className="mt-6 inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground"
-              >
+              <Link href="/discover" className="listen-btn-primary mt-6">
                 Discover
               </Link>
             </div>
@@ -92,7 +84,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
 
         <section className="rounded-2xl border border-white/10 bg-card/60 p-4 sm:p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Heat</h2>
+            <h2 className="listen-title text-foreground">Heat</h2>
             <Link href="/discover" className="text-xs text-muted-foreground hover:text-foreground">
               View all
             </Link>
@@ -116,8 +108,8 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">{track.title}</p>
-                      <p className="truncate text-xs text-muted-foreground">{track.artistName}</p>
+                      <p className="truncate text-sm font-medium text-foreground" data-entity="track">{track.title}</p>
+                      <p className="truncate text-xs text-muted-foreground" data-entity="artist">{track.artistName}</p>
                     </div>
                     {track.hasCoin && (
                       <span className="flex-shrink-0 text-[10px] font-medium text-primary">Coin</span>
@@ -136,7 +128,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
       <section className="mt-10">
         <div className="mb-4 flex items-end justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Live</h2>
+            <h2 className="listen-title text-foreground">Live</h2>
             <p className="text-sm text-muted-foreground">Tracks on Streamstar right now.</p>
           </div>
           <Link href="/discover" className="text-sm text-muted-foreground hover:text-foreground">
@@ -167,8 +159,8 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                     </span>
                   )}
                 </div>
-                <p className="mt-2 truncate text-sm font-medium">{track.title}</p>
-                <p className="truncate text-xs text-muted-foreground">{track.artistName}</p>
+                <p className="mt-2 truncate text-sm font-medium" data-entity="track">{track.title}</p>
+                <p className="truncate text-xs text-muted-foreground" data-entity="artist">{track.artistName}</p>
               </Link>
             ))}
           </div>
