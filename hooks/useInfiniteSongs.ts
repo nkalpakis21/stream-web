@@ -257,9 +257,7 @@ export function useInfiniteSongs(
         setError(err instanceof Error ? err : new Error('Failed to load songs'));
       }
     } finally {
-      if (currentKeyRef.current === key) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   }, [key, fetchSongs, deserializeSong, attachArtistMeta]);
 

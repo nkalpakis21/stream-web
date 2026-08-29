@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
 import { PlayerCoinChip } from './PlayerCoinChip';
+import { CoverImage } from '@/components/media/CoverImage';
 import './listen-player.css';
 
 interface PlayingTrack {
@@ -150,16 +150,12 @@ export function ListenPlayer({
 
       <div className="listen-player-inner">
         <div className="listen-player-art" aria-hidden={!nowPlaying?.albumCoverUrl}>
-          {nowPlaying?.albumCoverUrl ? (
-            <Image
-              src={nowPlaying.albumCoverUrl}
-              alt=""
-              fill
-              unoptimized
-              className="object-cover"
-              sizes="56px"
-            />
-          ) : null}
+          <CoverImage
+            src={nowPlaying?.albumCoverUrl}
+            title={nowPlaying?.songTitle || 'Track'}
+            sizes="56px"
+            rounded="rounded-md"
+          />
         </div>
 
         <div className="listen-player-meta">

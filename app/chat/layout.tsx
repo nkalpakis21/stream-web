@@ -1,14 +1,10 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Studio',
+  title: 'Chat',
   robots: { index: false, follow: false },
 };
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function ChatLayout({ children }: { children: React.ReactNode }) {
   return children;
 }

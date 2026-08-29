@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import dynamic from 'next/dynamic';
 import { Figtree, Playfair_Display } from 'next/font/google';
 import './globals.css';
@@ -9,6 +9,7 @@ import { Footer } from '@/components/layout/Footer';
 import { SiteHeader } from '@/components/navigation/SiteHeader';
 import { MobileTabBar } from '@/components/navigation/MobileTabBar';
 import { ListenSurface } from '@/components/listen/ListenSurface';
+import { SITE_NAME, SITE_ORIGIN, THEME_COLOR, publicUrl } from '@/lib/brand/site';
 
 const SolanaWalletProvider = dynamic(
   () =>
@@ -33,12 +34,14 @@ const playfairDisplay = Playfair_Display({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_ORIGIN),
   title: {
-    default: 'Streamstar',
-    template: '%s · Streamstar',
+    default: SITE_NAME,
+    template: `%s · ${SITE_NAME}`,
   },
-  description: 'Listen, create, trade.',
-  applicationName: 'Streamstar',
+  description: 'Listen and create on Streamstar.',
+  applicationName: SITE_NAME,
+  alternates: { canonical: publicUrl('/') },
   icons: {
     icon: [
       { url: '/icon-16x16.png', sizes: '16x16', type: 'image/png' },
@@ -49,16 +52,23 @@ export const metadata: Metadata = {
   },
   manifest: '/site.webmanifest',
   openGraph: {
-    title: 'Streamstar',
-    description: 'Listen, create, trade.',
-    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Streamstar' }],
+    title: SITE_NAME,
+    description: 'Listen and create on Streamstar.',
+    url: publicUrl('/'),
+    siteName: SITE_NAME,
+    type: 'website',
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: SITE_NAME }],
   },
   twitter: {
-    card: 'summary',
-    title: 'Streamstar',
-    description: 'Listen, create, trade.',
+    card: 'summary_large_image',
+    title: SITE_NAME,
+    description: 'Listen and create on Streamstar.',
     images: ['/og-image.png'],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: THEME_COLOR,
 };
 
 export default function RootLayout({

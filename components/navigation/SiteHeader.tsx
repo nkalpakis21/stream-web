@@ -41,7 +41,10 @@ export function SiteHeader() {
           aria-label="Primary"
         >
           {visibleLinks.map((link) => {
-            const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+            const active =
+              link.href === '/discover'
+                ? pathname === '/discover'
+                : pathname === link.href || pathname.startsWith(`${link.href}/`);
             return (
               <Link
                 key={link.href}

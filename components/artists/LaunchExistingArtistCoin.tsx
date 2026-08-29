@@ -8,6 +8,7 @@ import { getFreshIdToken, userFacingApiError } from '@/lib/api/clientAuth';
 import { launchPumpFunForExistingArtist } from '@/lib/solana/launchArtistPumpFunCoin';
 import { LAUNCH_FAILED_NOTICE } from '@/lib/solana/pumpFun';
 import type { PumpFunCoin } from '@/types/firestore';
+import { useToast, ToastContainer } from '@/components/ui/toast';
 
 interface LaunchExistingArtistCoinProps {
   artistId: string;
@@ -38,6 +39,7 @@ export function LaunchExistingArtistCoin({
   const [coinName, setCoinName] = useState('');
   const [ticker, setTicker] = useState('');
   const [launching, setLaunching] = useState(false);
+  const { toasts, showToast, dismissToast } = useToast();
 
   const busy = Boolean(disabled || launching);
 
@@ -85,7 +87,7 @@ export function LaunchExistingArtistCoin({
       });
 
       if (!coin) {
-        alert(launchNotice || LAUNCH_FAILED_NOTICE);
+        showToast(launchNotice || LAUNCH_FAILED_NOTICE, 'error');
         return;
       }
 
@@ -103,7 +105,7 @@ export function LaunchExistingArtistCoin({
       onLaunched(coin);
     } catch (error) {
       console.error('Failed to launch artist coin:', error);
-      alert(userFacingApiError(undefined, error, LAUNCH_FAILED_NOTICE));
+      showToast(userFacingApiError(undefined, error, LAUNCH_FAILED_NOTICE), 'error');
     } finally {
       setLaunching(false);
     }
@@ -111,6 +113,7 @@ export function LaunchExistingArtistCoin({
 
   return (
     <div className="space-y-4">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <LaunchCoinToggle
         checked={launchCoin}
         onChange={setLaunchCoin}

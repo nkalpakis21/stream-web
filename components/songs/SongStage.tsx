@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { PlayableArt } from '@/components/songs/PlayableArt';
 import { ShareButton } from '@/components/songs/ShareButton';
 import { SongCoinCluster } from '@/components/songs/SongCoinCluster';
+import { AiMark } from '@/components/brand/AiMark';
+import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 
 interface VersionOption {
@@ -66,6 +68,7 @@ export function SongStage({
     () => versions.filter(v => v.audioURL),
     [versions]
   );
+  const { play } = useSongPlayer();
   const [activeId, setActiveId] = useState(
     playable.find(v => v.isPrimary)?.id || playable[0]?.id || null
   );
@@ -94,6 +97,7 @@ export function SongStage({
           {titleClock ? (
             <span className="song-stage-duration">{titleClock}</span>
           ) : null}
+          <AiMark />
         </div>
         {artistId ? (
           <Link href={`/artists/${artistId}`} className="mt-2 inline-block text-lg text-primary underline-offset-4 hover:underline" data-entity="artist">
@@ -104,7 +108,13 @@ export function SongStage({
         )}
         <SongCoinCluster artistId={artistId} quote={coin} buyUrl={buyUrl} />
         {pending && !currentAudio && (
-          <p className="mt-4 text-sm text-muted-foreground">Making the track…</p>
+          <div
+            className="mt-6 rounded-xl border px-4 py-5"
+            style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}
+          >
+            <p className="text-sm font-medium text-foreground">Making the track</p>
+            <p className="mt-1 text-sm text-muted-foreground">This usually takes a minute. Stay here and it will play when ready.</p>
+          </div>
         )}
 
         {playable.length > 0 && (
@@ -117,7 +127,19 @@ export function SongStage({
                 <button
                   key={version.id}
                   type="button"
-                  onClick={() => setActiveId(version.id)}
+                  onClick={() => {
+                    setActiveId(version.id);
+                    if (version.audioURL) {
+                      play({
+                        songId,
+                        songTitle,
+                        artistName,
+                        artistId: artistId || undefined,
+                        albumCoverUrl: albumCoverUrl,
+                        audioUrl: version.audioURL,
+                      });
+                    }
+                  }}
                   className={`song-stage-chip ${selected ? 'is-selected' : ''}`}
                 >
                   {clock ? `Version ${label} · ${clock}` : `Version ${label}`}

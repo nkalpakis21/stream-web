@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { getArtist } from '@/lib/services/artists';
+import { publicUrl, isDefaultTempoRange } from '@/lib/brand/site';
 import { getArtistSongs } from '@/lib/services/songs';
 import { SongCard } from '@/components/songs/SongCard';
 import { ArtistHero } from '@/components/artists/ArtistHero';
@@ -16,6 +18,33 @@ interface ArtistPageProps {
   };
 }
 
+export async function generateMetadata({ params }: ArtistPageProps): Promise<Metadata> {
+  const artist = await getArtist(params.id);
+  if (!artist || artist.deletedAt) {
+    return { title: 'Artist' };
+  }
+  const image = artist.avatarURL || undefined;
+  const title = artist.name;
+  const description = `Listen to ${artist.name} on Streamstar`;
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: 'profile',
+      url: publicUrl(`/artists/${artist.id}`),
+      images: image ? [{ url: image, alt: `${artist.name} cover art` }] : [],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: image ? [image] : [],
+    },
+  };
+}
+
 export default async function ArtistPage({ params }: ArtistPageProps) {
   const artist = await getArtist(params.id);
 
@@ -29,11 +58,13 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
   ]);
 
   const style = artist.styleDNA;
+  const showTempo = !isDefaultTempoRange(style.tempoRange);
   const hasStyle =
     style.genres.length > 0 ||
     style.moods.length > 0 ||
     style.influences.length > 0 ||
-    Boolean(artist.vocalIdentity);
+    Boolean(artist.vocalIdentity) ||
+    showTempo;
 
   return (
     <div className="min-h-screen bg-background">
@@ -71,6 +102,16 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                     Vocal identity
                   </span>
                   <p className="text-sm font-medium">{artist.vocalIdentity}</p>
+                </div>
+              ) : null}
+              {showTempo ? (
+                <div>
+                  <span className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">
+                    Tempo range
+                  </span>
+                  <p className="text-sm font-medium">
+                    {style.tempoRange.min}–{style.tempoRange.max}
+                  </p>
                 </div>
               ) : null}
             </div>

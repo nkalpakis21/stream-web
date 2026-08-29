@@ -12,6 +12,7 @@ import { ArtistLookPicker } from '@/components/artists/ArtistLookPicker';
 import { getFreshIdToken } from '@/lib/api/clientAuth';
 import { resolvePumpFunForArtistCreate } from '@/lib/solana/launchArtistPumpFunCoin';
 import type { StyleDNA } from '@/types/firestore';
+import { useToast, ToastContainer } from '@/components/ui/toast';
 
 interface CreativeArtistFormProps {
   onSuccess?: (artistId: string) => void;
@@ -41,6 +42,7 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
     connectX: false,
   });
   const [avatarURL, setAvatarURL] = useState<string | null>(null);
+  const { toasts, showToast, dismissToast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,13 +106,13 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
       setAvatarURL(null);
 
       if (launchNotice) {
-        alert(launchNotice);
+        showToast(launchNotice, 'info');
       }
 
       if (shouldConnectX) {
         const xError = await startArtistXConnect(user, artist.id);
         if (xError) {
-          alert(xError);
+          showToast(xError, 'error');
         } else {
           return;
         }
@@ -123,7 +125,7 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
       }
     } catch (error) {
       console.error('Failed to create artist:', error);
-      alert('Failed to create artist. Please try again.');
+      showToast('Failed to create artist. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -131,6 +133,7 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-card/60 shadow-lg">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <div className="relative p-6 sm:p-8">
         <div className="flex items-start justify-between mb-6">
           <div>
@@ -243,7 +246,7 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
                       type="text"
                       value={formData.genres}
                       onChange={e => setFormData({ ...formData, genres: e.target.value })}
-                      placeholder="jazz, electronic, cyberpunk"
+                      placeholder="electronic, pop, ambient"
                       className="w-full px-4 py-3 border border-border rounded-xl bg-background/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                     />
                   </div>

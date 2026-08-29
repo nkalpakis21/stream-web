@@ -113,17 +113,19 @@ html.listen [data-entity='artist'] {
 .btn-primary,
 .btn-primary:disabled,
 .listen-btn-primary {
+  min-height: 44px;
   height: 48px;
   padding: 0 20px;
   background: var(--accent);
-  color: var(--ink);
+  color: var(--accent-ink);
   border: none;
 }
 
 .btn-ghost,
 .btn-ghost:disabled,
 .listen-btn-ghost {
-  height: 40px;
+  min-height: 44px;
+  height: 44px;
   padding: 0 16px;
   background: transparent;
   color: var(--ink);
@@ -271,8 +273,9 @@ html.listen [data-entity='artist'] {
 }
 
 .song-stage-chip {
+  min-height: 44px;
   border-radius: 999px;
-  padding: 6px 12px;
+  padding: 10px 16px;
   font-family: var(--font-figtree), system-ui, sans-serif;
   font-size: 14px;
   line-height: 20px;
@@ -281,6 +284,19 @@ html.listen [data-entity='artist'] {
   background: transparent;
   color: var(--mute, #8b8896);
   cursor: pointer;
+}
+
+html.listen :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+html.listen a:focus-visible,
+html.listen button:focus-visible,
+html.listen input:focus-visible,
+html.listen [role='button']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .song-stage-chip.is-selected {

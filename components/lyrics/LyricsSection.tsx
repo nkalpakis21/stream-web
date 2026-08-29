@@ -27,13 +27,21 @@ export function LyricsSection({
   isPlaying = false,
 }: LyricsSectionProps) {
   const [mode, setMode] = useState<DisplayMode>('minimal');
-  const [isExpanded, setIsExpanded] = useState(true); // Start expanded by default
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    // Trigger entrance animation
     setIsVisible(true);
   }, []);
+
+  useEffect(() => {
+    if (mode !== 'immersive') return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMode('minimal');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mode]);
 
   if (!lyrics || !lyrics.raw) {
     return null;
