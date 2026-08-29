@@ -1,46 +1,71 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { Search } from 'lucide-react';
 import { SongCard } from '@/components/songs/SongCard';
 import { InfiniteScrollSentinel } from '@/components/discover/InfiniteScrollSentinel';
 import { SongCardSkeleton, SongCardSkeletonGrid } from '@/components/discover/SongCardSkeleton';
 import { EmptyAction } from '@/components/states/EmptyAction';
-import { useInfiniteSongs } from '@/hooks/useInfiniteSongs';
+import { useInfiniteSongs, type DiscoverSort } from '@/hooks/useInfiniteSongs';
+
+function DiscoverPill({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="h-11 rounded-full px-5 text-sm font-semibold transition-colors"
+      style={
+        active
+          ? { background: 'var(--accent)', color: 'var(--accent-ink)' }
+          : { background: 'transparent', color: 'var(--mute)', border: '1px solid var(--line)' }
+      }
+    >
+      {label}
+    </button>
+  );
+}
 
 export default function DiscoverPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeQuery, setActiveQuery] = useState('');
+  const [sort, setSort] = useState<DiscoverSort>('new');
 
   const {
     songs,
     artistNames,
-    coinBySong,
+    quoteBySong,
     loading,
     loadingMore,
     hasMore,
     error,
     loadMore,
     reset,
-  } = useInfiniteSongs({ query: activeQuery });
+  } = useInfiniteSongs({ query: activeQuery, sort });
 
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    const trimmedQuery = searchQuery.trim();
-    setActiveQuery(trimmedQuery);
-    reset(); // Reset will trigger new load with updated query
-  }, [searchQuery, reset]);
+    setActiveQuery(searchQuery.trim());
+  }, [searchQuery]);
 
-  const handleQuickFilter = useCallback((query: string) => {
-    setSearchQuery(query);
-    setActiveQuery(query);
-    reset();
-  }, [reset]);
+  const handlePill = useCallback((next: DiscoverSort) => {
+    setSearchQuery('');
+    setActiveQuery('');
+    setSort(next);
+  }, []);
 
   const handleLoadRecent = useCallback(() => {
     setSearchQuery('');
     setActiveQuery('');
-    reset();
-  }, [reset]);
+    setSort('new');
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -49,43 +74,35 @@ export default function DiscoverPage() {
           <h1 className="listen-h1 mb-8">Discover</h1>
           
           <form onSubmit={handleSearch} className="mb-6">
-            <div className="flex gap-3">
+            <label className="relative block">
+              <span className="sr-only">Search</span>
+              <Search
+                className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2"
+                style={{ color: 'var(--mute)' }}
+                aria-hidden
+              />
               <input
-                type="text"
+                type="search"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search by prompt, genre, mood, or description..."
-                className="flex-1 px-5 py-3 border border-border rounded-full bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+                placeholder="Songs, artists, titles."
+                className="h-12 w-full border bg-card pl-12 pr-5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:border-transparent transition-all"
+                style={{
+                  borderRadius: 9999,
+                  borderColor: 'var(--line)',
+                  background: 'var(--surface)',
+                  color: 'var(--ink)',
+                }}
               />
-              <button type="submit" className="listen-btn-primary">
-                Search
-              </button>
-            </div>
+            </label>
           </form>
 
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={handleLoadRecent}
-              className="px-4 py-2 rounded-full border border-border hover:bg-muted hover:border-accent/20 transition-all duration-200 text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              Recent
-            </button>
-            <button
-              onClick={() => handleQuickFilter('cyberpunk')}
-              className="px-4 py-2 rounded-full border border-border hover:bg-muted hover:border-accent/20 transition-all duration-200 text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              Cyberpunk
-            </button>
-            <button
-              onClick={() => handleQuickFilter('jazz')}
-              className="px-4 py-2 rounded-full border border-border hover:bg-muted hover:border-accent/20 transition-all duration-200 text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              Jazz
-            </button>
+            <DiscoverPill label="Heat" active={sort === 'heat' && !activeQuery} onClick={() => handlePill('heat')} />
+            <DiscoverPill label="New" active={sort === 'new' && !activeQuery} onClick={() => handlePill('new')} />
           </div>
         </section>
 
-        {/* Initial Loading State */}
         {loading ? (
           <SongCardSkeletonGrid />
         ) : error ? (
@@ -110,7 +127,6 @@ export default function DiscoverPage() {
           </div>
         ) : (
           <>
-            {/* Songs Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {songs.map((song, index) => (
                 <div
@@ -124,12 +140,11 @@ export default function DiscoverPage() {
                   <SongCard
                     song={song}
                     artistName={artistNames.get(song.id)}
-                    hasCoin={coinBySong.get(song.id) ?? false}
+                    coin={quoteBySong.get(song.id) ?? null}
                   />
                 </div>
               ))}
               
-              {/* Loading More Skeletons */}
               {loadingMore && (
                 <>
                   {Array.from({ length: 4 }).map((_, i) => (
@@ -139,7 +154,6 @@ export default function DiscoverPage() {
               )}
             </div>
 
-            {/* Infinite Scroll Sentinel */}
             {hasMore && !loadingMore && (
               <InfiniteScrollSentinel
                 onIntersect={loadMore}
@@ -147,7 +161,6 @@ export default function DiscoverPage() {
               />
             )}
 
-            {/* Loading More Indicator */}
             {loadingMore && (
               <div className="py-8 text-center">
                 <div className="inline-flex items-center gap-3 text-muted-foreground">
@@ -157,7 +170,6 @@ export default function DiscoverPage() {
               </div>
             )}
 
-            {/* End of Results */}
             {!hasMore && songs.length > 0 && (
               <div className="py-12 text-center">
                 <div className="relative">
@@ -178,4 +190,3 @@ export default function DiscoverPage() {
     </div>
   );
 }
-

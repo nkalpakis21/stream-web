@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPaginatedPublicSongs, searchSongsByPromptPaginated } from '@/lib/services/discovery';
+import { getTopSongs } from '@/lib/services/songs';
 import type { SongDocument } from '@/types/firestore';
 
 /**
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const cursor = searchParams.get('cursor') || null;
     const query = searchParams.get('query') || null;
+    const sort = searchParams.get('sort') === 'heat' ? 'heat' : 'new';
 
     // Validate limit
     if (limit < 1 || limit > 100) {
@@ -34,10 +36,12 @@ export async function GET(request: NextRequest) {
     };
 
     if (query && query.trim()) {
-      // Search mode
+      // Search mode — STR-27 owns search matching; do not expand it here.
       result = await searchSongsByPromptPaginated(query.trim(), limit, cursor);
+    } else if (sort === 'heat') {
+      const songs = await getTopSongs(limit);
+      result = { songs, nextCursor: null, hasMore: false };
     } else {
-      // Recent songs mode
       result = await getPaginatedPublicSongs(limit, cursor);
     }
 

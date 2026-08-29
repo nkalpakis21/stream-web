@@ -28,7 +28,9 @@ export function SongPlayCardClient({
     []
   );
   
-  const isCurrentSong = nowPlaying?.audioUrl === audioUrl;
+  const isCurrentSong = Boolean(
+    (songId && nowPlaying?.songId === songId) || nowPlaying?.audioUrl === audioUrl
+  );
   const showPlayingState = isCurrentSong && isPlaying;
 
   const handleCardClick = () => {
@@ -45,6 +47,7 @@ export function SongPlayCardClient({
     // Otherwise, play this song
     else {
       play({
+        songId,
         songTitle,
         artistName,
         albumCoverUrl,
