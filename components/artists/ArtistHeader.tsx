@@ -7,6 +7,8 @@ import { MessageArtistButton } from './MessageArtistButton';
 import { FollowButton } from './FollowButton';
 import { FollowersList } from './FollowersList';
 import { ArtistXPanel } from './ArtistXPanel';
+import { ArtistPumpFunBuyLink } from './ArtistPumpFunBuyLink';
+import { ArtistCoinBuy } from './ArtistCoinBuy';
 import type { AIArtistDocument } from '@/types/firestore';
 
 interface ArtistHeaderProps {
@@ -27,7 +29,8 @@ export function ArtistHeader({ artist, timeAgo, isOwner: propIsOwner }: ArtistHe
         ) : (
           <h1 className="text-4xl lg:text-5xl font-bold tracking-tight">{artist.name}</h1>
         )}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <ArtistPumpFunBuyLink pumpFun={artist.pumpFun} />
           <MessageArtistButton artistId={artist.id} ownerId={artist.ownerId} />
           <FollowButton artistId={artist.id} ownerId={artist.ownerId} />
         </div>
@@ -37,6 +40,7 @@ export function ArtistHeader({ artist, timeAgo, isOwner: propIsOwner }: ArtistHe
         <FollowersList artistId={artist.id} />
       </div>
       <p className="text-lg text-foreground/80 mb-8 leading-relaxed max-w-2xl">{artist.lore}</p>
+      <ArtistCoinBuy url={artist.pumpFun?.url} />
       <Suspense fallback={null}>
         <ArtistXPanel artistId={artist.id} ownerId={artist.ownerId} />
       </Suspense>

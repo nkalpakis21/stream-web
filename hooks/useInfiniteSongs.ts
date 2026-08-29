@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { SongDocument } from '@/types/firestore';
 import { getArtistNamesForSongs } from '@/lib/services/songs';
+import { getArtistsData } from '@/lib/services/artists';
+import { hasLaunchedCoin } from '@/lib/brand/coin';
 
 interface PaginatedResponse {
   songs: Array<Omit<SongDocument, 'createdAt' | 'updatedAt' | 'deletedAt'> & {
@@ -22,6 +24,7 @@ interface UseInfiniteSongsOptions {
 interface UseInfiniteSongsReturn {
   songs: SongDocument[];
   artistNames: Map<string, string>;
+  coinBySong: Map<string, boolean>;
   loading: boolean;
   loadingMore: boolean;
   hasMore: boolean;
@@ -46,6 +49,7 @@ export function useInfiniteSongs(
   
   const [songs, setSongs] = useState<SongDocument[]>([]);
   const [artistNames, setArtistNames] = useState<Map<string, string>>(new Map());
+  const [coinBySong, setCoinBySong] = useState<Map<string, boolean>>(new Map());
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -135,6 +139,7 @@ export function useInfiniteSongs(
     setError(null);
     setSongs([]);
     setArtistNames(new Map());
+    setCoinBySong(new Map());
     setCursor(null);
     setHasMore(true);
     currentQueryRef.current = query;
@@ -152,9 +157,17 @@ export function useInfiniteSongs(
       setHasMore(data.hasMore);
 
       // Fetch artist names
-      const names = await getArtistNamesForSongs(deserializedSongs);
+      const [names, artists] = await Promise.all([
+        getArtistNamesForSongs(deserializedSongs),
+        getArtistsData(deserializedSongs.map(s => s.artistId)),
+      ]);
       if (currentQueryRef.current === query) {
         setArtistNames(names);
+        const coins = new Map<string, boolean>();
+        deserializedSongs.forEach(song => {
+          coins.set(song.id, hasLaunchedCoin(artists.get(song.artistId)?.pumpFun));
+        });
+        setCoinBySong(coins);
       }
     } catch (err) {
       console.error('[useInfiniteSongs] Error loading initial songs:', err);
@@ -197,11 +210,21 @@ export function useInfiniteSongs(
       setHasMore(data.hasMore);
 
       // Fetch artist names for new songs
-      const names = await getArtistNamesForSongs(deserializedSongs);
+      const [names, artists] = await Promise.all([
+        getArtistNamesForSongs(deserializedSongs),
+        getArtistsData(deserializedSongs.map(s => s.artistId)),
+      ]);
       if (currentQueryRef.current === query) {
         setArtistNames(prev => {
           const updated = new Map(prev);
           names.forEach((name, id) => updated.set(id, name));
+          return updated;
+        });
+        setCoinBySong(prev => {
+          const updated = new Map(prev);
+          deserializedSongs.forEach(song => {
+            updated.set(song.id, hasLaunchedCoin(artists.get(song.artistId)?.pumpFun));
+          });
           return updated;
         });
       }
@@ -220,6 +243,7 @@ export function useInfiniteSongs(
   const reset = useCallback(() => {
     setSongs([]);
     setArtistNames(new Map());
+    setCoinBySong(new Map());
     setCursor(null);
     setHasMore(true);
     setError(null);
@@ -241,6 +265,7 @@ export function useInfiniteSongs(
   return {
     songs,
     artistNames,
+    coinBySong,
     loading,
     loadingMore,
     hasMore,

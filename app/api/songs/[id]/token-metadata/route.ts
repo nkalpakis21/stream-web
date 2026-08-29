@@ -39,7 +39,7 @@ export async function GET(
     const metadata = {
       name: song.title || 'Stream Song',
       symbol,
-      description: `Token for "${song.title}" by ${artist?.name || 'Unknown Artist'}. Created on Stream ⭐.`,
+      description: `Token for "${song.title}" by ${artist?.name || 'Unknown Artist'}. Created on Streamstar.`,
       image: imageUrl || `${baseUrl}/icon-512x512.png`,
       external_url: songUrl,
     };

@@ -130,7 +130,7 @@ export function UserMenu() {
           
           {/* Menu */}
           <div
-            className="absolute right-0 top-[calc(100%+0.75rem)] w-[260px] bg-card border border-border/60 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+            className="absolute right-0 top-[calc(100%+0.75rem)] w-[min(260px,calc(100vw-2rem))] bg-card border border-border/60 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
           >
             {/* User Info Header */}
             <div className="px-4 py-3 border-b border-border/40">
@@ -142,16 +142,27 @@ export function UserMenu() {
               </div>
             </div>
 
-            {/* Wallet Connect */}
+            {/* Wallet — quiet, no chain jargon */}
             <div className="px-4 py-3 border-b border-border/40">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
-                Solana Wallet
-              </p>
               <WalletConnectSection />
             </div>
 
             {/* Menu Items */}
             <div className="py-1.5">
+              <Link
+                href="/chat"
+                onClick={() => setIsOpen(false)}
+                className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors duration-200 ${
+                  pathname?.startsWith('/chat')
+                    ? 'text-foreground bg-muted/40'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/20'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                Chat
+              </Link>
               <Link
                 href="/dashboard"
                 onClick={() => setIsOpen(false)}

@@ -1,5 +1,3 @@
-'use client';
-
 import Image from 'next/image';
 
 interface LogoIconProps {
@@ -7,23 +5,15 @@ interface LogoIconProps {
   className?: string;
 }
 
-export function LogoIcon({ size = 24, className = '' }: LogoIconProps) {
+export function LogoIcon({ size = 32, className = '' }: LogoIconProps) {
   return (
-    <div 
-      className={`relative flex-shrink-0 ${className}`}
-      style={{ width: size, height: size }}
-    >
-      <Image
-        src="/logo.png"
-        alt="Stream ⭐"
-        fill
-        className="object-contain"
-        priority
-        sizes={`${size}px`}
-      />
-    </div>
+    <Image
+      src="/icon.svg"
+      alt=""
+      width={size}
+      height={size}
+      className={`flex-shrink-0 ${className}`}
+      priority
+    />
   );
 }
-
-
-

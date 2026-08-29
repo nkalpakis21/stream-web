@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { V0Navbar } from '@/components/navigation/V0Navbar';
 import { isWhitelistedInvestorEmail } from '@/lib/investing/whitelist';
 
 const HOW_IT_WORKS = [
@@ -16,8 +15,7 @@ const HOW_IT_WORKS = [
 function GateShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
-      <V0Navbar />
-      <div className="flex items-center justify-center min-h-[60vh] pt-20 px-4">
+      <div className="flex items-center justify-center min-h-[60vh] px-4">
         {children}
       </div>
     </div>
@@ -124,8 +122,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function InvestingMemo() {
   return (
     <div className="min-h-screen bg-background">
-      <V0Navbar />
-      <main className="relative pt-20">
+      <main className="relative">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-24 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full bg-primary/5 blur-[120px]" />
         </div>

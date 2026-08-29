@@ -1,17 +1,14 @@
-import { V0Navbar } from '@/components/navigation/V0Navbar';
 import Link from 'next/link';
 
 export const metadata = {
   title: 'Privacy Policy',
-  description: 'Privacy Policy for Stream ⭐',
+  description: 'Privacy Policy for Streamstar',
 };
 
 export default function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-background">
-      <V0Navbar />
-
-      <main className="max-w-4xl mx-auto px-6 lg:px-8 pt-20 pb-12 lg:pt-24 lg:pb-16">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16">
         <div className="prose prose-neutral dark:prose-invert max-w-none">
           <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-8">Privacy Policy</h1>
           
@@ -23,7 +20,7 @@ export default function PrivacyPolicyPage() {
             <section>
               <h2 className="text-2xl font-semibold mb-4">1. Introduction</h2>
               <p className="text-muted-foreground leading-relaxed">
-                Welcome to Stream ⭐ (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). We are committed to protecting your privacy and ensuring you have a positive experience on our platform. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our AI-native music platform.
+                Welcome to Streamstar (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). We are committed to protecting your privacy and ensuring you have a positive experience on our platform. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our AI-native music platform.
               </p>
             </section>
 

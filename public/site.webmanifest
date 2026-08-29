@@ -1,26 +1,28 @@
 {
-  "name": "Stream ⭐",
-  "short_name": "Stream ⭐",
-  "description": "AI-Native Music Platform",
+  "name": "Streamstar",
+  "short_name": "Streamstar",
+  "description": "Listen, create, trade.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#0A0A10",
+  "theme_color": "#0A0A10",
   "icons": [
     {
       "src": "/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
     }
   ]
 }
-
-
-

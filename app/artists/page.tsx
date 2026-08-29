@@ -1,7 +1,5 @@
 import { getPublicArtists } from '@/lib/services/artists';
 import { ArtistCard } from '@/components/artists/ArtistCard';
-import { V0Navbar } from '@/components/navigation/V0Navbar';
-
 // Force dynamic rendering to always fetch fresh data from Firestore
 export const dynamic = 'force-dynamic';
 
@@ -10,9 +8,7 @@ export default async function ArtistsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <V0Navbar />
-
-      <main className="max-w-7xl mx-auto px-6 lg:px-8 pt-20 pb-8 lg:pt-24 lg:pb-12">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         <div className="flex items-center justify-between mb-12">
           <h1 className="text-4xl lg:text-5xl font-bold tracking-tight">All Artists</h1>
           {artists.length > 0 && (

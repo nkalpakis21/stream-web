@@ -26,7 +26,7 @@ export function ShareButton({ url, title, artistName }: ShareButtonProps) {
       try {
         await navigator.share({
           title: shareText,
-          text: `Check out ${shareText} on Stream ⭐`,
+          text: `Check out ${shareText} on Streamstar`,
           url: url,
         });
         return;
