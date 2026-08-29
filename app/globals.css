@@ -2,6 +2,120 @@
 @tailwind components;
 @tailwind utilities;
 
+/* STR-40 listen tokens — exact Product values. Do not invent colors. */
+html.listen {
+  --bg: #0A0A10;
+  --surface: #14141C;
+  --surface-2: #1C1C28;
+  --line: #2A2A38;
+  --ink: #F5F4F8;
+  --mute: #8B8896;
+  --accent: #7C7BFF;
+  --accent-ink: #0A0A10;
+  --heat: #C8F542;
+  --down: #FF4D6A;
+  --radius: 12px;
+  --header-h: 56px;
+  --player-h: 80px;
+  --player-m: 56px;
+  --tab-h: 56px;
+
+  /* Tailwind bridges so existing utilities resolve to the hex tokens */
+  --listen-bg: var(--bg);
+  --listen-surface: var(--surface);
+  --listen-surface-2: var(--surface-2);
+  --listen-line: var(--line);
+  --listen-ink: var(--ink);
+  --listen-mute: var(--mute);
+  --listen-accent: var(--accent);
+  --listen-accent-ink: var(--accent-ink);
+  --listen-heat: var(--heat);
+  --listen-down: var(--down);
+}
+
+html.listen,
+html.listen body {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-figtree), system-ui, sans-serif;
+}
+
+/* Playfair for H1 40/48 and section titles 28/34 only */
+html.listen main h1,
+html.listen .listen-h1 {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  font-size: 40px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+
+@media (min-width: 768px) {
+  html.listen main h1,
+  html.listen .listen-h1 {
+    font-size: 48px;
+  }
+}
+
+html.listen .listen-title {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+
+@media (min-width: 768px) {
+  html.listen .listen-title {
+    font-size: 34px;
+  }
+}
+
+/* Never uppercase song or artist names */
+html.listen [data-entity='track'],
+html.listen [data-entity='artist'] {
+  text-transform: none;
+}
+
+.listen-btn-primary,
+.listen-btn-ghost,
+.listen-btn-buy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius, 12px);
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.listen-btn-primary {
+  height: 48px;
+  padding: 0 20px;
+  background: var(--accent);
+  color: var(--ink);
+  border: none;
+}
+
+.listen-btn-ghost {
+  height: 40px;
+  padding: 0 16px;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.listen-btn-buy {
+  height: 48px;
+  padding: 0 20px;
+  background: var(--heat);
+  color: var(--accent-ink);
+  border: none;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

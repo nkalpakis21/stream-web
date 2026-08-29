@@ -79,7 +79,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
         {/* Songs Section */}
         <section>
           <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-bold tracking-tight">Songs</h2>
+            <h2 className="listen-title">Songs</h2>
             {songs.length > 0 && (
               <span className="text-sm text-muted-foreground">{songs.length} {songs.length === 1 ? 'song' : 'songs'}</span>
             )}

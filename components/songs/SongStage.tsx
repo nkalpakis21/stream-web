@@ -54,13 +54,13 @@ export function SongStage({
         className="w-full"
       />
       <div className="min-w-0">
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{songTitle}</h1>
+        <h1 className="listen-h1" data-entity="track">{songTitle}</h1>
         {artistId ? (
-          <Link href={`/artists/${artistId}`} className="mt-2 inline-block text-lg text-primary underline-offset-4 hover:underline">
+          <Link href={`/artists/${artistId}`} className="mt-2 inline-block text-lg text-primary underline-offset-4 hover:underline" data-entity="artist">
             {artistName}
           </Link>
         ) : (
-          <p className="mt-2 text-lg text-muted-foreground">{artistName}</p>
+          <p className="mt-2 text-lg text-muted-foreground" data-entity="artist">{artistName}</p>
         )}
         {pending && !currentAudio && (
           <p className="mt-4 text-sm text-muted-foreground">Making the track…</p>

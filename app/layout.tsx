@@ -8,6 +8,7 @@ import { AnalyticsProvider } from '@/components/providers/AnalyticsProvider';
 import { Footer } from '@/components/layout/Footer';
 import { SiteHeader } from '@/components/navigation/SiteHeader';
 import { MobileTabBar } from '@/components/navigation/MobileTabBar';
+import { ListenSurface } from '@/components/listen/ListenSurface';
 
 const SolanaWalletProvider = dynamic(
   () =>
@@ -28,7 +29,7 @@ const playfairDisplay = Playfair_Display({
   subsets: ['latin'],
   variable: '--font-playfair',
   display: 'swap',
-  weight: ['400', '500', '600', '700'],
+  weight: ['500', '600', '700'],
 });
 
 export const metadata: Metadata = {
@@ -66,8 +67,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`dark ${figtree.variable} ${playfairDisplay.variable}`}>
-      <body className="antialiased flex flex-col min-h-screen overflow-x-hidden">
+    <html lang="en" className={`dark listen ${figtree.variable} ${playfairDisplay.variable}`}>
+      <body className="font-sans antialiased flex flex-col min-h-screen overflow-x-hidden bg-background text-foreground">
+        <ListenSurface />
         <AnalyticsProvider>
           <AuthProvider>
             <SolanaWalletProvider>

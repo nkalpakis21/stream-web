@@ -132,7 +132,7 @@ export function EditArtistName({ artistId, currentName, onUpdate }: EditArtistNa
         </div>
       ) : (
         <div className="flex items-center gap-2">
-          <span className="text-4xl lg:text-5xl font-bold tracking-tight">{name}</span>
+          <span className="listen-h1" data-entity="artist">{name}</span>
           <button
             onClick={() => setEditing(true)}
             className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted"
