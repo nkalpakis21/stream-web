@@ -11,12 +11,18 @@ import { clusterApiUrl } from '@solana/web3.js';
 
 import { WalletSessionEffects } from '@/hooks/useWalletSession';
 import { WalletPickerLayer } from '@/components/wallet/WalletConnectControl';
+import { firstHttpSolanaRpcUrl } from '@/lib/solana/rpcUrl';
 
 export function SolanaWalletProvider({ children }: { children: React.ReactNode }) {
   const endpoint = useMemo(() => {
-    return (
-      process.env.NEXT_PUBLIC_SOLANA_RPC_URL || clusterApiUrl('mainnet-beta')
-    );
+    try {
+      return (
+        firstHttpSolanaRpcUrl(process.env.NEXT_PUBLIC_SOLANA_RPC_URL) ??
+        clusterApiUrl('mainnet-beta')
+      );
+    } catch {
+      return clusterApiUrl('mainnet-beta');
+    }
   }, []);
 
   const wallets = useMemo(

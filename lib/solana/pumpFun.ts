@@ -3,6 +3,8 @@
  * No private keys. Mint + URL are persisted only after a confirmed on-chain launch.
  */
 
+import { firstHttpSolanaRpcUrl } from '@/lib/solana/rpcUrl';
+
 export const PUMP_FUN_COIN_URL_PREFIX = 'https://pump.fun/coin/';
 
 /** Official pump.fun frontend create compute-unit budget (create only, no buy). */
@@ -33,9 +35,10 @@ export function pumpFunCoinUrl(mint: string): string {
 
 export function getSolanaRpcUrl(): string {
   return (
-    process.env.SOLANA_RPC_URL ||
-    process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
-    'https://api.mainnet-beta.solana.com'
+    firstHttpSolanaRpcUrl(
+      process.env.SOLANA_RPC_URL,
+      process.env.NEXT_PUBLIC_SOLANA_RPC_URL
+    ) ?? 'https://api.mainnet-beta.solana.com'
   );
 }
 
