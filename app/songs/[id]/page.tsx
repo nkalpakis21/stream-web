@@ -14,6 +14,7 @@ import { ShareButton } from '@/components/songs/ShareButton';
 import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
 import { SongTokenCard } from '@/components/songs/SongTokenCard';
 import { ArtistPumpFunBuyLink } from '@/components/artists/ArtistPumpFunBuyLink';
+import { ArtistCoinBuy } from '@/components/artists/ArtistCoinBuy';
 import { V0Navbar } from '@/components/navigation/V0Navbar';
 import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
 import { getLyricsForSong } from '@/lib/services/lyrics';
@@ -197,6 +198,9 @@ export default async function SongPage({ params }: SongPageProps) {
                 tokenMintAddress={song.tokenMintAddress}
               />
             )}
+            <div className="flex justify-center mt-3">
+              <ArtistCoinBuy url={artist?.pumpFun?.url} />
+            </div>
             <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3">
               Created {timeAgo}
             </p>

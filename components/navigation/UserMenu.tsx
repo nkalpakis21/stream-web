@@ -142,11 +142,8 @@ export function UserMenu() {
               </div>
             </div>
 
-            {/* Wallet Connect */}
+            {/* Wallet — quiet, no chain jargon */}
             <div className="px-4 py-3 border-b border-border/40">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
-                Solana Wallet
-              </p>
               <WalletConnectSection />
             </div>
 
