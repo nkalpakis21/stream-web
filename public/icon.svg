@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Streamstar">
+  <rect width="1024" height="1024" rx="236" fill="#0A0A10"/>
+  <path
+    d="M168 512 H292 C348 512 372 300 456 248 C520 208 568 300 548 430 C528 560 528 620 580 700 C636 786 732 768 780 620 C804 548 848 512 856 512 H860"
+    fill="none"
+    stroke="#6D5CFF"
+    stroke-width="76"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

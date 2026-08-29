@@ -1,17 +1,14 @@
-import { V0Navbar } from '@/components/navigation/V0Navbar';
 import Link from 'next/link';
 
 export const metadata = {
   title: 'Terms of Service',
-  description: 'Terms of Service for Stream ⭐',
+  description: 'Terms of Service for Streamstar',
 };
 
 export default function TermsOfServicePage() {
   return (
     <div className="min-h-screen bg-background">
-      <V0Navbar />
-
-      <main className="max-w-4xl mx-auto px-6 lg:px-8 pt-20 pb-12 lg:pt-24 lg:pb-16">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16">
         <div className="prose prose-neutral dark:prose-invert max-w-none">
           <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-8">Terms of Service</h1>
           
@@ -23,14 +20,14 @@ export default function TermsOfServicePage() {
             <section>
               <h2 className="text-2xl font-semibold mb-4">1. Acceptance of Terms</h2>
               <p className="text-muted-foreground leading-relaxed">
-                By accessing or using Stream ⭐ (&quot;the Service&quot;), you agree to be bound by these Terms of Service (&quot;Terms&quot;). If you disagree with any part of these terms, then you may not access the Service.
+                By accessing or using Streamstar (&quot;the Service&quot;), you agree to be bound by these Terms of Service (&quot;Terms&quot;). If you disagree with any part of these terms, then you may not access the Service.
               </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-semibold mb-4">2. Description of Service</h2>
               <p className="text-muted-foreground leading-relaxed">
-                Stream ⭐ is an AI-native music platform that allows users to generate, collaborate, and discover music powered by artificial intelligence. The Service includes tools for creating AI artists, generating musical compositions, and sharing content with other users.
+                Streamstar is an AI-native music platform that allows users to generate, collaborate, and discover music powered by artificial intelligence. The Service includes tools for creating AI artists, generating musical compositions, and sharing content with other users.
               </p>
             </section>
 
@@ -91,7 +88,7 @@ export default function TermsOfServicePage() {
             <section>
               <h2 className="text-2xl font-semibold mb-4">6. Intellectual Property</h2>
               <p className="text-muted-foreground leading-relaxed">
-                The Service and its original content, features, and functionality are owned by Stream ⭐ and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws. You may not copy, modify, distribute, sell, or lease any part of the Service without our prior written consent.
+                The Service and its original content, features, and functionality are owned by Streamstar and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws. You may not copy, modify, distribute, sell, or lease any part of the Service without our prior written consent.
               </p>
             </section>
 
@@ -134,14 +131,14 @@ export default function TermsOfServicePage() {
             <section>
               <h2 className="text-2xl font-semibold mb-4">11. Indemnification</h2>
               <p className="text-muted-foreground leading-relaxed">
-                You agree to indemnify, defend, and hold harmless Stream ⭐ and its affiliates from any claims, damages, losses, liabilities, and expenses (including attorneys&apos; fees) arising out of or relating to your use of the Service, your User Content, or your violation of these Terms.
+                You agree to indemnify, defend, and hold harmless Streamstar and its affiliates from any claims, damages, losses, liabilities, and expenses (including attorneys&apos; fees) arising out of or relating to your use of the Service, your User Content, or your violation of these Terms.
               </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-semibold mb-4">12. Governing Law</h2>
               <p className="text-muted-foreground leading-relaxed">
-                These Terms shall be governed by and construed in accordance with the laws of the jurisdiction in which Stream ⭐ operates, without regard to its conflict of law provisions. Any disputes arising under these Terms shall be subject to the exclusive jurisdiction of the courts in that jurisdiction.
+                These Terms shall be governed by and construed in accordance with the laws of the jurisdiction in which Streamstar operates, without regard to its conflict of law provisions. Any disputes arising under these Terms shall be subject to the exclusive jurisdiction of the courts in that jurisdiction.
               </p>
             </section>
 

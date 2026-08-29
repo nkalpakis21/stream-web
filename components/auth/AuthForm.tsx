@@ -17,13 +17,13 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Redirect to dashboard after successful authentication
+  // Listen surface after auth — studio stays at /dashboard, not the landing.
   useEffect(() => {
     if (user && !authLoading && !loading) {
       if (onSuccess) {
         onSuccess();
       } else {
-        router.push('/dashboard');
+        router.push('/discover');
       }
     }
   }, [user, authLoading, loading, router, onSuccess]);

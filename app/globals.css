@@ -129,8 +129,12 @@
   .wallet-adapter-button-trigger {
     @apply !bg-accent !text-accent-foreground !rounded-xl;
   }
+  .wallet-adapter-modal {
+    max-width: 100vw !important;
+  }
   .wallet-adapter-modal-wrapper {
     @apply !bg-background;
+    max-width: min(100vw, 24rem) !important;
   }
   .wallet-adapter-modal-title {
     font-size: 0 !important;

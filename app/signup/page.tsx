@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { V0Navbar } from '@/components/navigation/V0Navbar';
+import { Logo } from '@/components/branding/Logo';
 import Link from 'next/link';
 
 export default function SignUpPage() {
@@ -18,7 +18,7 @@ export default function SignUpPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!authLoading && user) {
-      router.push('/dashboard');
+      router.push('/discover');
     }
   }, [user, authLoading, router]);
 
@@ -41,7 +41,7 @@ export default function SignUpPage() {
 
     try {
       await signUpWithEmail(email, password);
-      router.push('/dashboard');
+      router.push('/discover');
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.');
     } finally {
@@ -54,7 +54,7 @@ export default function SignUpPage() {
     setLoading(true);
     try {
       await signInWithGoogle();
-      router.push('/dashboard');
+      router.push('/discover');
     } catch (err: any) {
       setError(err.message || 'Google authentication failed. Please try again.');
     } finally {
@@ -65,8 +65,7 @@ export default function SignUpPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <V0Navbar />
-        <div className="flex items-center justify-center min-h-[60vh] pt-20">
+        <div className="flex items-center justify-center min-h-[60vh]">
           <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin" />
         </div>
       </div>
@@ -79,17 +78,17 @@ export default function SignUpPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <V0Navbar />
-      
-      <main className="flex items-center justify-center min-h-[calc(100vh-5rem)] pt-20 px-4 py-12">
+      <main className="flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
-          {/* Header */}
           <div className="text-center mb-10">
-            <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-3 text-foreground">
-              Create your account
+            <div className="mb-6 flex justify-center">
+              <Logo />
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight mb-3 text-foreground">
+              Listen, create, trade.
             </h1>
             <p className="text-lg text-muted-foreground">
-              Start creating music with AI in seconds
+              Create your Streamstar account
             </p>
           </div>
 

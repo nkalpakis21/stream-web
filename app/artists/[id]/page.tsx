@@ -2,8 +2,8 @@ import { notFound } from 'next/navigation';
 import { getArtist } from '@/lib/services/artists';
 import { getArtistSongs } from '@/lib/services/songs';
 import { SongCard } from '@/components/songs/SongCard';
-import { V0Navbar } from '@/components/navigation/V0Navbar';
 import { ArtistHero } from '@/components/artists/ArtistHero';
+import { hasLaunchedCoin } from '@/lib/brand/coin';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -33,25 +33,27 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      <V0Navbar />
-
-      <main className="max-w-7xl mx-auto px-6 lg:px-8 pt-20 pb-8 lg:pt-24 lg:pb-12">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {/* Artist Header — look picker is owner/manager only (client-side) */}
         <ArtistHero artist={artist} timeAgo={timeAgo}>
           {/* Style DNA */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-border">
+            {artist.styleDNA.genres.length > 0 && (
             <div>
               <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Genres</span>
               <p className="text-sm font-medium">
-                {artist.styleDNA.genres.length > 0 ? artist.styleDNA.genres.join(', ') : 'None'}
+                {artist.styleDNA.genres.join(', ')}
               </p>
             </div>
+            )}
+            {artist.styleDNA.moods.length > 0 && (
             <div>
               <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Moods</span>
               <p className="text-sm font-medium">
-                {artist.styleDNA.moods.length > 0 ? artist.styleDNA.moods.join(', ') : 'None'}
+                {artist.styleDNA.moods.join(', ')}
               </p>
             </div>
+            )}
             <div>
               <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Tempo Range</span>
               <p className="text-sm font-medium">
@@ -84,7 +86,12 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
           {songs.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {songs.map(song => (
-                <SongCard key={song.id} song={song} artistName={artist.name} />
+                <SongCard
+                  key={song.id}
+                  song={song}
+                  artistName={artist.name}
+                  hasCoin={hasLaunchedCoin(artist.pumpFun)}
+                />
               ))}
             </div>
           ) : (
