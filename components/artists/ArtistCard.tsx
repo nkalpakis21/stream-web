@@ -1,51 +1,55 @@
 import Link from 'next/link';
-import Image from 'next/image';
-import type { AIArtistDocument } from '@/types/firestore';
-import { getAvatarGradient, getInitials } from '@/lib/utils/avatar';
+import type { AIArtistDocument, SongDocument } from '@/types/firestore';
+import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
+import { PlayableArt } from '@/components/songs/PlayableArt';
+import { CoverImage } from '@/components/media/CoverImage';
+import { DiscoverCoinRow } from '@/components/discover/DiscoverCoinRow';
 
 interface ArtistCardProps {
   artist: AIArtistDocument;
+  playable?: SongDocument | null;
+  coin?: ArtistCoinQuote | null;
 }
 
-export function ArtistCard({ artist }: ArtistCardProps) {
+export function ArtistCard({ artist, playable = null, coin = null }: ArtistCardProps) {
+  const cover = playable?.albumCoverThumbnail || playable?.albumCoverPath || artist.avatarURL;
+
   return (
-    <Link
-      href={`/artists/${artist.id}`}
-      className="block text-center group"
-    >
-      <div className="relative w-full aspect-square rounded-full overflow-hidden bg-muted mb-3 ring-2 ring-transparent group-hover:ring-accent/20 transition-all duration-300 group-hover:scale-105">
-        {artist.avatarURL ? (
-          <Image
+    <article className="block text-left">
+      <Link href={`/artists/${artist.id}`} className="block">
+        <div className="relative mx-auto mb-3 aspect-square w-full max-w-[160px] overflow-hidden rounded-full">
+          <CoverImage
             src={artist.avatarURL}
-            alt={artist.name}
-            fill
-            className="object-cover"
-            sizes="(max-width: 768px) 80px, 120px"
+            title={artist.name}
+            sizes="160px"
+            rounded="rounded-full"
           />
-        ) : (
-          <div 
-            className="w-full h-full flex items-center justify-center relative"
-            style={{ background: getAvatarGradient(artist.name) }}
-          >
-            {/* Subtle pattern overlay */}
-            <div 
-              className="absolute inset-0 opacity-10"
-              style={{ 
-                backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', 
-                backgroundSize: '20px 20px' 
-              }} 
-            />
-            {/* Initials */}
-            <span className="relative text-white font-bold text-2xl lg:text-3xl drop-shadow-lg">
-              {getInitials(artist.name)}
-            </span>
-          </div>
-        )}
-      </div>
-      <h3 className="font-medium text-sm text-foreground group-hover:text-accent transition-colors line-clamp-1">
-        {artist.name}
-      </h3>
-    </Link>
+        </div>
+        <h3
+          className="break-words text-center text-sm font-medium text-foreground"
+          data-entity="artist"
+        >
+          {artist.name}
+        </h3>
+      </Link>
+      {playable ? (
+        <div className="mx-auto mt-3 w-full max-w-[160px]">
+          <PlayableArt
+            songId={playable.id}
+            title={playable.title}
+            artistName={artist.name}
+            artistId={artist.id}
+            coverUrl={cover}
+            hasCoin={false}
+            durationSeconds={playable.duration}
+          />
+        </div>
+      ) : null}
+      {coin ? (
+        <div className="mt-2">
+          <DiscoverCoinRow artistId={artist.id} quote={coin} />
+        </div>
+      ) : null}
+    </article>
   );
 }
-

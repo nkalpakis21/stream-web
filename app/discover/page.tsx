@@ -1,99 +1,168 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { SongCard } from '@/components/songs/SongCard';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Search } from 'lucide-react';
+import { DiscoverSongCard } from '@/components/discover/DiscoverSongCard';
 import { InfiniteScrollSentinel } from '@/components/discover/InfiniteScrollSentinel';
-import { SongCardSkeleton } from '@/components/discover/SongCardSkeleton';
-import { useInfiniteSongs } from '@/hooks/useInfiniteSongs';
+import { SongCardSkeleton, SongCardSkeletonGrid } from '@/components/discover/SongCardSkeleton';
+import { EmptyAction } from '@/components/states/EmptyAction';
+import { useInfiniteSongs, type DiscoverSort } from '@/hooks/useInfiniteSongs';
 
-export default function DiscoverPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeQuery, setActiveQuery] = useState('');
+function DiscoverPill({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="min-h-11 rounded-full px-5 text-sm font-semibold transition-colors"
+      style={
+        active
+          ? { background: 'var(--accent)', color: 'var(--accent-ink)' }
+          : { background: 'transparent', color: 'var(--mute)', border: '1px solid var(--line)' }
+      }
+    >
+      {label}
+    </button>
+  );
+}
+
+function parseSort(value: string | null): DiscoverSort {
+  return value === 'heat' ? 'heat' : 'new';
+}
+
+function DiscoverPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlQuery = (searchParams.get('q') || '').trim();
+  const urlSort = parseSort(searchParams.get('sort'));
+
+  const [searchQuery, setSearchQuery] = useState(urlQuery);
+  const [activeQuery, setActiveQuery] = useState(urlQuery);
+  const [sort, setSort] = useState<DiscoverSort>(urlSort);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     songs,
     artistNames,
     coinBySong,
+    quoteBySong,
     loading,
     loadingMore,
     hasMore,
     error,
     loadMore,
     reset,
-  } = useInfiniteSongs({ query: activeQuery });
+  } = useInfiniteSongs({ query: activeQuery, sort });
+
+  const writeUrl = useCallback((nextQuery: string, nextSort: DiscoverSort) => {
+    const params = new URLSearchParams();
+    if (nextQuery) params.set('q', nextQuery);
+    else if (nextSort === 'heat') params.set('sort', 'heat');
+    else params.set('sort', 'new');
+    const qs = params.toString();
+    router.replace(qs ? `/discover?${qs}` : '/discover', { scroll: false });
+  }, [router]);
+
+  useEffect(() => {
+    setSearchQuery(urlQuery);
+    setActiveQuery(urlQuery);
+    setSort(urlSort);
+  }, [urlQuery, urlSort]);
+
+  const commitSearch = useCallback((value: string) => {
+    const next = value.trim();
+    if (!next) return;
+    setActiveQuery(next);
+    setSearchQuery(next);
+    writeUrl(next, sort);
+  }, [sort, writeUrl]);
 
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    const trimmedQuery = searchQuery.trim();
-    setActiveQuery(trimmedQuery);
-    reset(); // Reset will trigger new load with updated query
-  }, [searchQuery, reset]);
+    commitSearch(searchQuery);
+  }, [commitSearch, searchQuery]);
 
-  const handleQuickFilter = useCallback((query: string) => {
-    setSearchQuery(query);
-    setActiveQuery(query);
-    reset();
-  }, [reset]);
+  const handleChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const next = value.trim();
+      if (!next) return;
+      setActiveQuery(next);
+      writeUrl(next, sort);
+    }, 350);
+  }, [sort, writeUrl]);
 
-  const handleLoadRecent = useCallback(() => {
+  const handlePill = useCallback((next: DiscoverSort) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     setSearchQuery('');
     setActiveQuery('');
-    reset();
-  }, [reset]);
+    setSort(next);
+    writeUrl('', next);
+  }, [writeUrl]);
+
+  const handleClear = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setSearchQuery('');
+    setActiveQuery('');
+    writeUrl('', sort);
+  }, [sort, writeUrl]);
+
+  const canSearch = Boolean(searchQuery.trim());
 
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         <section className="mb-12">
-          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-8">Discover</h1>
-          
-          <form onSubmit={handleSearch} className="mb-6">
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search by prompt, genre, mood, or description..."
-                className="flex-1 px-5 py-3 border border-border rounded-full bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+          <h1 className="listen-h1 mb-8">Discover</h1>
+
+          <form onSubmit={handleSearch} className="mb-6 flex gap-2">
+            <label className="relative block min-w-0 flex-1">
+              <span className="sr-only">Search</span>
+              <Search
+                className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2"
+                style={{ color: 'var(--mute)' }}
+                aria-hidden
               />
-              <button
-                type="submit"
-                className="px-6 py-3 bg-accent text-accent-foreground rounded-full hover:opacity-90 transition-opacity font-medium shadow-soft"
-              >
-                Search
-              </button>
-            </div>
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={e => handleChange(e.target.value)}
+                placeholder="Songs, artists, titles."
+                className="h-12 w-full border bg-card pl-12 pr-5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:border-transparent transition-all"
+                style={{
+                  borderRadius: 9999,
+                  borderColor: 'var(--line)',
+                  background: 'var(--surface)',
+                  color: 'var(--ink)',
+                }}
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={!canSearch}
+              className="listen-btn-primary disabled:opacity-50"
+            >
+              Search
+            </button>
           </form>
 
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={handleLoadRecent}
-              className="px-4 py-2 rounded-full border border-border hover:bg-muted hover:border-accent/20 transition-all duration-200 text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              Recent
-            </button>
-            <button
-              onClick={() => handleQuickFilter('cyberpunk')}
-              className="px-4 py-2 rounded-full border border-border hover:bg-muted hover:border-accent/20 transition-all duration-200 text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              Cyberpunk
-            </button>
-            <button
-              onClick={() => handleQuickFilter('jazz')}
-              className="px-4 py-2 rounded-full border border-border hover:bg-muted hover:border-accent/20 transition-all duration-200 text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              Jazz
-            </button>
+            <DiscoverPill label="Heat" active={sort === 'heat' && !activeQuery} onClick={() => handlePill('heat')} />
+            <DiscoverPill label="New" active={sort === 'new' && !activeQuery} onClick={() => handlePill('new')} />
           </div>
         </section>
 
-        {/* Initial Loading State */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <SongCardSkeleton key={i} />
-            ))}
-          </div>
+          <SongCardSkeletonGrid showCluster />
         ) : error ? (
           <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
             <p className="text-muted-foreground text-lg mb-4">
@@ -101,20 +170,28 @@ export default function DiscoverPage() {
             </p>
             <button
               onClick={reset}
-              className="px-6 py-2 bg-accent text-accent-foreground rounded-full hover:opacity-90 transition-opacity font-medium"
+              className="listen-btn-primary"
             >
               Try Again
             </button>
           </div>
         ) : songs.length === 0 ? (
           <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
-            <p className="text-muted-foreground text-lg">
-              No songs found. Try a different search or create your own!
-            </p>
+            {activeQuery ? (
+              <div className="space-y-4">
+                <p className="text-muted-foreground text-lg">
+                  0 results for {activeQuery}
+                </p>
+                <button type="button" onClick={handleClear} className="listen-btn-ghost">
+                  Clear
+                </button>
+              </div>
+            ) : (
+              <EmptyAction message="No songs yet." href="/" label="Home" />
+            )}
           </div>
         ) : (
           <>
-            {/* Songs Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {songs.map((song, index) => (
                 <div
@@ -125,25 +202,24 @@ export default function DiscoverPage() {
                     animationFillMode: 'both',
                   }}
                 >
-                  <SongCard
+                  <DiscoverSongCard
                     song={song}
                     artistName={artistNames.get(song.id)}
+                    coin={quoteBySong.get(song.id) ?? null}
                     hasCoin={coinBySong.get(song.id) ?? false}
                   />
                 </div>
               ))}
-              
-              {/* Loading More Skeletons */}
+
               {loadingMore && (
                 <>
                   {Array.from({ length: 4 }).map((_, i) => (
-                    <SongCardSkeleton key={`skeleton-${i}`} />
+                    <SongCardSkeleton key={`skeleton-${i}`} showCluster />
                   ))}
                 </>
               )}
             </div>
 
-            {/* Infinite Scroll Sentinel */}
             {hasMore && !loadingMore && (
               <InfiniteScrollSentinel
                 onIntersect={loadMore}
@@ -151,28 +227,11 @@ export default function DiscoverPage() {
               />
             )}
 
-            {/* Loading More Indicator */}
             {loadingMore && (
               <div className="py-8 text-center">
                 <div className="inline-flex items-center gap-3 text-muted-foreground">
                   <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
                   <span className="text-sm font-medium">Loading more songs...</span>
-                </div>
-              </div>
-            )}
-
-            {/* End of Results */}
-            {!hasMore && songs.length > 0 && (
-              <div className="py-12 text-center">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-border" />
-                  </div>
-                  <div className="relative">
-                    <span className="px-4 bg-background text-sm text-muted-foreground">
-                      You&apos;ve reached the end
-                    </span>
-                  </div>
                 </div>
               </div>
             )}
@@ -183,3 +242,10 @@ export default function DiscoverPage() {
   );
 }
 
+export default function DiscoverPage() {
+  return (
+    <Suspense fallback={<SongCardSkeletonGrid showCluster />}>
+      <DiscoverPageInner />
+    </Suspense>
+  );
+}

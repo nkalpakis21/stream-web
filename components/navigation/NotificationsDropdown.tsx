@@ -116,7 +116,6 @@ export function NotificationsDropdown({ isOpen, onClose }: NotificationsDropdown
             </div>
           ) : notifications.length === 0 ? (
             <div className="px-6 py-12 text-center">
-              <div className="text-4xl mb-3">🔔</div>
               <p className="text-sm text-muted-foreground">No new notifications</p>
             </div>
           ) : (
@@ -134,7 +133,7 @@ export function NotificationsDropdown({ isOpen, onClose }: NotificationsDropdown
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex-shrink-0 w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
-                        <span className="text-lg">🎵</span>
+                        <span className="text-xs font-semibold text-accent">New</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">

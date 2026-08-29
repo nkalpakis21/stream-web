@@ -1,25 +1,28 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { ArtistHeader } from '@/components/artists/ArtistHeader';
 import { ArtistLookPicker } from '@/components/artists/ArtistLookPicker';
+import { ArtistCoinModule } from '@/components/artists/ArtistCoinModule';
+import { ArtistCoinBuy } from '@/components/artists/ArtistCoinBuy';
 import { useToast, ToastContainer } from '@/components/ui/toast';
 import { LaunchExistingArtistCoin } from '@/components/artists/LaunchExistingArtistCoin';
 import { updateArtistAvatar } from '@/lib/services/artists';
 import { hasLaunchedCoin } from '@/lib/brand/coin';
-import { getAvatarGradient, getInitials } from '@/lib/utils/avatar';
+import { CoverImage } from '@/components/media/CoverImage';
+import { AiMark } from '@/components/brand/AiMark';
+import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import type { AIArtistDocument, PumpFunCoin } from '@/types/firestore';
 
 interface ArtistHeroProps {
   artist: AIArtistDocument;
-  timeAgo: string;
+  coin?: ArtistCoinQuote | null;
   children?: React.ReactNode;
 }
 
-export function ArtistHero({ artist, timeAgo, children }: ArtistHeroProps) {
+export function ArtistHero({ artist, coin = null, children }: ArtistHeroProps) {
   const { user } = useAuth();
   const router = useRouter();
   const isOwner = Boolean(user && user.uid === artist.ownerId);
@@ -31,6 +34,7 @@ export function ArtistHero({ artist, timeAgo, children }: ArtistHeroProps) {
   const [locking, setLocking] = useState(false);
   const { toasts, showToast, dismissToast } = useToast();
   const showLaunch = isOwner && !hasLaunchedCoin(pumpFun);
+  const buyUrl = pumpFun?.url?.trim() || null;
 
   useEffect(() => {
     setAvatarURL(artist.avatarURL);
@@ -65,43 +69,37 @@ export function ArtistHero({ artist, timeAgo, children }: ArtistHeroProps) {
   return (
     <>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-      <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12">
-        <div className="flex-shrink-0">
-          <div className="relative w-32 h-32 lg:w-40 lg:h-40 rounded-full overflow-hidden bg-muted ring-4 ring-border shadow-medium">
-            {avatarURL ? (
-              <Image
-                key={avatarURL}
+      <div className="mb-12 flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
+        <div className="flex min-w-0 flex-1 gap-5">
+          <div className="h-[120px] w-[120px] flex-shrink-0 overflow-hidden rounded-full bg-muted">
+            <div className="relative h-full w-full">
+              <CoverImage
+                key={avatarURL || 'placeholder'}
                 src={avatarURL}
-                alt={artist.name}
-                fill
-                className="object-cover"
-                sizes="160px"
+                title={artist.name}
+                sizes="120px"
+                rounded="rounded-full"
+                unoptimized={false}
               />
-            ) : (
-              <div
-                className="w-full h-full flex items-center justify-center relative"
-                style={{ background: getAvatarGradient(artist.name) }}
-              >
-                <div
-                  className="absolute inset-0 opacity-10"
-                  style={{
-                    backgroundImage:
-                      'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
-                    backgroundSize: '20px 20px',
-                  }}
-                />
-                <span className="relative text-white font-bold text-5xl lg:text-6xl drop-shadow-lg">
-                  {getInitials(artist.name)}
-                </span>
-              </div>
-            )}
+            </div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="mb-2">
+              <AiMark />
+            </div>
+            <ArtistHeader artist={{ ...artist, pumpFun }} />
           </div>
         </div>
 
-        <ArtistHeader artist={{ ...artist, pumpFun }} timeAgo={timeAgo} />
-
-        {children}
+        {coin ? (
+          <div className="w-full lg:w-[320px] lg:flex-shrink-0">
+            <ArtistCoinModule quote={coin} buyUrl={buyUrl} />
+            <ArtistCoinBuy url={buyUrl} />
+          </div>
+        ) : null}
       </div>
+
+      {children}
 
       {isOwner && (
         <div className="mb-12 max-w-2xl rounded-2xl border border-border bg-muted/20 p-6">
@@ -117,7 +115,7 @@ export function ArtistHero({ artist, timeAgo, children }: ArtistHeroProps) {
             disabled={locking}
           />
           {showLaunch && (
-            <div className="mt-6 pt-6 border-t border-border">
+            <div className="mt-6 border-t border-border pt-6">
               <LaunchExistingArtistCoin
                 artistId={artist.id}
                 artistName={artist.name}

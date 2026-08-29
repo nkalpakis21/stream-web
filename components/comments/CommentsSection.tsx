@@ -7,6 +7,12 @@ import { CommentForm } from './CommentForm';
 import { getComments, getReplies } from '@/lib/services/comments';
 import type { CommentDocument } from '@/types/firestore';
 import { MessageSquare } from 'lucide-react';
+import { AuthGateCard } from '@/components/auth/AuthGateCard';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
+import { authHref } from '@/lib/auth/returnTo';
+import { EmptyAction } from '@/components/states/EmptyAction';
+import { CommentSkeletonList } from '@/components/comments/CommentSkeleton';
 
 interface CommentsSectionProps {
   targetType: 'artist' | 'song';
@@ -22,6 +28,7 @@ type SerializedCommentDocument = Omit<CommentDocument, 'createdAt' | 'updatedAt'
 
 export function CommentsSection({ targetType, targetId }: CommentsSectionProps) {
   const { user } = useAuth();
+  const pathname = usePathname();
   const [comments, setComments] = useState<SerializedCommentDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
@@ -79,24 +86,43 @@ export function CommentsSection({ targetType, targetId }: CommentsSectionProps) 
         )}
       </div>
 
-      {user && (
-        <div className="mb-8">
+      <div className="mb-8">
+        {user ? (
           <CommentForm
             targetType={targetType}
             targetId={targetId}
             onCommentAdded={handleCommentAdded}
           />
-        </div>
-      )}
+        ) : targetType === 'song' ? (
+          <p className="text-sm text-muted-foreground">
+            Join the conversation.{' '}
+            <Link
+              href={authHref('/signin', pathname)}
+              className="font-semibold text-foreground underline-offset-4 hover:underline"
+            >
+              Sign in to comment
+            </Link>
+          </p>
+        ) : (
+          <AuthGateCard
+            headline="Sign in to comment"
+            why="Join the conversation."
+            returnTo={pathname}
+          />
+        )}
+      </div>
 
       {loading && comments.length === 0 ? (
-        <div className="py-8 text-center">
-          <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin mx-auto" />
-        </div>
+        <CommentSkeletonList />
       ) : comments.length === 0 ? (
-        <div className="py-8 text-center text-muted-foreground">
-          <p>No comments yet. Be the first to comment!</p>
-        </div>
+        user ? (
+          <div className="py-8">
+            <EmptyAction
+              label="Write a comment"
+              onClick={() => document.getElementById('comment-composer')?.focus()}
+            />
+          </div>
+        ) : null
       ) : (
         <div className="space-y-6">
           {comments.map(comment => (

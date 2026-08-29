@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { followArtist, unfollowArtist, isFollowing } from '@/lib/services/follows';
 import { useToast } from '@/components/ui/toast';
-import { UserPlus, UserMinus } from 'lucide-react';
+import { authHref } from '@/lib/auth/returnTo';
 
 interface FollowButtonProps {
   artistId: string;
-  ownerId: string; // Add ownerId prop
+  ownerId: string;
   className?: string;
 }
 
@@ -19,8 +20,8 @@ export function FollowButton({ artistId, ownerId, className = '' }: FollowButton
   const { showToast } = useToast();
 
   const isOwnArtist = user?.uid === ownerId;
+  const returnTo = `/artists/${artistId}`;
 
-  // Check if user is following this artist
   useEffect(() => {
     if (!user || isOwnArtist) {
       setFollowing(null);
@@ -44,12 +45,7 @@ export function FollowButton({ artistId, ownerId, className = '' }: FollowButton
     e.preventDefault();
     e.stopPropagation();
 
-    if (!user) {
-      showToast('Please sign in to follow artists', 'info');
-      return;
-    }
-
-    if (loading || isOwnArtist) return;
+    if (!user || loading || isOwnArtist) return;
 
     setLoading(true);
     try {
@@ -75,33 +71,26 @@ export function FollowButton({ artistId, ownerId, className = '' }: FollowButton
     return null;
   }
 
+  if (!user) {
+    return (
+      <Link
+        href={authHref('/signin', returnTo)}
+        className={`btn-primary ${className}`.trim()}
+        aria-label="Sign in to follow artist"
+      >
+        Follow
+      </Link>
+    );
+  }
+
   return (
     <button
       onClick={handleFollow}
-      disabled={loading || Boolean(user && following === null)}
-      className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
-        following
-          ? 'border-accent/30 bg-accent/10 text-accent hover:bg-accent/20'
-          : 'border-border hover:bg-muted hover:border-accent/20 text-muted-foreground hover:text-foreground'
-      } ${className}`}
+      disabled={loading || following === null}
+      className={`btn-primary ${className}`.trim()}
       aria-label={following ? 'Unfollow artist' : 'Follow artist'}
     >
-      {loading ? (
-        <>
-          <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-medium">...</span>
-        </>
-      ) : following ? (
-        <>
-          <UserMinus className="w-4 h-4" />
-          <span className="text-sm font-medium">Following</span>
-        </>
-      ) : (
-        <>
-          <UserPlus className="w-4 h-4" />
-          <span className="text-sm font-medium">Follow</span>
-        </>
-      )}
+      {loading ? '...' : following ? 'Following' : 'Follow'}
     </button>
   );
 }

@@ -23,10 +23,10 @@ export function ArtistPumpFunBuyLink({
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className={`flex items-center gap-2 px-4 py-2 rounded-full border border-border hover:bg-muted hover:border-accent/20 text-muted-foreground hover:text-foreground transition-all duration-200 ${className}`}
-      aria-label="Buy on pump.fun"
+      className={`listen-btn-buy ${className}`}
+      aria-label="Buy coin"
     >
-      <span className="text-sm font-medium">Buy</span>
+      Buy
     </a>
   );
 }

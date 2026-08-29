@@ -193,6 +193,10 @@ export interface SongDocument {
    */
   playCount?: number;
   /**
+   * Audio length in seconds when known. Omitted on older songs — never invent.
+   */
+  duration?: number;
+  /**
    * Legacy per-song Metaplex mint address. Kept so existing documents still
    * load. New tokens are artist-level via pump.fun; do not mint new song tokens.
    */

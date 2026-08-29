@@ -20,6 +20,8 @@ import {
 import { db } from '@/lib/firebase/config';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import type { SongDocument, AIArtistDocument, DiscoveryQuery } from '@/types/firestore';
+import { searchArtistsByName } from '@/lib/services/artists';
+import { getArtistSongs } from '@/lib/services/songs';
 
 /**
  * Search songs by prompt (free-text search)
@@ -268,14 +270,27 @@ export async function searchSongsByPromptPaginated(
   }
 
   const snapshot = await getDocs(q);
-  const allSongs = snapshot.docs
+  const titleMatches = snapshot.docs
     .map(doc => doc.data() as SongDocument)
-    .filter(song => 
-      !song.deletedAt && 
+    .filter(song =>
+      !song.deletedAt &&
       song.title.toLowerCase().includes(queryLower)
     );
 
-  const hasMore = allSongs.length > limitCount;
+  const artistMatches = await searchArtistsByName(searchQuery, undefined, 8);
+  const artistSongs = (
+    await Promise.all(artistMatches.map(artist => getArtistSongs(artist.id, 6)))
+  ).flat();
+
+  const seen = new Set<string>();
+  const allSongs: SongDocument[] = [];
+  for (const song of [...titleMatches, ...artistSongs]) {
+    if (seen.has(song.id) || song.deletedAt) continue;
+    seen.add(song.id);
+    allSongs.push(song);
+  }
+
+  const hasMore = titleMatches.length > limitCount;
   const songs = allSongs.slice(0, limitCount);
   const nextCursor = hasMore && songs.length > 0 ? songs[songs.length - 1].id : null;
 

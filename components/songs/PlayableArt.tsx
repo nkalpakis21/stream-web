@@ -1,19 +1,28 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
+import { CoverImage } from '@/components/media/CoverImage';
 import { getSongVersions } from '@/lib/services/songs';
 import { createDebouncedPlayTracker } from '@/lib/utils/playTracking';
+
+function formatClock(total: number): string {
+  const sec = Math.max(0, Math.floor(total));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 interface PlayableArtProps {
   songId: string;
   title: string;
   artistName: string;
+  artistId?: string;
   coverUrl: string | null;
   audioUrl?: string | null;
   hasCoin?: boolean;
+  durationSeconds?: number | null;
   href?: string;
   className?: string;
 }
@@ -22,9 +31,11 @@ export function PlayableArt({
   songId,
   title,
   artistName,
+  artistId,
   coverUrl,
   audioUrl: audioUrlProp,
   hasCoin = false,
+  durationSeconds = null,
   href,
   className = '',
 }: PlayableArtProps) {
@@ -33,8 +44,16 @@ export function PlayableArt({
   const [loading, setLoading] = useState(false);
   const trackPlay = useMemo(() => createDebouncedPlayTracker(500), []);
 
-  const isCurrent = nowPlaying?.audioUrl && resolvedAudio && nowPlaying.audioUrl === resolvedAudio;
+  const isCurrent = Boolean(
+    (nowPlaying?.songId && nowPlaying.songId === songId) ||
+      (nowPlaying?.audioUrl && resolvedAudio && nowPlaying.audioUrl === resolvedAudio)
+  );
   const showPause = Boolean(isCurrent && isPlaying);
+  const playingCover = Boolean(isCurrent && isPlaying);
+  const clock =
+    durationSeconds != null && Number.isFinite(durationSeconds) && durationSeconds > 0
+      ? formatClock(durationSeconds)
+      : null;
 
   const startPlayback = async () => {
     let url = resolvedAudio;
@@ -53,8 +72,10 @@ export function PlayableArt({
     }
     if (!url) return;
     play({
+      songId,
       songTitle: title,
       artistName,
+      artistId,
       albumCoverUrl: coverUrl,
       audioUrl: url,
     });
@@ -70,45 +91,48 @@ export function PlayableArt({
   };
 
   return (
-    <div className={`relative aspect-square overflow-hidden rounded-xl bg-muted ${className}`}>
-      {href ? (
-        <Link href={href} className="absolute inset-0" aria-label={`${title} by ${artistName}`}>
-          {coverUrl ? (
-            <Image src={coverUrl} alt="" fill className="object-cover" sizes="(max-width: 768px) 50vw, 25vw" unoptimized />
-          ) : (
-            <span className="flex h-full w-full items-center justify-center bg-secondary" />
-          )}
-        </Link>
-      ) : coverUrl ? (
-        <Image src={coverUrl} alt="" fill className="object-cover" sizes="(max-width: 768px) 50vw, 25vw" unoptimized />
-      ) : (
-        <div className="h-full w-full bg-secondary" />
-      )}
-
-      <button
-        type="button"
-        onClick={onPlay}
-        className="absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center rounded-full bg-black/55 text-white shadow-lg"
-        aria-label={showPause ? `Pause ${title}` : `Play ${title}`}
-      >
-        {loading ? (
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-        ) : showPause ? (
-          <svg className="h-7 w-7" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-          </svg>
+    <div
+      className={`rounded-[12px] ${className}`}
+      style={playingCover ? { boxShadow: '0 0 0 2px var(--accent)' } : undefined}
+    >
+      <div className="relative aspect-square overflow-hidden rounded-[12px]">
+        {href ? (
+          <Link href={href} className="absolute inset-0" aria-label={`${title} by ${artistName}`}>
+            <CoverImage src={coverUrl} title={title} sizes="(max-width: 768px) 50vw, 25vw" />
+          </Link>
         ) : (
-          <svg className="ml-0.5 h-7 w-7" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z" />
-          </svg>
+          <CoverImage src={coverUrl} title={title} sizes="(max-width: 768px) 50vw, 25vw" />
         )}
-      </button>
 
-      {hasCoin && (
-        <span className="absolute bottom-2 right-2 z-10 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-medium text-primary">
-          Coin
-        </span>
-      )}
+        <button
+          type="button"
+          onClick={onPlay}
+          className="absolute inset-0 z-10 m-auto flex h-12 w-12 items-center justify-center rounded-full bg-black/55 text-white shadow-lg"
+          aria-label={showPause ? `Pause ${title}` : `Play ${title}`}
+        >
+          {loading ? (
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          ) : showPause ? (
+            <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+            </svg>
+          ) : (
+            <svg className="ml-0.5 h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          )}
+        </button>
+
+        {clock ? (
+          <span className="absolute bottom-2 right-2 z-10 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">
+            {clock}
+          </span>
+        ) : hasCoin ? (
+          <span className="absolute bottom-2 right-2 z-10 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-medium text-primary">
+            Coin
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }

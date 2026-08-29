@@ -8,6 +8,7 @@ import { createDebouncedPlayTracker } from '@/lib/utils/playTracking';
 interface SongPlayCardClientProps {
   songTitle: string;
   artistName: string;
+  artistId?: string;
   albumCoverUrl: string | null;
   audioUrl: string | null;
   songId?: string; // Song ID for play tracking (optional)
@@ -16,6 +17,7 @@ interface SongPlayCardClientProps {
 export function SongPlayCardClient({
   songTitle,
   artistName,
+  artistId,
   albumCoverUrl,
   audioUrl,
   songId,
@@ -28,7 +30,9 @@ export function SongPlayCardClient({
     []
   );
   
-  const isCurrentSong = nowPlaying?.audioUrl === audioUrl;
+  const isCurrentSong = Boolean(
+    (songId && nowPlaying?.songId === songId) || nowPlaying?.audioUrl === audioUrl
+  );
   const showPlayingState = isCurrentSong && isPlaying;
 
   const handleCardClick = () => {
@@ -45,8 +49,10 @@ export function SongPlayCardClient({
     // Otherwise, play this song
     else {
       play({
+        songId,
         songTitle,
         artistName,
+        artistId,
         albumCoverUrl,
         audioUrl,
       });

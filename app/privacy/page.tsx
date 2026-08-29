@@ -10,10 +10,10 @@ export default function PrivacyPolicyPage() {
     <div className="min-h-screen bg-background">
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16">
         <div className="prose prose-neutral dark:prose-invert max-w-none">
-          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-8">Privacy Policy</h1>
+          <h1 className="listen-h1 mb-8">Privacy Policy</h1>
           
           <p className="text-muted-foreground mb-6">
-            <strong>Last updated:</strong> {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            <strong>Last updated:</strong> August 29, 2026
           </p>
 
           <div className="space-y-8 text-foreground">
@@ -137,7 +137,7 @@ export default function PrivacyPolicyPage() {
                 If you have any questions about this Privacy Policy, please contact us at:
               </p>
               <p className="text-muted-foreground mt-2">
-                Email: privacy@stream.app
+                Email: privacy@streamstar.xyz
               </p>
             </section>
           </div>

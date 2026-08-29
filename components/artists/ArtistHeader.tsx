@@ -7,40 +7,40 @@ import { MessageArtistButton } from './MessageArtistButton';
 import { FollowButton } from './FollowButton';
 import { FollowersList } from './FollowersList';
 import { ArtistXPanel } from './ArtistXPanel';
-import { ArtistPumpFunBuyLink } from './ArtistPumpFunBuyLink';
-import { ArtistCoinBuy } from './ArtistCoinBuy';
+import { isHonestBio } from '@/lib/brand/bio';
 import type { AIArtistDocument } from '@/types/firestore';
 
 interface ArtistHeaderProps {
   artist: AIArtistDocument;
-  timeAgo: string;
-  isOwner?: boolean; // Optional, will be checked client-side if not provided
+  isOwner?: boolean;
 }
 
-export function ArtistHeader({ artist, timeAgo, isOwner: propIsOwner }: ArtistHeaderProps) {
+export function ArtistHeader({ artist, isOwner: propIsOwner }: ArtistHeaderProps) {
   const { user } = useAuth();
   const isOwner = propIsOwner ?? (user?.uid === artist.ownerId);
+  const bio = isHonestBio(artist.lore, artist.name) ? artist.lore.trim() : null;
 
   return (
-    <div className="flex-1">
-      <div className="flex items-start justify-between mb-3">
+    <div className="min-w-0 flex-1">
+      <div className="flex items-start justify-between gap-4 mb-3">
         {isOwner ? (
           <EditArtistName artistId={artist.id} currentName={artist.name} />
         ) : (
-          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight">{artist.name}</h1>
+          <h1 className="listen-h1" data-entity="artist">
+            {artist.name}
+          </h1>
         )}
-        <div className="flex flex-wrap items-center gap-3">
-          <ArtistPumpFunBuyLink pumpFun={artist.pumpFun} />
-          <MessageArtistButton artistId={artist.id} ownerId={artist.ownerId} />
-          <FollowButton artistId={artist.id} ownerId={artist.ownerId} />
-        </div>
       </div>
-      <div className="flex items-center gap-4 mb-6">
-        <p className="text-sm text-muted-foreground">Created {timeAgo}</p>
-        <FollowersList artistId={artist.id} />
+      <FollowersList artistId={artist.id} />
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <FollowButton artistId={artist.id} ownerId={artist.ownerId} />
+        <MessageArtistButton artistId={artist.id} ownerId={artist.ownerId} />
       </div>
-      <p className="text-lg text-foreground/80 mb-8 leading-relaxed max-w-2xl">{artist.lore}</p>
-      <ArtistCoinBuy url={artist.pumpFun?.url} />
+      {bio ? (
+        <p className="mt-6 text-base leading-relaxed text-[color:var(--ink)]/80 max-w-2xl">
+          {bio}
+        </p>
+      ) : null}
       <Suspense fallback={null}>
         <ArtistXPanel artistId={artist.id} ownerId={artist.ownerId} />
       </Suspense>

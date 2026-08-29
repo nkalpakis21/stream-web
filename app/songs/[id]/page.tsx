@@ -7,16 +7,16 @@ import { getArtist } from '@/lib/services/artists';
 import { formatDistanceToNow } from 'date-fns';
 import { getSongVersions } from '@/lib/services/songs';
 import { VersionCards } from '@/components/songs/VersionCards';
-import { DeveloperSection } from '@/components/songs/DeveloperSection';
-import { ShareButton } from '@/components/songs/ShareButton';
 import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
-import { SongTokenCard } from '@/components/songs/SongTokenCard';
-import { ArtistPumpFunBuyLink } from '@/components/artists/ArtistPumpFunBuyLink';
+import { publicUrl, coverArtAlt } from '@/lib/brand/site';
 import { ArtistCoinBuy } from '@/components/artists/ArtistCoinBuy';
 import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
 import { SongStage } from '@/components/songs/SongStage';
 import { getLyricsForSong } from '@/lib/services/lyrics';
 import { CommentsSection } from '@/components/comments/CommentsSection';
+import { hasLaunchedCoin } from '@/lib/brand/coin';
+import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
+import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 
 // Force dynamic rendering to always fetch fresh data from Firestore
 export const dynamic = 'force-dynamic';
@@ -31,9 +31,7 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
   const song = await getSong(params.id);
   
   if (!song || song.deletedAt) {
-    return {
-      title: 'Song not found',
-    };
+    notFound();
   }
 
   // Get all versions to find primary version
@@ -53,10 +51,10 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
   const coverImageUrl = song.albumCoverThumbnail || song.albumCoverPath;
   
   // Ensure the image URL is absolute for Open Graph
-  const ogImageUrl = coverImageUrl 
-    ? (coverImageUrl.startsWith('http') 
-        ? coverImageUrl 
-        : `${process.env.NEXT_PUBLIC_APP_URL || 'https://stream.app'}${coverImageUrl}`)
+  const ogImageUrl = coverImageUrl
+    ? (coverImageUrl.startsWith('http')
+        ? coverImageUrl
+        : publicUrl(coverImageUrl))
     : undefined;
 
   const title = song.title;
@@ -70,12 +68,13 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
       title,
       description: `by ${artistName}`,
       type: 'music.song',
+      url: publicUrl(`/songs/${params.id}`),
       images: ogImageUrl ? [
         {
           url: ogImageUrl,
           width: 1200,
           height: 1200,
-          alt: title,
+          alt: coverArtAlt(title),
         },
       ] : [],
     },
@@ -118,7 +117,6 @@ export default async function SongPage({ params }: SongPageProps) {
 
   const versions = allVersions;
 
-  const latestGeneration = generations.find(g => g.status === 'completed');
   const hasPendingGeneration = generations.some(g => g.status === 'pending' || g.status === 'processing');
   const timeAgo = formatDistanceToNow(song.createdAt.toDate(), {
     addSuffix: true,
@@ -131,13 +129,6 @@ export default async function SongPage({ params }: SongPageProps) {
     createdAt: version.createdAt.toMillis(), // Convert Timestamp to milliseconds
   }));
 
-  // Serialize generations for client component
-  const serializedGenerations = generations.map(gen => ({
-    ...gen,
-    createdAt: gen.createdAt.toMillis(),
-    completedAt: gen.completedAt ? gen.completedAt.toMillis() : null,
-  }));
-
   const coverImageUrl = song.albumCoverThumbnail || song.albumCoverPath;
   
   // Use primary version audio URL (already found above)
@@ -145,6 +136,13 @@ export default async function SongPage({ params }: SongPageProps) {
 
   // Get lyrics from generations
   const lyrics = getLyricsForSong(generations);
+
+  const launched = hasLaunchedCoin(artist?.pumpFun);
+  const mint = launched ? (artist?.pumpFun?.mint || '').trim() : '';
+  const quotes = mint ? await fetchCoinQuotes([mint]) : new Map<string, ArtistCoinQuote>();
+  const coin = mint ? quotes.get(mint) ?? null : null;
+  const buyUrl = launched ? (artist?.pumpFun?.url?.trim() || null) : null;
+  const shareUrl = publicUrl(`/songs/${song.id}`);
 
   return (
     <div className="min-h-screen bg-background">
@@ -156,10 +154,16 @@ export default async function SongPage({ params }: SongPageProps) {
           artistName={artist?.name || 'Unknown Artist'}
           albumCoverUrl={coverImageUrl}
           audioUrl={primaryAudioUrl}
+          pending={hasPendingGeneration}
+          durationSeconds={song.duration ?? null}
+          coin={coin}
+          buyUrl={buyUrl}
+          shareUrl={shareUrl}
           versions={serializedVersions.map(v => ({
             id: v.id,
             audioURL: v.audioURL,
             isPrimary: v.isPrimary,
+            duration: song.duration ?? null,
           }))}
         >
           {lyrics && (
@@ -175,54 +179,28 @@ export default async function SongPage({ params }: SongPageProps) {
           )}
         </SongStage>
         <div className="mt-6 mb-10 flex flex-col items-start gap-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <ShareButton 
-                  url={`${process.env.NEXT_PUBLIC_APP_URL || 'https://stream.app'}/songs/${song.id}`}
-                  title={song.title}
-                  artistName={artist?.name}
-                />
-                <ArtistPumpFunBuyLink pumpFun={artist?.pumpFun} />
-              </div>
             <SongOwnerActions
               songId={song.id}
               songTitle={song.title}
               ownerId={song.ownerId}
             />
-            {song.tokenMintAddress && (
-              <SongTokenCard
-                songId={song.id}
-                tokenMintAddress={song.tokenMintAddress}
-              />
-            )}
             <ArtistCoinBuy url={artist?.pumpFun?.url} />
             <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3">
               Created {timeAgo}
             </p>
-            
-            {/* Metadata - Hidden on mobile, shown on larger screens */}
-            {latestGeneration?.contentHash && (
-              <div className="hidden sm:block pt-2">
-                <span className="text-xs text-muted-foreground uppercase tracking-wide">Content Hash</span>
-                <p className="text-xs font-mono text-muted-foreground mt-1 break-all max-w-xs">
-                  {latestGeneration.contentHash}
-                </p>
-              </div>
-            )}
         </div>
 
         {/* Version Cards */}
         <VersionCards
           songTitle={song.title}
           artistName={artist?.name || 'Unknown Artist'}
+          artistId={artist?.id}
           albumCoverUrl={coverImageUrl}
           initialVersions={serializedVersions}
           hasPendingGeneration={hasPendingGeneration}
           songId={song.id}
           ownerId={song.ownerId}
         />
-
-        {/* Developer Section */}
-        <DeveloperSection generations={serializedGenerations} songId={song.id} />
 
         {/* Comments Section */}
         <CommentsSection targetType="song" targetId={song.id} />

@@ -11,6 +11,7 @@ import { getUserSongs } from '@/lib/services/songs';
 import { getUserArtists } from '@/lib/services/artists';
 import { getArtistNamesForSongs } from '@/lib/services/songs';
 import type { SongDocument, AIArtistDocument } from '@/types/firestore';
+import { authHref, currentReturnTo } from '@/lib/auth/returnTo';
 
 type DashboardTab = 'overview' | 'artists' | 'songs';
 
@@ -31,7 +32,8 @@ function DashboardContent() {
     if (authLoading) return;
 
     if (!user) {
-      router.push('/signin');
+      const search = searchParams.toString();
+      router.replace(authHref('/signin', currentReturnTo('/dashboard', search ? `?${search}` : '')));
       return;
     }
 
@@ -58,7 +60,7 @@ function DashboardContent() {
     };
 
     loadData();
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, searchParams]);
 
   const handleTabChange = (tab: DashboardTab) => {
     router.push(`/dashboard?tab=${tab}`);
@@ -78,24 +80,15 @@ function DashboardContent() {
     return null; // Will redirect
   }
 
-  // Calculate stats
-  const totalPlays = songs.reduce((sum, song) => sum + (song.playCount || 0), 0);
-  const stats = {
-    songsCount: songs.length,
-    artistsCount: artists.length,
-    totalPlays,
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
-        {/* Dashboard Header */}
         <div className="mb-8">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-2 text-foreground">
-            Dashboard
+            Studio
           </h1>
           <p className="text-muted-foreground">
-            Manage your artists, songs, and creative work
+            Create artists and generate songs.
           </p>
         </div>
 
@@ -108,8 +101,6 @@ function DashboardContent() {
         <div className="min-h-[60vh]">
           {activeTab === 'overview' && (
             <OverviewTab
-              user={user}
-              stats={stats}
               songs={songs}
               artists={artists}
               songArtistMap={songArtistMap}

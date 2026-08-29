@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation';
 import { FeedPageClient } from '@/components/feed/FeedPageClient';
 
 // Force dynamic rendering to always fetch fresh data
@@ -9,7 +8,7 @@ export default function FeedPage() {
     <div className="min-h-screen bg-background">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         <div className="mb-8">
-          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-2">Your Feed</h1>
+          <h1 className="listen-h1 mb-2">Your Feed</h1>
           <p className="text-lg text-muted-foreground">
             Songs from artists you follow
           </p>

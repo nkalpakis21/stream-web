@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { SongDocument } from '@/types/firestore';
+import type { AIArtistDocument, SongDocument } from '@/types/firestore';
+import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { getArtistNamesForSongs } from '@/lib/services/songs';
 import { getArtistsData } from '@/lib/services/artists';
 import { hasLaunchedCoin } from '@/lib/brand/coin';
@@ -16,8 +17,11 @@ interface PaginatedResponse {
   hasMore: boolean;
 }
 
+export type DiscoverSort = 'heat' | 'new';
+
 interface UseInfiniteSongsOptions {
   query?: string;
+  sort?: DiscoverSort;
   initialLimit?: number;
 }
 
@@ -25,12 +29,61 @@ interface UseInfiniteSongsReturn {
   songs: SongDocument[];
   artistNames: Map<string, string>;
   coinBySong: Map<string, boolean>;
+  quoteBySong: Map<string, ArtistCoinQuote>;
   loading: boolean;
   loadingMore: boolean;
   hasMore: boolean;
   error: Error | null;
   loadMore: () => Promise<void>;
   reset: () => void;
+}
+
+function requestKey(query: string, sort: DiscoverSort) {
+  return `${query}::${sort}`;
+}
+
+async function fetchQuotesForArtists(
+  artists: Map<string, AIArtistDocument>,
+  cache: Map<string, ArtistCoinQuote>
+): Promise<Map<string, ArtistCoinQuote>> {
+  const needed: string[] = [];
+  artists.forEach(artist => {
+    const mint = artist.pumpFun?.mint?.trim();
+    if (mint && hasLaunchedCoin(artist.pumpFun) && !cache.has(mint)) {
+      needed.push(mint);
+    }
+  });
+
+  if (needed.length === 0) return cache;
+
+  try {
+    const params = new URLSearchParams({ mints: needed.join(',') });
+    const res = await fetch(`/api/coin-quotes?${params}`);
+    if (!res.ok) return cache;
+    const body = (await res.json()) as { quotes?: Record<string, ArtistCoinQuote> };
+    Object.entries(body.quotes || {}).forEach(([mint, quote]) => {
+      cache.set(mint, quote);
+    });
+  } catch {
+    return cache;
+  }
+
+  return cache;
+}
+
+function quotesForSongs(
+  songs: SongDocument[],
+  artists: Map<string, AIArtistDocument>,
+  cache: Map<string, ArtistCoinQuote>
+): Map<string, ArtistCoinQuote> {
+  const bySong = new Map<string, ArtistCoinQuote>();
+  songs.forEach(song => {
+    const mint = artists.get(song.artistId)?.pumpFun?.mint?.trim();
+    if (!mint) return;
+    const quote = cache.get(mint);
+    if (quote) bySong.set(song.id, quote);
+  });
+  return bySong;
 }
 
 /**
@@ -45,26 +98,26 @@ interface UseInfiniteSongsReturn {
 export function useInfiniteSongs(
   options: UseInfiniteSongsOptions = {}
 ): UseInfiniteSongsReturn {
-  const { query = '', initialLimit = 20 } = options;
+  const { query = '', sort = 'new', initialLimit = 20 } = options;
+  const key = requestKey(query, sort);
   
   const [songs, setSongs] = useState<SongDocument[]>([]);
   const [artistNames, setArtistNames] = useState<Map<string, string>>(new Map());
   const [coinBySong, setCoinBySong] = useState<Map<string, boolean>>(new Map());
+  const [quoteBySong, setQuoteBySong] = useState<Map<string, ArtistCoinQuote>>(new Map());
+  const quotesByMintRef = useRef<Map<string, ArtistCoinQuote>>(new Map());
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   
-  // Track current query to prevent stale updates
-  const currentQueryRef = useRef<string | null>(null); // Start as null to trigger initial load
+  const currentKeyRef = useRef<string | null>(null);
   const requestIdRef = useRef(0);
   const isLoadingRef = useRef(false);
   const hasLoadedInitialRef = useRef(false);
 
-  // Convert serialized songs back to SongDocument format
   const deserializeSong = useCallback((song: PaginatedResponse['songs'][0]): SongDocument => {
-    // Dynamically import to avoid SSR issues
     const { Timestamp } = require('firebase/firestore');
     return {
       ...song,
@@ -74,12 +127,9 @@ export function useInfiniteSongs(
     } as SongDocument;
   }, []);
 
-  // Fetch songs from API
   const fetchSongs = useCallback(async (
     cursorParam: string | null,
-    isInitial: boolean
   ): Promise<PaginatedResponse | null> => {
-    // Prevent duplicate requests
     if (isLoadingRef.current) {
       return null;
     }
@@ -92,13 +142,13 @@ export function useInfiniteSongs(
         limit: initialLimit.toString(),
         ...(cursorParam && { cursor: cursorParam }),
         ...(query && { query }),
+        ...(!query && sort === 'heat' ? { sort: 'heat' } : {}),
       });
 
       const response = await fetch(`/api/discover/songs?${params}`);
       
-      // Check if this request is still current
-      if (requestId !== requestIdRef.current || currentQueryRef.current !== query) {
-        return null; // Stale request, ignore
+      if (requestId !== requestIdRef.current || currentKeyRef.current !== key) {
+        return null;
       }
 
       if (!response.ok) {
@@ -115,14 +165,13 @@ export function useInfiniteSongs(
 
       const data: PaginatedResponse = await response.json();
       
-      // Validate response structure
       if (!data || !Array.isArray(data.songs)) {
         throw new Error('Invalid response format from API');
       }
       
       return data;
     } catch (err) {
-      if (requestId === requestIdRef.current && currentQueryRef.current === query) {
+      if (requestId === requestIdRef.current && currentKeyRef.current === key) {
         throw err;
       }
       return null;
@@ -131,57 +180,87 @@ export function useInfiniteSongs(
         isLoadingRef.current = false;
       }
     }
-  }, [query, initialLimit]);
+  }, [query, sort, key, initialLimit]);
 
-  // Load initial songs
+  const attachArtistMeta = useCallback(async (
+    deserializedSongs: SongDocument[],
+    merge: boolean
+  ) => {
+    const [names, artists] = await Promise.all([
+      getArtistNamesForSongs(deserializedSongs),
+      getArtistsData(deserializedSongs.map(s => s.artistId)),
+    ]);
+    if (currentKeyRef.current !== key) return;
+
+    await fetchQuotesForArtists(artists, quotesByMintRef.current);
+    if (currentKeyRef.current !== key) return;
+
+    const quotes = quotesForSongs(deserializedSongs, artists, quotesByMintRef.current);
+
+    if (merge) {
+      setArtistNames(prev => {
+        const updated = new Map(prev);
+        names.forEach((name, id) => updated.set(id, name));
+        return updated;
+      });
+      setCoinBySong(prev => {
+        const updated = new Map(prev);
+        deserializedSongs.forEach(song => {
+          updated.set(song.id, hasLaunchedCoin(artists.get(song.artistId)?.pumpFun));
+        });
+        return updated;
+      });
+      setQuoteBySong(prev => {
+        const updated = new Map(prev);
+        quotes.forEach((quote, id) => updated.set(id, quote));
+        return updated;
+      });
+      return;
+    }
+
+    setArtistNames(names);
+    const coins = new Map<string, boolean>();
+    deserializedSongs.forEach(song => {
+      coins.set(song.id, hasLaunchedCoin(artists.get(song.artistId)?.pumpFun));
+    });
+    setCoinBySong(coins);
+    setQuoteBySong(quotes);
+  }, [key]);
+
   const loadInitial = useCallback(async () => {
     setLoading(true);
     setError(null);
     setSongs([]);
     setArtistNames(new Map());
     setCoinBySong(new Map());
+    setQuoteBySong(new Map());
+    quotesByMintRef.current = new Map();
     setCursor(null);
     setHasMore(true);
-    currentQueryRef.current = query;
+    currentKeyRef.current = key;
 
     try {
-      const data = await fetchSongs(null, true);
+      const data = await fetchSongs(null);
       
-      if (!data || currentQueryRef.current !== query) {
-        return; // Stale request
+      if (!data || currentKeyRef.current !== key) {
+        return;
       }
 
       const deserializedSongs = data.songs.map(s => deserializeSong(s));
       setSongs(deserializedSongs);
       setCursor(data.nextCursor);
       setHasMore(data.hasMore);
-
-      // Fetch artist names
-      const [names, artists] = await Promise.all([
-        getArtistNamesForSongs(deserializedSongs),
-        getArtistsData(deserializedSongs.map(s => s.artistId)),
-      ]);
-      if (currentQueryRef.current === query) {
-        setArtistNames(names);
-        const coins = new Map<string, boolean>();
-        deserializedSongs.forEach(song => {
-          coins.set(song.id, hasLaunchedCoin(artists.get(song.artistId)?.pumpFun));
-        });
-        setCoinBySong(coins);
-      }
+      await attachArtistMeta(deserializedSongs, false);
     } catch (err) {
       console.error('[useInfiniteSongs] Error loading initial songs:', err);
-      if (currentQueryRef.current === query) {
+      if (currentKeyRef.current === key) {
         setError(err instanceof Error ? err : new Error('Failed to load songs'));
       }
     } finally {
-      if (currentQueryRef.current === query) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
-  }, [query, fetchSongs, deserializeSong]);
+  }, [key, fetchSongs, deserializeSong, attachArtistMeta]);
 
-  // Load more songs (pagination)
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || !cursor || isLoadingRef.current) {
       return;
@@ -191,15 +270,14 @@ export function useInfiniteSongs(
     setError(null);
 
     try {
-      const data = await fetchSongs(cursor, false);
+      const data = await fetchSongs(cursor);
       
-      if (!data || currentQueryRef.current !== query) {
-        return; // Stale request
+      if (!data || currentKeyRef.current !== key) {
+        return;
       }
 
       const deserializedSongs = data.songs.map(s => deserializeSong(s));
       
-      // Deduplicate songs (in case of race conditions)
       setSongs(prev => {
         const existingIds = new Set(prev.map(s => s.id));
         const newSongs = deserializedSongs.filter(s => !existingIds.has(s.id));
@@ -208,64 +286,45 @@ export function useInfiniteSongs(
 
       setCursor(data.nextCursor);
       setHasMore(data.hasMore);
-
-      // Fetch artist names for new songs
-      const [names, artists] = await Promise.all([
-        getArtistNamesForSongs(deserializedSongs),
-        getArtistsData(deserializedSongs.map(s => s.artistId)),
-      ]);
-      if (currentQueryRef.current === query) {
-        setArtistNames(prev => {
-          const updated = new Map(prev);
-          names.forEach((name, id) => updated.set(id, name));
-          return updated;
-        });
-        setCoinBySong(prev => {
-          const updated = new Map(prev);
-          deserializedSongs.forEach(song => {
-            updated.set(song.id, hasLaunchedCoin(artists.get(song.artistId)?.pumpFun));
-          });
-          return updated;
-        });
-      }
+      await attachArtistMeta(deserializedSongs, true);
     } catch (err) {
-      if (currentQueryRef.current === query) {
+      if (currentKeyRef.current === key) {
         setError(err instanceof Error ? err : new Error('Failed to load more songs'));
       }
     } finally {
-      if (currentQueryRef.current === query) {
+      if (currentKeyRef.current === key) {
         setLoadingMore(false);
       }
     }
-  }, [cursor, hasMore, loadingMore, query, fetchSongs]);
+  }, [cursor, hasMore, loadingMore, key, fetchSongs, deserializeSong, attachArtistMeta]);
 
-  // Reset to initial state
   const reset = useCallback(() => {
     setSongs([]);
     setArtistNames(new Map());
     setCoinBySong(new Map());
+    setQuoteBySong(new Map());
+    quotesByMintRef.current = new Map();
     setCursor(null);
     setHasMore(true);
     setError(null);
-    currentQueryRef.current = query; // Update ref before loading
-    hasLoadedInitialRef.current = false; // Allow reload
+    currentKeyRef.current = key;
+    hasLoadedInitialRef.current = false;
     loadInitial();
-  }, [query, loadInitial]);
+  }, [key, loadInitial]);
 
-  // Load initial songs on mount or when query changes
   useEffect(() => {
-    // Always load on mount, or if query changed
-    if (!hasLoadedInitialRef.current || currentQueryRef.current !== query) {
+    if (!hasLoadedInitialRef.current || currentKeyRef.current !== key) {
       hasLoadedInitialRef.current = true;
-      currentQueryRef.current = query;
+      currentKeyRef.current = key;
       loadInitial();
     }
-  }, [query, loadInitial]);
+  }, [key, loadInitial]);
 
   return {
     songs,
     artistNames,
     coinBySong,
+    quoteBySong,
     loading,
     loadingMore,
     hasMore,
@@ -274,4 +333,3 @@ export function useInfiniteSongs(
     reset,
   };
 }
-

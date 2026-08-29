@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { LyricsData, TimestampedLine } from '@/lib/utils/lyrics';
-import { splitLyricsIntoLines, findActiveLineIndex } from '@/lib/utils/lyrics';
+import {
+  splitLyricsIntoLines,
+  findActiveLineIndex,
+  stripLyricSectionTags,
+} from '@/lib/utils/lyrics';
 import type { DisplayMode } from './LyricsSection';
 import { LyricsLine } from './LyricsLine';
 
@@ -21,7 +25,7 @@ export function LyricsViewer({
   isPlaying = false,
   audioUrl,
 }: LyricsViewerProps) {
-  const lines = splitLyricsIntoLines(lyrics.raw);
+  const lines = splitLyricsIntoLines(stripLyricSectionTags(lyrics.raw));
   const [activeLineIndex, setActiveLineIndex] = useState<number>(-1);
   const activeLineRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,7 +70,7 @@ export function LyricsViewer({
   }, [activeLineIndex, mode]);
 
   const baseClasses = {
-    minimal: 'text-lg sm:text-xl leading-[1.8] text-left font-playfair',
+    minimal: 'lyrics-listen text-left',
     immersive: 'text-2xl lg:text-3xl xl:text-4xl leading-[1.9] text-center max-w-[680px] mx-auto font-playfair',
     shareable: 'text-xl leading-[1.7] text-center max-w-[600px] mx-auto font-playfair',
   };

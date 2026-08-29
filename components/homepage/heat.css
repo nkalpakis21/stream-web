@@ -1,0 +1,309 @@
+/* STR-34 Heat tape. Uses listen tokens when present; hex fallbacks are Product values. */
+
+.heat-tape {
+  container-type: inline-size;
+  container-name: heat;
+}
+
+.heat-title {
+  margin: 0;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--ink, #f5f4f8);
+  text-transform: none;
+}
+
+.heat-cols,
+.heat-row {
+  display: grid;
+  grid-template-columns: 24px 36px minmax(0, 1fr) 72px 64px 64px 44px;
+  column-gap: 8px;
+  align-items: center;
+}
+
+.heat-headers {
+  margin-bottom: 4px;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mute, #8b8896);
+}
+
+.heat-h-price,
+.heat-h-chg,
+.heat-h-mcap {
+  text-align: right;
+}
+
+.heat-row {
+  min-height: 52px;
+  height: 52px;
+  border-radius: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.heat-row:hover,
+.heat-row.is-playing {
+  background: var(--surface-2, #1c1c28);
+}
+
+.heat-row.r1 {
+  box-shadow: inset 2px 0 0 var(--heat, #c8f542);
+}
+
+.heat-row.r1 .rank {
+  color: var(--heat, #c8f542);
+}
+
+.heat-row .rank {
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--mute, #8b8896);
+}
+
+.heat-row.r1 .rank,
+.heat-row.r2 .rank,
+.heat-row.r3 .rank {
+  animation: heat-rank-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes heat-rank-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.heat-thumb {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--surface-2, #1c1c28);
+}
+
+.heat-meta {
+  min-width: 0;
+}
+
+.heat-track {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--ink, #f5f4f8);
+  text-transform: none;
+}
+
+.heat-artist-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.heat-artist-line .heat-hit {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.heat-artist {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--mute, #8b8896);
+  text-transform: none;
+}
+
+.heat-price,
+.heat-chg,
+.heat-mcap {
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.heat-price {
+  font-weight: 600;
+  color: var(--ink, #f5f4f8);
+}
+
+.heat-chg {
+  font-weight: 700;
+}
+
+.heat-chg.is-up {
+  color: var(--heat, #c8f542);
+}
+
+.heat-chg.is-down {
+  color: var(--down, #ff4d6a);
+}
+
+.heat-chg.is-flat {
+  color: var(--mute, #8b8896);
+}
+
+.heat-mcap {
+  font-weight: 500;
+  color: var(--mute, #8b8896);
+}
+
+.heat-play {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink, #f5f4f8);
+  cursor: pointer;
+}
+
+.heat-play:hover {
+  color: var(--accent, #7c7bff);
+}
+
+.heat-hit {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.heat-cluster-inline {
+  display: none;
+  flex: 0 0 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  color: var(--mute, #8b8896);
+}
+
+.heat-cluster-inline .is-up {
+  color: var(--heat, #c8f542);
+  font-weight: 700;
+}
+
+.heat-cluster-inline .is-down {
+  color: var(--down, #ff4d6a);
+  font-weight: 700;
+}
+
+.heat-featured-meta {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  color: var(--mute, #8b8896);
+}
+
+.heat-featured-meta .is-up {
+  color: var(--heat, #c8f542);
+  font-weight: 700;
+}
+
+.heat-featured-meta .is-down {
+  color: var(--down, #ff4d6a);
+  font-weight: 700;
+}
+
+@container heat (max-width: 419px) {
+  .heat-cols,
+  .heat-row {
+    grid-template-columns: 24px 36px minmax(0, 1fr) 44px;
+  }
+
+  .heat-h-price,
+  .heat-h-chg,
+  .heat-h-mcap,
+  .heat-row > .heat-price,
+  .heat-row > .heat-chg,
+  .heat-row > .heat-mcap {
+    display: none;
+  }
+
+  .heat-cluster-inline {
+    display: inline;
+  }
+}
+
+/* Phone Heat: rank, thumb, title/artist cluster, play. No desktop tape headers. */
+@media (max-width: 767px) {
+  .heat-headers {
+    display: none;
+  }
+
+  .heat-cols,
+  .heat-row {
+    grid-template-columns: 24px 36px minmax(0, 1fr) 44px;
+  }
+
+  .heat-h-price,
+  .heat-h-chg,
+  .heat-h-mcap,
+  .heat-row > .heat-price,
+  .heat-row > .heat-chg,
+  .heat-row > .heat-mcap {
+    display: none;
+  }
+
+  .heat-cluster-inline {
+    display: inline;
+  }
+}
+
+/* 375: keep price + 24h on the artist line; drop mcap when the row is tight. */
+@media (max-width: 375px) {
+  .heat-cluster-inline .heat-cluster-mcap,
+  .heat-h-mcap,
+  .heat-row > .heat-mcap {
+    display: none;
+  }
+}

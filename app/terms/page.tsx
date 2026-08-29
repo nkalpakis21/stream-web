@@ -10,10 +10,10 @@ export default function TermsOfServicePage() {
     <div className="min-h-screen bg-background">
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16">
         <div className="prose prose-neutral dark:prose-invert max-w-none">
-          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-8">Terms of Service</h1>
+          <h1 className="listen-h1 mb-8">Terms of Service</h1>
           
           <p className="text-muted-foreground mb-6">
-            <strong>Last updated:</strong> {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            <strong>Last updated:</strong> August 29, 2026
           </p>
 
           <div className="space-y-8 text-foreground">
@@ -124,7 +124,7 @@ export default function TermsOfServicePage() {
             <section>
               <h2 className="text-2xl font-semibold mb-4">10. Limitation of Liability</h2>
               <p className="text-muted-foreground leading-relaxed">
-                TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL STREAM ⭐, ITS AFFILIATES, OR THEIR RESPECTIVE OFFICERS, DIRECTORS, EMPLOYEES, OR AGENTS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF PROFITS, DATA, OR USE, ARISING OUT OF OR RELATING TO YOUR USE OF THE SERVICE.
+                TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL STREAMSTAR, ITS AFFILIATES, OR THEIR RESPECTIVE OFFICERS, DIRECTORS, EMPLOYEES, OR AGENTS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF PROFITS, DATA, OR USE, ARISING OUT OF OR RELATING TO YOUR USE OF THE SERVICE.
               </p>
             </section>
 
@@ -155,7 +155,7 @@ export default function TermsOfServicePage() {
                 If you have any questions about these Terms of Service, please contact us at:
               </p>
               <p className="text-muted-foreground mt-2">
-                Email: legal@stream.app
+                Email: legal@streamstar.xyz
               </p>
             </section>
           </div>

@@ -7,10 +7,11 @@ import { getUserArtists } from '@/lib/services/artists';
 import { createSong } from '@/lib/services/songs';
 import { createGeneration } from '@/lib/services/generations';
 import type { AIArtistDocument } from '@/types/firestore';
+import { useToast, ToastContainer } from '@/components/ui/toast';
 
 interface CreativeSongFormProps {
   preselectedArtistId?: string;
-  onSuccess?: () => void;
+  onSuccess?: (songId: string) => void;
   onCancel?: () => void;
 }
 
@@ -20,6 +21,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
   const [loading, setLoading] = useState(false);
   const [artists, setArtists] = useState<AIArtistDocument[]>([]);
   const [loadingArtists, setLoadingArtists] = useState(true);
+  const { toasts, showToast, dismissToast } = useToast();
   const [formData, setFormData] = useState({
     title: '',
     artistId: preselectedArtistId || '',
@@ -57,23 +59,23 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
     if (!user) return;
 
     if (artists.length === 0) {
-      alert('Please create an AI artist first');
+      showToast('Create an artist first', 'error');
       return;
     }
 
     const selectedArtist = artists.find(a => a.id === formData.artistId);
     if (!selectedArtist || selectedArtist.ownerId !== user.uid) {
-      alert('Please select a valid artist');
+      showToast('Please select a valid artist', 'error');
       return;
     }
 
     if (formData.prompt.length > 300 || formData.prompt.trim().length === 0) {
-      alert('Please enter a valid prompt (max 300 characters)');
+      showToast('Please enter a valid prompt (max 300 characters)', 'error');
       return;
     }
 
     if (formData.lyrics.length > 2000) {
-      alert('Lyrics cannot exceed 2000 characters');
+      showToast('Lyrics cannot exceed 2000 characters', 'error');
       return;
     }
 
@@ -109,7 +111,6 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
         lyrics: formData.lyrics.trim() || undefined,
       });
 
-      // Reset form
       setFormData({
         title: '',
         artistId: artists[0]?.id || '',
@@ -118,14 +119,11 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
         provider: 'musicgpt',
       });
 
-      if (onSuccess) {
-        onSuccess();
-      } else {
-        router.push(`/songs/${song.id}`);
-      }
+      onSuccess?.(song.id);
+      router.push(`/songs/${song.id}`);
     } catch (error) {
       console.error('Failed to create song:', error);
-      alert('Failed to create song. Please try again.');
+      showToast('Failed to create song. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -147,11 +145,11 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         </div>
-        <p className="text-muted-foreground mb-4">You need to create an AI artist first.</p>
+        <p className="text-muted-foreground mb-4">Create an artist first, then generate a song.</p>
         <button
           type="button"
-          onClick={() => router.push('/dashboard?tab=artists')}
-          className="text-accent hover:opacity-80 transition-opacity font-medium"
+          onClick={() => router.push('/dashboard?tab=artists&new=1')}
+          className="text-primary hover:opacity-80 transition-opacity font-medium"
         >
           Create an artist →
         </button>
@@ -161,6 +159,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-card via-card to-accent/5 shadow-lg">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {/* Decorative gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent pointer-events-none" />
       
@@ -174,8 +173,8 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
               </svg>
             </div>
             <div>
-              <h3 className="text-xl font-bold text-foreground">Create New Song</h3>
-              <p className="text-sm text-muted-foreground">Generate music with your AI artist</p>
+              <h3 className="text-xl font-bold text-foreground">Generate song</h3>
+              <p className="text-sm text-muted-foreground">One generation. Then you listen.</p>
             </div>
           </div>
           {onCancel && (
@@ -194,7 +193,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label htmlFor="title" className="block text-sm font-medium mb-2 text-foreground">
-                Song Title *
+                Title *
               </label>
               <input
                 id="title"
@@ -209,7 +208,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
 
             <div>
               <label htmlFor="artistId" className="block text-sm font-medium mb-2 text-foreground">
-                AI Artist *
+                Artist *
               </label>
               <select
                 id="artistId"
@@ -230,7 +229,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
           <div>
             <div className="flex items-center justify-between mb-2">
               <label htmlFor="prompt" className="block text-sm font-medium text-foreground">
-                Generation Prompt *
+                Prompt *
               </label>
               <span
                 className={`text-xs font-medium transition-colors ${
@@ -256,7 +255,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
                   setFormData({ ...formData, prompt: value });
                 }
               }}
-              placeholder="Describe the style, mood, and feel of your song..."
+              placeholder="Mood, feel, what the song should do…"
               className={`w-full px-4 py-3 border rounded-xl bg-background/50 backdrop-blur-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all resize-none ${
                 formData.prompt.length > 300
                   ? 'border-red-500 focus:ring-red-500'
@@ -270,7 +269,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
           <div>
             <div className="flex items-center justify-between mb-2">
               <label htmlFor="lyrics" className="block text-sm font-medium text-foreground">
-                Lyrics (Optional)
+                Lyrics (optional)
               </label>
               <span
                 className={`text-xs font-medium transition-colors ${
@@ -320,7 +319,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
                   Generating...
                 </span>
               ) : (
-                'Generate Song'
+                'Generate song'
               )}
             </button>
             {onCancel && (
