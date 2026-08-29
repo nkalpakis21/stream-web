@@ -3,9 +3,9 @@
  */
 export function SongCardSkeleton() {
   return (
-    <article className="block animate-pulse overflow-hidden rounded-xl bg-card">
+    <article className="block animate-pulse rounded-[12px] bg-card">
       <div className="relative aspect-square overflow-hidden rounded-xl bg-muted">
-        <span className="absolute inset-0 z-10 m-auto flex h-14 w-14 rounded-full bg-black/55" />
+        <span className="absolute inset-0 z-10 m-auto flex h-12 w-12 rounded-full bg-black/55" />
       </div>
       <div className="p-3">
         <div className="h-4 w-3/4 rounded bg-muted" />

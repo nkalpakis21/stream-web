@@ -8,9 +8,8 @@ export default function DiscoverLoading() {
           <div className="mb-8 h-10 w-48 rounded bg-muted lg:h-12" />
           <div className="mb-6 h-12 rounded-full bg-muted" />
           <div className="flex gap-2">
-            <div className="h-9 w-20 rounded-full bg-muted" />
-            <div className="h-9 w-24 rounded-full bg-muted" />
-            <div className="h-9 w-16 rounded-full bg-muted" />
+            <div className="h-11 w-16 rounded-full bg-muted" />
+            <div className="h-11 w-16 rounded-full bg-muted" />
           </div>
         </div>
         <SongCardSkeletonGrid />
