@@ -4,11 +4,10 @@ import { getArtistSongs } from '@/lib/services/songs';
 import { SongCard } from '@/components/songs/SongCard';
 import { ArtistHero } from '@/components/artists/ArtistHero';
 import { hasLaunchedCoin } from '@/lib/brand/coin';
+import { fetchArtistCoinModule } from '@/lib/solana/fetchArtistCoinModule';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import { EmptyAction } from '@/components/states/EmptyAction';
-import { formatDistanceToNow } from 'date-fns';
 
-// Force dynamic rendering to always fetch fresh data from Firestore
 export const dynamic = 'force-dynamic';
 
 interface ArtistPageProps {
@@ -24,68 +23,71 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
     notFound();
   }
 
-  // Check if artist is public or user has access
-  // TODO: Add auth check for private artists
+  const [songs, coin] = await Promise.all([
+    getArtistSongs(artist.id, 20),
+    fetchArtistCoinModule(artist.pumpFun?.mint),
+  ]);
 
-  const songs = await getArtistSongs(artist.id, 20);
-  const timeAgo = formatDistanceToNow(artist.createdAt.toDate(), {
-    addSuffix: true,
-  });
+  const style = artist.styleDNA;
+  const hasStyle =
+    style.genres.length > 0 ||
+    style.moods.length > 0 ||
+    style.influences.length > 0 ||
+    Boolean(artist.vocalIdentity);
 
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        {/* Artist Header — look picker is owner/manager only (client-side) */}
-        <ArtistHero artist={artist} timeAgo={timeAgo}>
-          {/* Style DNA */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-border">
-            {artist.styleDNA.genres.length > 0 && (
-            <div>
-              <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Genres</span>
-              <p className="text-sm font-medium">
-                {artist.styleDNA.genres.join(', ')}
-              </p>
+        <ArtistHero artist={artist} coin={coin}>
+          {hasStyle ? (
+            <div className="mb-12 grid grid-cols-1 gap-4 border-t border-border pt-6 sm:grid-cols-2">
+              {style.genres.length > 0 && (
+                <div>
+                  <span className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">
+                    Genres
+                  </span>
+                  <p className="text-sm font-medium">{style.genres.join(', ')}</p>
+                </div>
+              )}
+              {style.moods.length > 0 && (
+                <div>
+                  <span className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">
+                    Moods
+                  </span>
+                  <p className="text-sm font-medium">{style.moods.join(', ')}</p>
+                </div>
+              )}
+              {style.influences.length > 0 && (
+                <div>
+                  <span className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">
+                    Influences
+                  </span>
+                  <p className="text-sm font-medium">{style.influences.join(', ')}</p>
+                </div>
+              )}
+              {artist.vocalIdentity ? (
+                <div>
+                  <span className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">
+                    Vocal identity
+                  </span>
+                  <p className="text-sm font-medium">{artist.vocalIdentity}</p>
+                </div>
+              ) : null}
             </div>
-            )}
-            {artist.styleDNA.moods.length > 0 && (
-            <div>
-              <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Moods</span>
-              <p className="text-sm font-medium">
-                {artist.styleDNA.moods.join(', ')}
-              </p>
-            </div>
-            )}
-            <div>
-              <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Tempo Range</span>
-              <p className="text-sm font-medium">
-                {artist.styleDNA.tempoRange.min} - {artist.styleDNA.tempoRange.max} BPM
-              </p>
-            </div>
-            {artist.styleDNA.influences.length > 0 && (
-              <div>
-                <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Influences</span>
-                <p className="text-sm font-medium">{artist.styleDNA.influences.join(', ')}</p>
-              </div>
-            )}
-            {artist.vocalIdentity && (
-              <div>
-                <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Vocal identity</span>
-                <p className="text-sm font-medium">{artist.vocalIdentity}</p>
-              </div>
-            )}
-          </div>
+          ) : null}
         </ArtistHero>
 
-        {/* Songs Section */}
         <section>
-          <div className="flex items-center justify-between mb-8">
+          <div className="mb-8 flex items-center justify-between">
             <h2 className="listen-title">Songs</h2>
             {songs.length > 0 && (
-              <span className="text-sm text-muted-foreground">{songs.length} {songs.length === 1 ? 'song' : 'songs'}</span>
+              <span className="text-sm text-muted-foreground">
+                {songs.length} {songs.length === 1 ? 'song' : 'songs'}
+              </span>
             )}
           </div>
           {songs.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {songs.map(song => (
                 <SongCard
                   key={song.id}
@@ -96,16 +98,14 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
               ))}
             </div>
           ) : (
-            <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
+            <div className="rounded-2xl border-2 border-dashed border-border bg-muted/30 p-12 text-center">
               <EmptyAction message="No songs yet." href="/discover" label="Discover" />
             </div>
           )}
         </section>
 
-        {/* Comments Section */}
         <CommentsSection targetType="artist" targetId={artist.id} />
       </main>
     </div>
   );
 }
-

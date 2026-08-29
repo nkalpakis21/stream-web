@@ -13,7 +13,7 @@ export function ArtistCoinBuy({ url }: { url: string | null | undefined }) {
   if (!url || connected) return null;
 
   return (
-    <div className="flex flex-col items-start gap-2 mb-6">
+    <div className="mt-3 flex flex-col items-start gap-2">
       <WalletConnectControl />
     </div>
   );

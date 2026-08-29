@@ -20,6 +20,8 @@ html.listen {
   --player-m: 56px;
   --tab-h: 56px;
 
+  --font-display: var(--font-playfair);
+
   /* Tailwind bridges so existing utilities resolve to the hex tokens */
   --listen-bg: var(--bg);
   --listen-surface: var(--surface);
@@ -79,6 +81,9 @@ html.listen [data-entity='artist'] {
   text-transform: none;
 }
 
+.btn-primary,
+.btn-ghost,
+.btn-heat,
 .listen-btn-primary,
 .listen-btn-ghost,
 .listen-btn-buy {
@@ -92,6 +97,8 @@ html.listen [data-entity='artist'] {
   white-space: nowrap;
 }
 
+.btn-primary,
+.btn-primary:disabled,
 .listen-btn-primary {
   height: 48px;
   padding: 0 20px;
@@ -100,6 +107,8 @@ html.listen [data-entity='artist'] {
   border: none;
 }
 
+.btn-ghost,
+.btn-ghost:disabled,
 .listen-btn-ghost {
   height: 40px;
   padding: 0 16px;
@@ -108,12 +117,103 @@ html.listen [data-entity='artist'] {
   border: 1px solid var(--line);
 }
 
+.btn-heat,
 .listen-btn-buy {
   height: 48px;
   padding: 0 20px;
   background: var(--heat);
   color: var(--accent-ink);
   border: none;
+}
+
+.btn-primary:disabled,
+.btn-ghost:disabled,
+.btn-heat:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* STR-36 artist coin module — Product values, real quotes only */
+.coin-module {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.coin-module .px {
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0;
+}
+
+.coin-chg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.coin-module .chg {
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.coin-module .chg.is-up,
+.coin-spark.is-up {
+  color: var(--heat);
+}
+
+.coin-module .chg.is-down,
+.coin-spark.is-down {
+  color: var(--down);
+}
+
+.coin-module .chg.is-flat,
+.coin-spark.is-flat {
+  color: var(--mute);
+}
+
+.coin-spark {
+  display: block;
+  flex-shrink: 0;
+}
+
+.coin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 12px;
+  margin: 16px 0 0;
+}
+
+.coin-stats dt {
+  margin: 0;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--mute);
+}
+
+.coin-stats dd {
+  margin: 4px 0 0;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.coin-module .btn-heat {
+  margin-top: 16px;
+  width: 100%;
 }
 
 @layer base {
