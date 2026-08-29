@@ -155,7 +155,7 @@ export function CreateSongForm({ preselectedArtistId, showSuccessMessage }: Crea
         <p className="text-muted-foreground mb-4">You need to create an AI artist first.</p>
         <button
           type="button"
-          onClick={() => router.push('/create?step=artist')}
+          onClick={() => router.push('/dashboard?tab=artists&new=1')}
           className="text-accent hover:opacity-80 transition-opacity font-medium"
         >
           Create an artist →

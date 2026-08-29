@@ -27,15 +27,15 @@ export function CreateSongCard({ onClick }: CreateSongCardProps) {
               />
             </svg>
           </div>
-          <span className="text-sm font-medium">Create New Song</span>
+          <span className="text-sm font-medium">Generate song</span>
         </div>
       </div>
       <div className="p-3">
         <h3 className="text-sm font-semibold mb-1 text-card-foreground group-hover:text-accent transition-colors">
-          Create New Song
+          Generate song
         </h3>
         <p className="text-xs text-muted-foreground">
-          Start creating
+          One generation
         </p>
       </div>
     </div>

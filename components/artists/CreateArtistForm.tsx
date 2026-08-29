@@ -112,9 +112,20 @@ export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <ArtistLookPicker
+        artistName={formData.name}
+        lore={formData.lore}
+        genres={formData.genres}
+        moods={formData.moods}
+        influences={formData.influences}
+        selectedUrl={avatarURL}
+        onSelectedUrlChange={setAvatarURL}
+        disabled={loading}
+      />
+
       <div>
         <label htmlFor="name" className="block text-sm font-medium mb-2 text-foreground">
-          Artist Name *
+          Name *
         </label>
         <input
           id="name"
@@ -128,7 +139,7 @@ export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
 
       <div>
         <label htmlFor="lore" className="block text-sm font-medium mb-2 text-foreground">
-          Bio / Lore *
+          Lore *
         </label>
         <textarea
           id="lore"
@@ -142,7 +153,7 @@ export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
 
       <div>
         <label htmlFor="vocalIdentity" className="block text-sm font-medium mb-2 text-foreground">
-          Vocal identity
+          Voice
         </label>
         <input
           id="vocalIdentity"
@@ -154,7 +165,7 @@ export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
           className="w-full px-4 py-3 border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
         />
         <p className="mt-1.5 text-xs text-muted-foreground">
-          Locked for every song. MusicGPT has no custom voice clone on this endpoint yet, so this description is sent as music_style.
+          How this artist should sound. Locked on every song.
         </p>
       </div>
 
@@ -230,17 +241,6 @@ export function CreateArtistForm({ onSuccess }: CreateArtistFormProps) {
           className="w-full px-4 py-3 border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
         />
       </div>
-
-      <ArtistLookPicker
-        artistName={formData.name}
-        lore={formData.lore}
-        genres={formData.genres}
-        moods={formData.moods}
-        influences={formData.influences}
-        selectedUrl={avatarURL}
-        onSelectedUrlChange={setAvatarURL}
-        disabled={loading}
-      />
 
       <div className="flex items-center gap-3 pt-2">
         <input

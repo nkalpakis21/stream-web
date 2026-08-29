@@ -18,6 +18,7 @@ interface SongStageProps {
   albumCoverUrl: string | null;
   audioUrl: string | null;
   versions: VersionOption[];
+  pending?: boolean;
   children?: React.ReactNode;
 }
 
@@ -29,6 +30,7 @@ export function SongStage({
   albumCoverUrl,
   audioUrl,
   versions,
+  pending = false,
   children,
 }: SongStageProps) {
   const playable = useMemo(
@@ -59,6 +61,9 @@ export function SongStage({
           </Link>
         ) : (
           <p className="mt-2 text-lg text-muted-foreground">{artistName}</p>
+        )}
+        {pending && !currentAudio && (
+          <p className="mt-4 text-sm text-muted-foreground">Making the track…</p>
         )}
 
         {playable.length > 1 && (

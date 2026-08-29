@@ -78,24 +78,15 @@ function DashboardContent() {
     return null; // Will redirect
   }
 
-  // Calculate stats
-  const totalPlays = songs.reduce((sum, song) => sum + (song.playCount || 0), 0);
-  const stats = {
-    songsCount: songs.length,
-    artistsCount: artists.length,
-    totalPlays,
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
-        {/* Dashboard Header */}
         <div className="mb-8">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-2 text-foreground">
-            Dashboard
+            Studio
           </h1>
           <p className="text-muted-foreground">
-            Manage your artists, songs, and creative work
+            Create artists and generate songs. Listeners stay on Discover.
           </p>
         </div>
 
@@ -108,8 +99,6 @@ function DashboardContent() {
         <div className="min-h-[60vh]">
           {activeTab === 'overview' && (
             <OverviewTab
-              user={user}
-              stats={stats}
               songs={songs}
               artists={artists}
               songArtistMap={songArtistMap}
