@@ -49,6 +49,7 @@ export function SongStage({
         songId={songId}
         title={songTitle}
         artistName={artistName}
+        artistId={artistId || undefined}
         coverUrl={albumCoverUrl}
         audioUrl={currentAudio}
         className="w-full"

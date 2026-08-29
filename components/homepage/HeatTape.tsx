@@ -49,7 +49,17 @@ export function FeaturedCoinMeta({
   );
 }
 
-function HeatRow({ track, rank }: { track: HeatTrack; rank: number }) {
+function toQueueItem(track: HeatTrack) {
+  return {
+    songId: track.id,
+    songTitle: track.title,
+    artistName: track.artistName,
+    artistId: track.artistId,
+    albumCoverUrl: track.coverUrl,
+  };
+}
+
+function HeatRow({ track, rank, queue }: { track: HeatTrack; rank: number; queue: HeatTrack[] }) {
   const { play, nowPlaying, isPlaying, togglePlayPause } = useSongPlayer();
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -77,13 +87,17 @@ function HeatRow({ track, rank }: { track: HeatTrack; rank: number }) {
       }
     }
     if (!url) return;
-    play({
-      songId: track.id,
-      songTitle: track.title,
-      artistName: track.artistName,
-      albumCoverUrl: track.coverUrl,
-      audioUrl: url,
-    });
+    play(
+      {
+        songId: track.id,
+        songTitle: track.title,
+        artistName: track.artistName,
+        artistId: track.artistId,
+        albumCoverUrl: track.coverUrl,
+        audioUrl: url,
+      },
+      queue.map(toQueueItem)
+    );
     trackPlay(track.id);
   };
 
@@ -188,7 +202,7 @@ export function HeatTape({ tracks }: { tracks: HeatTrack[] }) {
           </div>
           <ol className="m-0 flex list-none flex-col p-0">
             {tracks.map((track, index) => (
-              <HeatRow key={track.id} track={track} rank={index + 1} />
+              <HeatRow key={track.id} track={track} rank={index + 1} queue={tracks} />
             ))}
           </ol>
         </>

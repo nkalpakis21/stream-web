@@ -202,6 +202,7 @@ export default async function SongPage({ params }: SongPageProps) {
         <VersionCards
           songTitle={song.title}
           artistName={artist?.name || 'Unknown Artist'}
+          artistId={artist?.id}
           albumCoverUrl={coverImageUrl}
           initialVersions={serializedVersions}
           hasPendingGeneration={hasPendingGeneration}
