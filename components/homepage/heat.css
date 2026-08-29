@@ -19,7 +19,7 @@
 .heat-cols,
 .heat-row {
   display: grid;
-  grid-template-columns: 24px 36px minmax(0, 1fr) 72px 64px 64px 44px;
+  grid-template-columns: 24px 40px minmax(0, 1fr) 72px 64px 64px 44px;
   column-gap: 8px;
   align-items: center;
 }
@@ -42,12 +42,14 @@
 }
 
 .heat-row {
-  min-height: 52px;
-  height: 52px;
+  min-height: 64px;
+  height: auto;
+  padding: 8px;
   border-radius: 10px;
-  padding: 0;
   border: 0;
   background: transparent;
+  overflow: hidden;
+  cursor: pointer;
 }
 
 .heat-row:hover,
@@ -91,15 +93,21 @@
 
 .heat-thumb {
   position: relative;
-  width: 36px;
-  height: 36px;
+  display: block;
+  width: 40px;
+  height: 40px;
   overflow: hidden;
   border-radius: 6px;
   background: var(--surface-2, #1c1c28);
 }
 
 .heat-meta {
+  display: flex;
   min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  overflow: hidden;
 }
 
 .heat-track {
@@ -108,8 +116,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-figtree), system-ui, sans-serif;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 14px;
+  line-height: 20px;
   font-weight: 600;
   color: var(--ink, #f5f4f8);
   text-transform: none;
@@ -122,7 +130,7 @@
   min-width: 0;
 }
 
-.heat-artist-line .heat-hit {
+.heat-artist-line .heat-artist {
   min-width: 0;
   flex: 1 1 auto;
 }
@@ -137,6 +145,7 @@
   line-height: 16px;
   color: var(--mute, #8b8896);
   text-transform: none;
+  text-decoration: none;
 }
 
 .heat-price,
@@ -196,19 +205,6 @@
   color: var(--accent, #7c7bff);
 }
 
-.heat-hit {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  min-height: 44px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  color: inherit;
-}
-
 .heat-cluster-inline {
   display: none;
   flex: 0 0 auto;
@@ -257,7 +253,7 @@
 @container heat (max-width: 419px) {
   .heat-cols,
   .heat-row {
-    grid-template-columns: 24px 36px minmax(0, 1fr) 44px;
+    grid-template-columns: 24px 40px minmax(0, 1fr) 44px;
   }
 
   .heat-h-price,
@@ -282,7 +278,7 @@
 
   .heat-cols,
   .heat-row {
-    grid-template-columns: 24px 36px minmax(0, 1fr) 44px;
+    grid-template-columns: 24px 40px minmax(0, 1fr) 44px;
   }
 
   .heat-h-price,
