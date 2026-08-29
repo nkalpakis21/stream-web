@@ -8,15 +8,16 @@ import { formatDistanceToNow } from 'date-fns';
 import { getSongVersions } from '@/lib/services/songs';
 import { VersionCards } from '@/components/songs/VersionCards';
 import { DeveloperSection } from '@/components/songs/DeveloperSection';
-import { ShareButton } from '@/components/songs/ShareButton';
 import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
 import { SongTokenCard } from '@/components/songs/SongTokenCard';
-import { ArtistPumpFunBuyLink } from '@/components/artists/ArtistPumpFunBuyLink';
 import { ArtistCoinBuy } from '@/components/artists/ArtistCoinBuy';
 import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
 import { SongStage } from '@/components/songs/SongStage';
 import { getLyricsForSong } from '@/lib/services/lyrics';
 import { CommentsSection } from '@/components/comments/CommentsSection';
+import { hasLaunchedCoin } from '@/lib/brand/coin';
+import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
+import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 
 // Force dynamic rendering to always fetch fresh data from Firestore
 export const dynamic = 'force-dynamic';
@@ -143,6 +144,13 @@ export default async function SongPage({ params }: SongPageProps) {
   // Get lyrics from generations
   const lyrics = getLyricsForSong(generations);
 
+  const launched = hasLaunchedCoin(artist?.pumpFun);
+  const mint = launched ? (artist?.pumpFun?.mint || '').trim() : '';
+  const quotes = mint ? await fetchCoinQuotes([mint]) : new Map<string, ArtistCoinQuote>();
+  const coin = mint ? quotes.get(mint) ?? null : null;
+  const buyUrl = launched ? (artist?.pumpFun?.url?.trim() || null) : null;
+  const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://stream.app'}/songs/${song.id}`;
+
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
@@ -154,10 +162,15 @@ export default async function SongPage({ params }: SongPageProps) {
           albumCoverUrl={coverImageUrl}
           audioUrl={primaryAudioUrl}
           pending={hasPendingGeneration}
+          durationSeconds={song.duration ?? null}
+          coin={coin}
+          buyUrl={buyUrl}
+          shareUrl={shareUrl}
           versions={serializedVersions.map(v => ({
             id: v.id,
             audioURL: v.audioURL,
             isPrimary: v.isPrimary,
+            duration: song.duration ?? null,
           }))}
         >
           {lyrics && (
@@ -173,14 +186,6 @@ export default async function SongPage({ params }: SongPageProps) {
           )}
         </SongStage>
         <div className="mt-6 mb-10 flex flex-col items-start gap-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <ShareButton 
-                  url={`${process.env.NEXT_PUBLIC_APP_URL || 'https://stream.app'}/songs/${song.id}`}
-                  title={song.title}
-                  artistName={artist?.name}
-                />
-                <ArtistPumpFunBuyLink pumpFun={artist?.pumpFun} />
-              </div>
             <SongOwnerActions
               songId={song.id}
               songTitle={song.title}
