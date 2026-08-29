@@ -28,16 +28,16 @@ export function SiteHeader() {
         style={{ height: 'var(--header-h, 56px)' }}
       >
         <div className="min-w-0 shrink-0">
-          <span className="hidden min-[390px]:block">
+          <span className="hidden min-[320px]:block">
             <Logo variant="compact" />
           </span>
-          <Link href="/" className="min-[390px]:hidden" aria-label="Streamstar home">
+          <Link href="/" className="min-[320px]:hidden" aria-label="Streamstar home">
             <LogoIcon size={28} />
           </Link>
         </div>
 
         <nav
-          className="flex min-w-0 flex-1 items-center justify-end gap-0.5 overflow-x-auto sm:gap-1 md:flex-none md:justify-center"
+          className="hidden min-w-0 flex-1 items-center justify-end gap-0.5 overflow-x-auto sm:gap-1 md:flex md:flex-none md:justify-center"
           aria-label="Primary"
         >
           {visibleLinks.map((link) => {

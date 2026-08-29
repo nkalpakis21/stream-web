@@ -75,6 +75,13 @@ html.listen .listen-title {
   }
 }
 
+/* Mobile listen chrome: tabs are 56. When STR-39 player is mounted, sit it above tabs. */
+@media (max-width: 767px) {
+  html.listen:has(.listen-player) .listen-chrome {
+    padding-bottom: calc(var(--tab-h, 56px) + var(--player-m, 56px) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* Never uppercase song or artist names */
 html.listen [data-entity='track'],
 html.listen [data-entity='artist'] {
