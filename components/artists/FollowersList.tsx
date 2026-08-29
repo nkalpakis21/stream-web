@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getFollowerCount, getFollowers } from '@/lib/services/follows';
-import { Users } from 'lucide-react';
+import { getFollowerCount } from '@/lib/services/follows';
 
 interface FollowersListProps {
   artistId: string;
@@ -10,49 +9,44 @@ interface FollowersListProps {
   showList?: boolean;
 }
 
-export function FollowersList({ 
-  artistId, 
-  showCount = true, 
-  showList = false 
+export function FollowersList({
+  artistId,
+  showCount = true,
+  showList = false,
 }: FollowersListProps) {
   const [followerCount, setFollowerCount] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadFollowerCount = async () => {
       try {
         const count = await getFollowerCount(artistId);
-        setFollowerCount(count);
+        if (!cancelled) setFollowerCount(count);
       } catch (error) {
         console.error('Failed to load follower count:', error);
-        setFollowerCount(0);
-      } finally {
-        setLoading(false);
+        if (!cancelled) setFollowerCount(null);
       }
     };
 
     loadFollowerCount();
+    return () => {
+      cancelled = true;
+    };
   }, [artistId]);
 
   if (!showCount && !showList) {
     return null;
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <Users className="w-4 h-4" />
-        <span className="text-sm">...</span>
-      </div>
-    );
+  // Honest count only — hide while loading or if the query failed.
+  if (followerCount == null) {
+    return null;
   }
 
   return (
-    <div className="flex items-center gap-2 text-muted-foreground">
-      <Users className="w-4 h-4" />
-      <span className="text-sm">
-        {followerCount ?? 0} {followerCount === 1 ? 'follower' : 'followers'}
-      </span>
-    </div>
+    <p className="text-sm text-[color:var(--mute)]">
+      {followerCount} {followerCount === 1 ? 'follower' : 'followers'}
+    </p>
   );
 }

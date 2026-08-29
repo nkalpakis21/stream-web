@@ -7,7 +7,8 @@ const MAX_MINTS = 30;
 interface DexPair {
   chainId?: string;
   priceUsd?: string;
-  priceChange?: { h24?: number };
+  priceChange?: { m5?: number; h1?: number; h6?: number; h24?: number };
+  volume?: { h24?: number | string };
   marketCap?: number;
   liquidity?: { usd?: number };
   baseToken?: { address?: string };
@@ -27,13 +28,53 @@ function pairLiquidity(pair: DexPair): number {
   return Number.isFinite(usd) ? (usd as number) : 0;
 }
 
+function finiteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function sparklineFromChanges(
+  price: number,
+  changes?: DexPair['priceChange']
+): number[] | undefined {
+  if (!changes) return undefined;
+  const points: { age: number; price: number }[] = [];
+  const add = (age: number, change?: number) => {
+    const pct = finiteNumber(change);
+    if (pct == null) return;
+    const past = price / (1 + pct / 100);
+    if (Number.isFinite(past) && past > 0) points.push({ age, price: past });
+  };
+  add(24, changes.h24);
+  add(6, changes.h6);
+  add(1, changes.h1);
+  add(5 / 60, changes.m5);
+  points.push({ age: 0, price });
+  if (points.length < 2) return undefined;
+  points.sort((a, b) => b.age - a.age);
+  return points.map(point => point.price);
+}
+
 function quoteFromPair(pair: DexPair): ArtistCoinQuote | null {
   const priceUsd = pair.priceUsd != null ? Number.parseFloat(pair.priceUsd) : null;
-  return completeCoinQuote({
+  const quote = completeCoinQuote({
     priceUsd,
     change24h: pair.priceChange?.h24,
     marketCap: pair.marketCap,
   });
+  if (!quote) return null;
+
+  const volume24h = finiteNumber(pair.volume?.h24);
+  const sparkline = sparklineFromChanges(quote.priceUsd, pair.priceChange);
+  return {
+    ...quote,
+    ...(volume24h != null && volume24h >= 0 ? { volume24h } : {}),
+    ...(sparkline ? { sparkline } : {}),
+  };
 }
 
 /**

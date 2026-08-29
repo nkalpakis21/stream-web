@@ -8,6 +8,12 @@ export interface ArtistCoinQuote {
   priceUsd: number;
   change24h: number;
   marketCap: number;
+  /** Present only when Dexscreener reported a real 24h volume. */
+  volume24h?: number;
+  /** Present only when a live holder count was returned. */
+  holders?: number;
+  /** Real interval prices from Dexscreener change windows. Hidden if shorter than 2. */
+  sparkline?: number[];
 }
 
 export function completeCoinQuote(input: {
@@ -76,4 +82,14 @@ export function formatCoinCluster(quote: ArtistCoinQuote) {
     mcap: formatCoinMcap(quote.marketCap),
     tone: coinChangeTone(quote.change24h),
   };
+}
+
+/** Same compact $ format as mcap. Empty when the value is not a real number. */
+export function formatCoinVolume(volume: number): string {
+  return formatCoinMcap(volume);
+}
+
+export function formatCoinHolders(holders: number): string {
+  if (!Number.isFinite(holders) || holders < 0) return '';
+  return Math.round(holders).toLocaleString('en-US');
 }
