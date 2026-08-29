@@ -9,6 +9,11 @@
  * Same pattern as FAL_KEY.
  */
 
+// Do not request media.write or users.write at authorize time. Nick's X app
+// only has coarse "Read and write" + Web App (confidential); those granular
+// scopes are not granted and X rejects the authorize URL with invalid_scope.
+// Cover-image upload and profile name/bio/avatar sync stay best-effort and
+// already no-op when the token lacks those permissions.
 export const X_SCOPES = [
   // Required by the product brief.
   'tweet.write',
@@ -16,11 +21,6 @@ export const X_SCOPES = [
   'offline.access',
   // X requires tweet.read alongside tweet.write for user-context posting.
   'tweet.read',
-  // Cover image on song-live posts (v2 media upload).
-  'media.write',
-  // Name/bio/avatar sync on connect. Harmless if the app's portal
-  // permissions do not include profile writes — sync then no-ops.
-  'users.write',
 ].join(' ');
 
 export const X_AUTHORIZE_URL = 'https://twitter.com/i/oauth2/authorize';
