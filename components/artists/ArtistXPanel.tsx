@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useSearchParams } from 'next/navigation';
+import { isProfileSyncUnavailableError } from '@/lib/x/profileSyncUnavailable';
 
 interface XPostRow {
   tweetId: string;
@@ -182,6 +183,9 @@ export function ArtistXPanel({
   };
 
   const connected = x.status === 'connected' || x.status === 'paused';
+  const lastError = isProfileSyncUnavailableError(x.lastError)
+    ? null
+    : x.lastError;
 
   return (
     <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3 max-w-2xl">
@@ -216,16 +220,16 @@ export function ArtistXPanel({
           {banner}
         </p>
       )}
-      {(bannerError || x.lastError) && (
+      {(bannerError || lastError) && (
         <p className="text-xs text-red-500" role="alert">
-          {bannerError || x.lastError}
+          {bannerError || lastError}
         </p>
       )}
 
       {x.status === 'paused' && (
         <p className="text-xs text-amber-600">
           Posting is paused
-          {x.lastError ? ' because of an X auth or spam failure.' : '.'} Resume or disconnect anytime.
+          {lastError ? ' because of an X auth or spam failure.' : '.'} Resume or disconnect anytime.
         </p>
       )}
 
