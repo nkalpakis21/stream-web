@@ -15,6 +15,26 @@ const QUIET_BUTTON_CLASS =
 const QUIET_ACTION_CLASS =
   'text-xs text-muted-foreground hover:text-foreground transition-colors';
 
+const PICKER_WALLETS = [
+  { name: 'Phantom', installUrl: 'https://phantom.app/download' },
+  { name: 'Solflare', installUrl: 'https://www.solflare.com/download/' },
+] as const;
+
+function canConnect(wallet: Wallet | undefined): wallet is Wallet {
+  return (
+    !!wallet &&
+    (wallet.readyState === WalletReadyState.Installed ||
+      wallet.readyState === WalletReadyState.Loadable)
+  );
+}
+
+function pickerRows(wallets: Wallet[]) {
+  return PICKER_WALLETS.map(spec => ({
+    ...spec,
+    wallet: wallets.find(w => w.adapter.name === spec.name),
+  }));
+}
+
 const pickerListeners = new Set<() => void>();
 let pickerOpen = false;
 
@@ -141,8 +161,12 @@ export function WalletPickerLayer() {
   const { wallets, select } = useWallet();
 
   const handlePick = useCallback(
-    (wallet: Wallet) => {
-      select(wallet.adapter.name);
+    (wallet: Wallet | undefined, installUrl: string) => {
+      if (canConnect(wallet)) {
+        select(wallet.adapter.name);
+      } else {
+        window.open(installUrl, '_blank', 'noopener,noreferrer');
+      }
       setPickerOpen(false);
     },
     [select]
@@ -165,7 +189,7 @@ function WalletPicker({
   onClose,
 }: {
   wallets: Wallet[];
-  onPick: (wallet: Wallet) => void;
+  onPick: (wallet: Wallet | undefined, installUrl: string) => void;
   onClose: () => void;
 }) {
   const titleId = useId();
@@ -183,12 +207,9 @@ function WalletPicker({
     };
   }, [onClose]);
 
-  const ready = wallets.filter(
-    w =>
-      w.readyState === WalletReadyState.Installed ||
-      w.readyState === WalletReadyState.Loadable
-  );
-  const list = ready.length > 0 ? ready : wallets;
+  // Always Phantom then Solflare, including NotDetected. Do not hide
+  // uninstalled wallets — tap opens that wallet's official install URL.
+  const list = pickerRows(wallets);
 
   // Portal to document.body so overflow/transform on the user menu (or any
   // parent) cannot clip or re-contain this overlay.
@@ -210,23 +231,23 @@ function WalletPicker({
           {WALLET_COPY.pickerTitle}
         </h2>
         <ul className="flex flex-col gap-2">
-          {list.map(wallet => (
-            <li key={wallet.adapter.name}>
+          {list.map(row => (
+            <li key={row.name}>
               <button
                 type="button"
-                onClick={() => onPick(wallet)}
+                onClick={() => onPick(row.wallet, row.installUrl)}
                 className="w-full flex items-center gap-3 px-4 py-2.5 bg-muted/40 hover:bg-accent/15 text-foreground rounded-xl transition-colors text-sm font-medium"
               >
-                {wallet.adapter.icon ? (
+                {row.wallet?.adapter.icon ? (
                   // Wallet adapter icons are data URIs from the installed extension.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={wallet.adapter.icon}
+                    src={row.wallet.adapter.icon}
                     alt=""
                     className="w-5 h-5 rounded"
                   />
                 ) : null}
-                {wallet.adapter.name}
+                {row.name}
               </button>
             </li>
           ))}
