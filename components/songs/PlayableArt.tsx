@@ -53,6 +53,7 @@ export function PlayableArt({
     }
     if (!url) return;
     play({
+      songId,
       songTitle: title,
       artistName,
       albumCoverUrl: coverUrl,

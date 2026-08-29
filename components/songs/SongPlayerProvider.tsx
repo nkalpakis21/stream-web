@@ -4,6 +4,7 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 import { SpotifyPlayer } from './SpotifyPlayer';
 
 interface NowPlaying {
+  songId?: string;
   songTitle: string;
   artistName: string;
   albumCoverUrl: string | null;
