@@ -79,9 +79,59 @@ function collectErrorText(error: unknown): string {
   const nested = 'error' in error ? error.error : undefined;
   if (nested instanceof Error && nested.message) parts.push(nested.message);
   else if (typeof nested === 'string') parts.push(nested);
+  else if (
+    nested &&
+    nested !== error &&
+    typeof nested === 'object' &&
+    'message' in nested &&
+    typeof nested.message === 'string'
+  ) {
+    parts.push(nested.message);
+  }
   const code = 'code' in error ? error.code : undefined;
-  if (typeof code === 'string') parts.push(code);
+  if (typeof code === 'string' || typeof code === 'number') parts.push(String(code));
+  const txError =
+    'transactionError' in error && error.transactionError && typeof error.transactionError === 'object'
+      ? error.transactionError
+      : undefined;
+  if (txError && 'message' in txError && typeof txError.message === 'string') {
+    parts.push(txError.message);
+  }
+  const logs = collectErrorLogs(error);
+  if (logs.length) parts.push(logs.slice(-4).join(' | '));
   return parts.join(' ');
+}
+
+function collectErrorLogs(error: unknown): string[] {
+  if (!error || typeof error !== 'object') return [];
+  const fromArray = (value: unknown): string[] =>
+    Array.isArray(value) ? value.filter((line): line is string => typeof line === 'string') : [];
+  if ('logs' in error) {
+    const logs = fromArray(error.logs);
+    if (logs.length) return logs;
+  }
+  if (
+    'transactionError' in error &&
+    error.transactionError &&
+    typeof error.transactionError === 'object' &&
+    'logs' in error.transactionError
+  ) {
+    const logs = fromArray(error.transactionError.logs);
+    if (logs.length) return logs;
+  }
+  if ('error' in error && error.error && error.error !== error) {
+    return collectErrorLogs(error.error);
+  }
+  return [];
+}
+
+function withErrorDetail(notice: string, error: unknown): string {
+  const detail = collectErrorText(error).replace(/\s+/g, ' ').trim();
+  if (!detail) return notice;
+  if (notice.toLowerCase().includes(detail.toLowerCase())) return notice;
+  const clipped = detail.length > 180 ? `${detail.slice(0, 177)}...` : detail;
+  const combined = `${notice} (${clipped})`;
+  return combined.length > 280 ? `${combined.slice(0, 277)}...` : combined;
 }
 
 function launchWalletErrorMessage(error: unknown): string {
@@ -90,29 +140,41 @@ function launchWalletErrorMessage(error: unknown): string {
     return `You cancelled the wallet signature. ${LAUNCH_NO_TOKEN_NOTICE}`;
   }
   if (/blocked|malicious|not been authorized|unauthorized/i.test(raw)) {
-    return LAUNCH_WALLET_BLOCKED_NOTICE;
+    return withErrorDetail(LAUNCH_WALLET_BLOCKED_NOTICE, error);
   }
-  if (/simulat/i.test(raw)) {
-    return LAUNCH_SIM_FAILED_NOTICE;
+  if (/simulat|preflight/i.test(raw)) {
+    return withErrorDetail(LAUNCH_SIM_FAILED_NOTICE, error);
   }
   if (/insufficient|0x1$|no record of a prior credit/i.test(raw)) {
-    return `Not enough SOL for network fees. ${LAUNCH_NO_TOKEN_NOTICE}`;
+    return withErrorDetail(
+      `Not enough SOL for network fees. ${LAUNCH_NO_TOKEN_NOTICE}`,
+      error
+    );
   }
   if (/blockhash|expired|timed out|timeout/i.test(raw)) {
     return `The launch transaction expired. ${LAUNCH_NO_TOKEN_NOTICE}`;
   }
-  return `Phantom couldn't complete the signature. ${LAUNCH_NO_TOKEN_NOTICE}`;
+  return withErrorDetail(
+    `Phantom couldn't complete the signature. ${LAUNCH_NO_TOKEN_NOTICE}`,
+    error
+  );
 }
 
 function launchSendErrorMessage(error: unknown): string {
   const raw = collectErrorText(error);
   if (/insufficient|0x1$|no record of a prior credit/i.test(raw)) {
-    return `Not enough SOL for network fees. ${LAUNCH_NO_TOKEN_NOTICE}`;
+    return withErrorDetail(
+      `Not enough SOL for network fees. ${LAUNCH_NO_TOKEN_NOTICE}`,
+      error
+    );
   }
   if (/blockhash|expired|timed out|timeout/i.test(raw)) {
     return `The launch transaction expired. ${LAUNCH_NO_TOKEN_NOTICE}`;
   }
-  return LAUNCH_SEND_FAILED_NOTICE;
+  if (/simulat|preflight/i.test(raw)) {
+    return withErrorDetail(LAUNCH_SIM_FAILED_NOTICE, error);
+  }
+  return withErrorDetail(LAUNCH_SEND_FAILED_NOTICE, error);
 }
 
 async function postJson<T>(
@@ -221,6 +283,11 @@ export async function launchArtistPumpFunCoin(
       c.charCodeAt(0)
     );
     const tx = VersionedTransaction.deserialize(txBytes);
+    // Extra signers go to sendTransaction so Phantom can simulate mint + user.
+    // Do not mint-sign then signTransaction (Phantom sim fails). Do not
+    // sendRawTransaction after a wallet signature: skipPreflight:false
+    // preflight re-simulates and drops a Confirm-unsafe signature with no
+    // on-chain activity.
     signature = await input.wallet.sendTransaction(tx, input.connection, {
       signers: [mintKeypair],
       skipPreflight: false,
@@ -237,7 +304,12 @@ export async function launchArtistPumpFunCoin(
       'confirmed'
     );
     if (confirmation.value.err) {
-      return fail(LAUNCH_SEND_FAILED_NOTICE);
+      return fail(
+        withErrorDetail(
+          LAUNCH_SEND_FAILED_NOTICE,
+          JSON.stringify(confirmation.value.err)
+        )
+      );
     }
   } catch (error) {
     return fail(launchSendErrorMessage(error));
