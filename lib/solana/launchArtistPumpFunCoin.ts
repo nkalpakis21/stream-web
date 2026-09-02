@@ -28,8 +28,10 @@ import {
   LAUNCH_SEND_FAILED_NOTICE,
   LAUNCH_SIM_FAILED_NOTICE,
   LAUNCH_WALLET_BLOCKED_NOTICE,
+  METADATA_URI_TOO_LONG_NOTICE,
   MIN_LAUNCH_LAMPORTS,
   isHttpsUrl,
+  isMetadataUriTooLong,
   isValidCoinName,
   isValidTicker,
   normalizeTicker,
@@ -134,10 +136,17 @@ function withErrorDetail(notice: string, error: unknown): string {
   return combined.length > 280 ? `${combined.slice(0, 277)}...` : combined;
 }
 
+function isUriTooLongError(raw: string): boolean {
+  return /UriTooLong|Error Number:\s*6045|Custom["\s:]*6045/i.test(raw);
+}
+
 function launchWalletErrorMessage(error: unknown): string {
   const raw = collectErrorText(error);
   if (/user rejected|rejected the request|cancelled|canceled/i.test(raw)) {
     return `You cancelled the wallet signature. ${LAUNCH_NO_TOKEN_NOTICE}`;
+  }
+  if (isUriTooLongError(raw)) {
+    return METADATA_URI_TOO_LONG_NOTICE;
   }
   if (/blocked|malicious|not been authorized|unauthorized/i.test(raw)) {
     return withErrorDetail(LAUNCH_WALLET_BLOCKED_NOTICE, error);
@@ -162,6 +171,9 @@ function launchWalletErrorMessage(error: unknown): string {
 
 function launchSendErrorMessage(error: unknown): string {
   const raw = collectErrorText(error);
+  if (isUriTooLongError(raw)) {
+    return METADATA_URI_TOO_LONG_NOTICE;
+  }
   if (/insufficient|0x1$|no record of a prior credit/i.test(raw)) {
     return withErrorDetail(
       `Not enough SOL for network fees. ${LAUNCH_NO_TOKEN_NOTICE}`,
@@ -254,6 +266,9 @@ export async function launchArtistPumpFunCoin(
   const metadataUri = metadataRes.data.uri;
   if (!metadataUri || !isHttpsUrl(metadataUri)) {
     return fail(LAUNCH_NO_TOKEN_NOTICE);
+  }
+  if (isMetadataUriTooLong(metadataUri)) {
+    return fail(METADATA_URI_TOO_LONG_NOTICE);
   }
 
   const mintKeypair = Keypair.generate();

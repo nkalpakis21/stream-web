@@ -18,8 +18,10 @@ import {
 import {
   MAX_COIN_NAME_LENGTH,
   MAX_TICKER_LENGTH,
+  METADATA_URI_TOO_LONG_NOTICE,
   MIN_TICKER_LENGTH,
   isHttpsUrl,
+  isMetadataUriTooLong,
   isValidTicker,
   normalizeTicker,
 } from '@/lib/solana/pumpFun';
@@ -62,6 +64,9 @@ export async function POST(request: NextRequest) {
     }
     if (!isHttpsUrl(parsed.data.uri)) {
       throw new HttpError(400, 'Metadata URI must be https.');
+    }
+    if (isMetadataUriTooLong(parsed.data.uri)) {
+      throw new HttpError(400, METADATA_URI_TOO_LONG_NOTICE);
     }
 
     const mint = parsePublicKey(parsed.data.mint, 'mint');
