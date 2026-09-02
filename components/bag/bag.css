@@ -1,0 +1,454 @@
+/* STR-47 bag — FOMO density, listen tokens. 12px on controls and cards. */
+
+.bag-page {
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  color: var(--ink, #f5f4f8);
+}
+
+.bag-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.bag-avatar {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2, #1c1c28);
+}
+
+.bag-avatar-fallback {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--mute, #8b8896);
+}
+
+.bag-identity-name {
+  margin: 0;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+  color: var(--ink, #f5f4f8);
+}
+
+.bag-identity-handle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--mute, #8b8896);
+}
+
+.bag-social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 6px;
+}
+
+.bag-social a,
+.bag-social span {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--mute, #8b8896);
+  text-decoration: none;
+}
+
+.bag-social a:hover {
+  color: var(--ink, #f5f4f8);
+}
+
+.bag-social strong {
+  font-weight: 600;
+  color: var(--ink, #f5f4f8);
+  font-variant-numeric: tabular-nums;
+}
+
+.bag-grid {
+  display: grid;
+  gap: 32px;
+}
+
+@media (min-width: 1024px) {
+  .bag-grid {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: start;
+  }
+}
+
+.bag-main,
+.bag-side {
+  min-width: 0;
+}
+
+.bag-value-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+
+.bag-value {
+  margin: 0;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 40px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink, #f5f4f8);
+}
+
+.bag-chg {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.bag-chg.is-up {
+  color: var(--heat, #c8f542);
+}
+
+.bag-chg.is-down {
+  color: var(--down, #ff4d6a);
+}
+
+.bag-chg.is-flat {
+  color: var(--mute, #8b8896);
+}
+
+.bag-ranges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.bag-range {
+  height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line, #2a2a38);
+  background: transparent;
+  color: var(--mute, #8b8896);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bag-range.is-on {
+  background: var(--accent, #7c7bff);
+  color: var(--accent-ink, #0a0a10);
+  border-color: var(--accent, #7c7bff);
+}
+
+.bag-chart {
+  margin: 0 0 28px;
+  height: 140px;
+  border-radius: 12px;
+  border: 1px solid var(--line, #2a2a38);
+  background: var(--surface, #14141c);
+  overflow: hidden;
+}
+
+.bag-chart svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.bag-chart-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.bag-chart-line.is-zero {
+  stroke-linecap: butt;
+}
+
+.bag-chart-line.is-up {
+  stroke: var(--heat, #c8f542);
+}
+
+.bag-chart-line.is-down {
+  stroke: var(--down, #ff4d6a);
+}
+
+.bag-chart-line.is-flat,
+.bag-chart-line.is-zero {
+  stroke: var(--mute, #8b8896);
+}
+
+.bag-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.bag-section-title {
+  margin: 0;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--ink, #f5f4f8);
+}
+
+.bag-section-count {
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--mute, #8b8896);
+}
+
+.bag-search {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.bag-search svg {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  color: var(--mute, #8b8896);
+  pointer-events: none;
+}
+
+.bag-search input {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px 0 44px;
+  border-radius: 12px;
+  border: 1px solid var(--line, #2a2a38);
+  background: var(--surface-2, #1c1c28);
+  color: var(--ink, #f5f4f8);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.bag-search input::placeholder {
+  color: var(--mute, #8b8896);
+}
+
+.bag-search input:focus {
+  outline: 2px solid var(--accent, #7c7bff);
+  outline-offset: 2px;
+}
+
+.bag-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bag-holding {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.bag-holding:hover {
+  background: var(--surface-2, #1c1c28);
+}
+
+.bag-holding-face {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 999px;
+}
+
+.bag-holding-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.bag-holding-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--ink, #f5f4f8);
+}
+
+.bag-holding-qty {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--mute, #8b8896);
+}
+
+.bag-holding-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.bag-holding-stats .val {
+  color: var(--ink, #f5f4f8);
+}
+
+.bag-holding-stats .chg.is-up {
+  color: var(--heat, #c8f542);
+}
+
+.bag-holding-stats .chg.is-down {
+  color: var(--down, #ff4d6a);
+}
+
+.bag-holding-stats .chg.is-flat {
+  color: var(--mute, #8b8896);
+}
+
+.bag-empty {
+  padding: 16px 4px 8px;
+}
+
+.bag-empty p {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--mute, #8b8896);
+}
+
+.bag-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bag-page .listen-btn-primary,
+.bag-page .listen-btn-ghost {
+  height: 44px;
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 12px;
+  border-radius: 12px;
+}
+
+.bag-tabs {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line, #2a2a38);
+}
+
+.bag-tab {
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--mute, #8b8896);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bag-tab.is-on {
+  color: var(--ink, #f5f4f8);
+  border-bottom-color: var(--ink, #f5f4f8);
+}
+
+.bag-activity-empty {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--mute, #8b8896);
+}
+
+.bag-activity-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 56px;
+  padding: 8px 0;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.bag-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bag-chip.is-buy {
+  background: var(--heat, #c8f542);
+  color: var(--accent-ink, #0a0a10);
+}
+
+.bag-chip.is-sell {
+  background: var(--down, #ff4d6a);
+  color: var(--ink, #f5f4f8);
+}
+
+.bag-skel {
+  border-radius: 12px;
+  background: var(--surface-2, #1c1c28);
+  animation: bag-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes bag-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}

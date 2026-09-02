@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
         artistId: artist.id,
         name: artist.name,
         avatarURL: artist.avatarURL,
+        ticker: artist.pumpFun?.symbol?.trim() || null,
         mint: row.mint,
         buyUrl,
         amount: row.amount,
