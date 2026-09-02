@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Search } from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { AuthGateCard } from '@/components/auth/AuthGateCard';
 import {
   listenPrimaryClass,
   listenSecondaryClass,
 } from '@/components/states/BrandDeadEnd';
+import { getFreshIdToken } from '@/lib/api/clientAuth';
 import { coinChangeTone } from '@/lib/brand/coinStats';
 import {
   BAG_TIMEFRAMES,
@@ -49,10 +49,6 @@ function asHoldings(value: unknown): BagHolding[] {
       ticker: ticker || null,
       mint: holding.mint,
       buyUrl: holding.buyUrl ?? null,
-      amount:
-        typeof holding.amount === 'number' && Number.isFinite(holding.amount)
-          ? holding.amount
-          : 0,
       quote: holding.quote ?? null,
     });
   }
@@ -68,15 +64,13 @@ function matchesQuery(holding: BagHolding, query: string): boolean {
 
 export function BagPageClient() {
   const { user, loading: authLoading } = useAuth();
-  const { publicKey } = useWallet();
-  const wallet = publicKey?.toBase58() ?? null;
   const [holdings, setHoldings] = useState<BagHolding[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<BagTimeframe>('24H');
   const [query, setQuery] = useState('');
 
   useEffect(() => {
-    if (!user || !wallet) {
+    if (!user) {
       setHoldings([]);
       setLoading(false);
       return;
@@ -85,7 +79,12 @@ export function BagPageClient() {
     let cancelled = false;
     setLoading(true);
 
-    fetch(`/api/me/holdings?wallet=${encodeURIComponent(wallet)}`)
+    getFreshIdToken(user)
+      .then(token =>
+        fetch('/api/me/holdings', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      )
       .then(async response => {
         if (!response.ok) return { holdings: [] as unknown[] };
         return (await response.json()) as { holdings?: unknown };
@@ -104,7 +103,7 @@ export function BagPageClient() {
     return () => {
       cancelled = true;
     };
-  }, [user, wallet]);
+  }, [user]);
 
   const totals = useMemo(() => bagTotals(holdings), [holdings]);
   const header = useMemo(() => {
