@@ -5,12 +5,13 @@ import { createPortal } from 'react-dom';
 import { WalletReadyState } from '@solana/wallet-adapter-base';
 import { useWallet, type Wallet } from '@solana/wallet-adapter-react';
 import { WALLET_COPY, connectedLabel } from '@/lib/wallet/copy';
+import { useWalletLiveStatus } from '@/lib/wallet/liveStatus';
 
 const CONNECT_BUTTON_CLASS =
-  'w-full px-4 py-2.5 bg-accent text-accent-foreground rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-sm shadow-soft';
+  'w-full px-4 py-2.5 bg-accent text-accent-foreground rounded-[12px] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-sm shadow-soft';
 
 const QUIET_BUTTON_CLASS =
-  'w-full px-3 py-2 bg-accent text-accent-foreground rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-sm';
+  'w-full px-3 py-2 bg-accent text-accent-foreground rounded-[12px] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-sm';
 
 const QUIET_ACTION_CLASS =
   'text-xs text-muted-foreground hover:text-foreground transition-colors';
@@ -68,9 +69,19 @@ export function WalletConnectControl({
   disabled,
   onPickerOpen,
 }: WalletConnectControlProps) {
-  const { publicKey, connected, connecting, disconnect, select } = useWallet();
+  const { publicKey, connected, connecting, disconnect, select, wallet } =
+    useWallet();
+  const live = useWalletLiveStatus();
 
-  const address = publicKey?.toBase58() ?? null;
+  const address =
+    live.address ??
+    publicKey?.toBase58() ??
+    wallet?.adapter.publicKey?.toBase58() ??
+    null;
+  const isConnecting =
+    (live.connecting || connecting || Boolean(wallet?.adapter.connecting)) &&
+    !address;
+  const isConnected = Boolean(address) && (live.connected || connected);
   const buttonClass =
     variant === 'quiet' ? QUIET_BUTTON_CLASS : CONNECT_BUTTON_CLASS;
 
@@ -80,7 +91,7 @@ export function WalletConnectControl({
   };
 
   const handleConnect = () => {
-    if (disabled || connecting) return;
+    if (disabled || isConnecting) return;
     openPicker();
   };
 
@@ -97,7 +108,7 @@ export function WalletConnectControl({
     });
   };
 
-  if (connecting && !connected) {
+  if (isConnecting) {
     return (
       <button type="button" disabled className={buttonClass}>
         {WALLET_COPY.connecting}
@@ -105,7 +116,7 @@ export function WalletConnectControl({
     );
   }
 
-  if (connected && address) {
+  if (isConnected && address) {
     return (
       <div className="flex flex-col gap-1.5">
         <p
@@ -214,7 +225,10 @@ function WalletPicker({
   // Portal to document.body so overflow/transform on the user menu (or any
   // parent) cannot clip or re-contain this overlay.
   return createPortal(
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 max-[390px]:items-end max-[390px]:p-0">
+    <div
+      data-wallet-picker
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 max-[390px]:items-end max-[390px]:p-0"
+    >
       <button
         type="button"
         aria-label="Close"
@@ -236,7 +250,7 @@ function WalletPicker({
               <button
                 type="button"
                 onClick={() => onPick(row.wallet, row.installUrl)}
-                className="w-full flex items-center gap-3 px-4 py-2.5 bg-muted/40 hover:bg-accent/15 text-foreground rounded-xl transition-colors text-sm font-medium"
+                className="w-full flex items-center gap-3 px-4 py-2.5 bg-muted/40 hover:bg-accent/15 text-foreground rounded-[12px] transition-colors text-sm font-medium"
               >
                 {row.wallet?.adapter.icon ? (
                   // Wallet adapter icons are data URIs from the installed extension.

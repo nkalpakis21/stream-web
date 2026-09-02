@@ -6,6 +6,7 @@ export const WALLET_COPY = {
   change: 'Change',
   disconnect: 'Disconnect',
   launchHint: "You'll sign once. Small network fee.",
+  launchReady: "Ready. You'll sign when you create.",
   pickerTitle: 'Connect wallet',
 } as const;
 

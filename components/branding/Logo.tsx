@@ -9,7 +9,7 @@ interface LogoProps {
 
 export function Logo({ variant = 'default', showText = true, className = '' }: LogoProps) {
   const isCompact = variant === 'compact';
-  const iconSize = isCompact ? 28 : variant === 'full' ? 40 : 32;
+  const iconSize = isCompact ? 30 : variant === 'full' ? 40 : 32;
 
   return (
     <Link
@@ -20,9 +20,12 @@ export function Logo({ variant = 'default', showText = true, className = '' }: L
       <LogoIcon size={iconSize} />
       {showText && (
         <span
-          className={`font-semibold tracking-tight text-foreground truncate ${
-            isCompact ? 'text-base sm:text-lg' : 'text-lg sm:text-xl'
-          }`}
+          className="font-semibold tracking-tight truncate"
+          style={{
+            fontSize: isCompact ? 18 : 20,
+            lineHeight: isCompact ? '24px' : '28px',
+            color: 'var(--ink)',
+          }}
         >
           Streamstar
         </span>

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { getInitials } from '@/lib/utils/avatar';
+import { getInitials, headerChipLabel } from '@/lib/utils/avatar';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { COLLECTIONS } from '@/lib/firebase/collections';
@@ -22,8 +22,9 @@ export function UserMenu() {
   const [unreadCount, setUnreadCount] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const displayName = user?.displayName || user?.email?.split('@')[0] || 'User';
+  const displayName = user?.displayName || user?.email?.split('@')[0] || 'You';
   const avatarUrl = user?.photoURL;
+  const chipName = headerChipLabel(user?.displayName);
 
   // Fetch unread notifications count
   useEffect(() => {
@@ -63,9 +64,12 @@ export function UserMenu() {
     if (!isOpen) return;
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+      const target = event.target as Node | null;
+      if (menuRef.current?.contains(target)) return;
+      if (target instanceof Element && target.closest('[data-wallet-picker]')) {
+        return;
       }
+      setIsOpen(false);
     };
 
     const handleEscape = (event: KeyboardEvent) => {
@@ -95,27 +99,71 @@ export function UserMenu() {
 
   return (
     <div className="relative" ref={menuRef}>
-      {/* Avatar Button */}
-      <div className="relative">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="relative w-7 h-7 rounded-full overflow-hidden bg-black border border-white/20 hover:border-white/40 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-background"
-          aria-label="User menu"
-          aria-expanded={isOpen}
-          aria-haspopup="true"
-        >
-          <div className="w-full h-full flex items-center justify-center bg-black">
-            <span className="text-muted-foreground font-medium text-xs">
-              {getInitials(displayName)}
-            </span>
-          </div>
-        </button>
-        {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-accent rounded-xl min-w-[18px] shadow-md ring-2 ring-background z-10">
-            {unreadCount > 99 ? '99+' : unreadCount}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="relative flex items-center gap-2 pl-0.5 pr-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        style={{
+          minHeight: 44,
+          borderRadius: 12,
+          background: 'var(--surface-2)',
+          border: '1px solid var(--line)',
+        }}
+        aria-label="User menu"
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+      >
+        <span className="relative shrink-0" style={{ width: 36, height: 36 }}>
+          <span
+            className="flex h-full w-full items-center justify-center overflow-hidden rounded-full"
+            style={{
+              background: 'var(--surface-2)',
+              boxShadow: '0 0 0 2px var(--accent)',
+            }}
+          >
+            {avatarUrl ? (
+              // Auth / Storage photo. Keep circular crop.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={avatarUrl}
+                alt=""
+                width={36}
+                height={36}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span
+                className="font-semibold"
+                style={{ fontSize: 12, lineHeight: '16px', color: 'var(--ink)' }}
+              >
+                {getInitials(displayName)}
+              </span>
+            )}
           </span>
-        )}
-      </div>
+          {unreadCount > 0 ? (
+            <span
+              className="absolute z-10 flex items-center justify-center font-semibold text-white"
+              style={{
+                top: -4,
+                right: -4,
+                width: 18,
+                height: 18,
+                borderRadius: 999,
+                background: 'var(--accent)',
+                fontSize: 10,
+                lineHeight: '18px',
+              }}
+            >
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          ) : null}
+        </span>
+        <span
+          className="max-w-[7.5rem] truncate font-medium"
+          style={{ fontSize: 13, lineHeight: '18px', color: 'var(--ink)' }}
+        >
+          {chipName}
+        </span>
+      </button>
 
       {/* Dropdown Menu */}
       {isOpen && (
@@ -140,9 +188,9 @@ export function UserMenu() {
               </div>
             </div>
 
-            {/* Wallet — quiet, no chain jargon */}
+            {/* Wallet — quiet, no chain jargon. Stay open so connect flips live. */}
             <div className="px-4 py-3 border-b border-border/40">
-              <WalletConnectSection onPickerOpen={() => setIsOpen(false)} />
+              <WalletConnectSection />
             </div>
 
             {/* Menu Items */}
