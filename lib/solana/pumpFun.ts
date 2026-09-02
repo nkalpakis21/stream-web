@@ -29,6 +29,15 @@ export const MIN_TICKER_LENGTH = 2;
 export const LAUNCH_FAILED_NOTICE =
   "The coin didn't go through. Your artist was created without a token.";
 
+/** Shared suffix when a launch does not persist a mint (create or existing artist). */
+export const LAUNCH_NO_TOKEN_NOTICE = 'No token was created.';
+
+export const LAUNCH_WALLET_BLOCKED_NOTICE = `Phantom blocked this request. ${LAUNCH_NO_TOKEN_NOTICE}`;
+
+export const LAUNCH_SIM_FAILED_NOTICE = `Phantom couldn't simulate the launch. ${LAUNCH_NO_TOKEN_NOTICE}`;
+
+export const LAUNCH_SEND_FAILED_NOTICE = `The launch didn't confirm on-chain. ${LAUNCH_NO_TOKEN_NOTICE}`;
+
 export function pumpFunCoinUrl(mint: string): string {
   return `${PUMP_FUN_COIN_URL_PREFIX}${mint}`;
 }

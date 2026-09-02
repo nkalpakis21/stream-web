@@ -1,8 +1,9 @@
 /**
  * POST /api/artists/pump-fun/create-tx
  *
- * Builds an unsigned pump.fun create_v2 VersionedTransaction via @pump-fun/pump-sdk.
- * The client generates the mint keypair, co-signs with the connected wallet, and sends.
+ * Builds an unsigned pump.fun create_v2 VersionedTransaction via @pump-fun/pump-sdk
+ * and simulates it on the same RPC (sigVerify off) before returning. The client
+ * generates the mint keypair and sends via wallet sendTransaction({ signers }).
  * No initial buy. Never accepts a private key or seed.
  */
 
@@ -10,7 +11,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PublicKey } from '@solana/web3.js';
 import { z } from 'zod';
 import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
-import { buildUnsignedArtistPumpFunCreateTx } from '@/lib/solana/buildArtistPumpFunCreateTx';
+import {
+  PumpFunCreateTxBuildError,
+  buildUnsignedArtistPumpFunCreateTx,
+} from '@/lib/solana/buildArtistPumpFunCreateTx';
 import {
   MAX_COIN_NAME_LENGTH,
   MAX_TICKER_LENGTH,
@@ -78,6 +82,9 @@ export async function POST(request: NextRequest) {
       mint: mint.toBase58(),
     });
   } catch (error) {
+    if (error instanceof PumpFunCreateTxBuildError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     return errorResponse(error);
   }
 }
