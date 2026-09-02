@@ -3,11 +3,7 @@
 import Link from 'next/link';
 import { CoverImage } from '@/components/media/CoverImage';
 import { coinChangeTone, type ArtistCoinQuote } from '@/lib/brand/coinStats';
-import {
-  formatHoldingChange,
-  formatHoldingValue,
-  formatTokenAmount,
-} from '@/lib/brand/bagStats';
+import { formatHoldingChange, formatHoldingValue } from '@/lib/brand/bagStats';
 
 export interface BagHolding {
   artistId: string;
@@ -16,19 +12,16 @@ export interface BagHolding {
   ticker: string | null;
   mint: string;
   buyUrl: string | null;
-  amount: number;
   quote: ArtistCoinQuote | null;
 }
 
 export function BagHoldingRow({ holding }: { holding: BagHolding }) {
-  const value = formatHoldingValue(holding.amount, holding.quote);
+  const value = formatHoldingValue(holding.quote);
   const change = formatHoldingChange(holding.quote);
   const tone = holding.quote
     ? coinChangeTone(holding.quote.change24h)
     : 'flat';
   const ticker = holding.ticker?.trim() || '';
-  const qty = formatTokenAmount(holding.amount);
-  const qtyLabel = ticker ? `${qty} ${ticker}` : qty;
 
   return (
     <Link
@@ -47,7 +40,7 @@ export function BagHoldingRow({ holding }: { holding: BagHolding }) {
         <span className="bag-holding-name" data-entity="artist">
           {holding.name}
         </span>
-        <span className="bag-holding-qty">{qtyLabel}</span>
+        {ticker ? <span className="bag-holding-qty">{ticker}</span> : null}
       </span>
       <span className="bag-holding-stats">
         <span className="val">{value}</span>

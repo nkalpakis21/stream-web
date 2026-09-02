@@ -1,6 +1,6 @@
 import {
   formatChange24h,
-  formatCoinPrice,
+  formatCoinMcap,
   type ArtistCoinQuote,
 } from '@/lib/brand/coinStats';
 
@@ -10,40 +10,17 @@ const ZERO_CHANGE = '0%';
 export const BAG_TIMEFRAMES = ['24H', '7D', '30D', 'ALL'] as const;
 export type BagTimeframe = (typeof BAG_TIMEFRAMES)[number];
 
-/** Token quantity for a bag row. Not a price — never invent a live-looking figure. */
-export function formatTokenAmount(amount: number): string {
-  if (!Number.isFinite(amount) || amount <= 0) return '0';
-  if (amount >= 1_000_000_000) {
-    const raw = (amount / 1_000_000_000).toFixed(1);
-    return `${raw.endsWith('.0') ? raw.slice(0, -2) : raw}B`;
-  }
-  if (amount >= 1_000_000) {
-    const raw = (amount / 1_000_000).toFixed(1);
-    return `${raw.endsWith('.0') ? raw.slice(0, -2) : raw}M`;
-  }
-  if (amount >= 1) {
-    return amount.toLocaleString('en-US', { maximumFractionDigits: 2 });
-  }
-  return amount.toLocaleString('en-US', { maximumFractionDigits: 6 });
-}
-
-export function holdingValueUsd(
-  amount: number,
-  quote: ArtistCoinQuote | null
-): number {
+/** Row / header USD is Dexscreener market cap. Missing or non-positive → 0. */
+export function holdingMarketCap(quote: ArtistCoinQuote | null): number {
   if (!quote) return 0;
-  if (!Number.isFinite(amount) || amount <= 0) return 0;
-  const value = amount * quote.priceUsd;
+  const value = quote.marketCap;
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-export function formatHoldingValue(
-  amount: number,
-  quote: ArtistCoinQuote | null
-): string {
-  const value = holdingValueUsd(amount, quote);
+export function formatHoldingValue(quote: ArtistCoinQuote | null): string {
+  const value = holdingMarketCap(quote);
   if (value <= 0) return ZERO_VALUE;
-  return formatCoinPrice(value) || ZERO_VALUE;
+  return formatCoinMcap(value) || ZERO_VALUE;
 }
 
 export function formatHoldingChange(quote: ArtistCoinQuote | null): string {
@@ -54,23 +31,26 @@ export function formatHoldingChange(quote: ArtistCoinQuote | null): string {
 /** Signed USD for 24h bag delta. Zero and missing stay `$0`, never `+$0`. */
 export function formatSignedUsd(amount: number): string {
   if (!Number.isFinite(amount) || amount === 0) return ZERO_VALUE;
-  const formatted = formatCoinPrice(Math.abs(amount));
+  const formatted = formatCoinMcap(Math.abs(amount));
   if (!formatted) return ZERO_VALUE;
   return amount < 0 ? `-${formatted}` : `+${formatted}`;
 }
 
 export function bagTotals(
-  rows: Array<{ amount: number; quote: ArtistCoinQuote | null }>
+  rows: Array<{ quote: ArtistCoinQuote | null }>
 ): { value: number; change24h: number; changeUsd: number; hasLive: boolean } {
   let value = 0;
   let previous = 0;
 
   for (const row of rows) {
-    const now = holdingValueUsd(row.amount, row.quote);
+    const now = holdingMarketCap(row.quote);
     if (now <= 0 || !row.quote) continue;
-    const denom = 1 + row.quote.change24h / 100;
+    const change = row.quote.change24h;
+    const denom = 1 + change / 100;
     const prev =
-      Number.isFinite(denom) && denom !== 0 ? now / denom : now;
+      Number.isFinite(change) && Number.isFinite(denom) && denom !== 0
+        ? now / denom
+        : now;
     value += now;
     previous += Number.isFinite(prev) && prev > 0 ? prev : now;
   }
@@ -99,10 +79,24 @@ export function formatBagHeader(totals: {
     return { value: ZERO_VALUE, change: ZERO_CHANGE, changeUsd: ZERO_VALUE };
   }
   return {
-    value: formatCoinPrice(totals.value) || ZERO_VALUE,
+    value: formatCoinMcap(totals.value) || ZERO_VALUE,
     change: formatChange24h(totals.change24h) || ZERO_CHANGE,
     changeUsd: formatSignedUsd(totals.changeUsd),
   };
+}
+
+/**
+ * Implied market-cap series from Dexscreener price windows (constant supply).
+ * Missing sparkline or missing MC stays null — the chart paints a flat zero line.
+ */
+function sparklineMarketCap(quote: ArtistCoinQuote, price: number): number {
+  const mc = holdingMarketCap(quote);
+  if (mc <= 0 || !Number.isFinite(quote.priceUsd) || quote.priceUsd <= 0) {
+    return 0;
+  }
+  if (!Number.isFinite(price) || price <= 0) return 0;
+  const value = mc * (price / quote.priceUsd);
+  return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
 /**
@@ -112,12 +106,12 @@ export function formatBagHeader(totals: {
  * a fake dip, never a reused 24h line.
  */
 export function bagValueSeries(
-  rows: Array<{ amount: number; quote: ArtistCoinQuote | null }>,
+  rows: Array<{ quote: ArtistCoinQuote | null }>,
   timeframe: BagTimeframe
 ): number[] | null {
   if (timeframe !== '24H') return null;
 
-  const live = rows.filter(row => holdingValueUsd(row.amount, row.quote) > 0);
+  const live = rows.filter(row => holdingMarketCap(row.quote) > 0);
   if (live.length === 0) return null;
   if (live.some(row => !row.quote?.sparkline || row.quote.sparkline.length < 2)) {
     return null;
@@ -132,8 +126,8 @@ export function bagValueSeries(
     for (const row of live) {
       const points = row.quote!.sparkline!;
       const price = points[points.length - minLen + i];
-      const value = row.amount * price;
-      if (Number.isFinite(value) && value > 0) sum += value;
+      const value = sparklineMarketCap(row.quote!, price);
+      if (value > 0) sum += value;
     }
     series.push(sum);
   }
