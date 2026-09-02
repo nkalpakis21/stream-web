@@ -93,8 +93,6 @@ export function UserMenu() {
     router.push('/');
   };
 
-  const isActive = (href: string) => pathname === href;
-
   return (
     <div className="relative" ref={menuRef}>
       {/* Avatar Button */}
@@ -113,7 +111,7 @@ export function UserMenu() {
           </div>
         </button>
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-accent rounded-full min-w-[18px] shadow-md ring-2 ring-background z-10">
+          <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-accent rounded-xl min-w-[18px] shadow-md ring-2 ring-background z-10">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -178,6 +176,20 @@ export function UserMenu() {
                 Chat
               </Link>
               <Link
+                href="/me"
+                onClick={() => setIsOpen(false)}
+                className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors duration-200 ${
+                  pathname?.startsWith('/me')
+                    ? 'text-foreground bg-muted/40'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/20'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 8a3 3 0 100 6 3 3 0 000-6zm6 1.5a3 3 0 100 6 3 3 0 000-6z" />
+                </svg>
+                Your coins
+              </Link>
+              <Link
                 href="/dashboard"
                 onClick={() => setIsOpen(false)}
                 className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors duration-200 ${
@@ -204,7 +216,7 @@ export function UserMenu() {
                 </svg>
                 Notifications
                 {unreadCount > 0 && (
-                  <span className="ml-auto inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-accent rounded-full min-w-[18px]">
+                  <span className="ml-auto inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-accent rounded-xl min-w-[18px]">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}

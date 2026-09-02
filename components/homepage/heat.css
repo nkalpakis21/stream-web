@@ -19,7 +19,7 @@
 .heat-cols,
 .heat-row {
   display: grid;
-  grid-template-columns: 24px 36px minmax(0, 1fr) 72px 64px 64px 44px;
+  grid-template-columns: 24px 40px minmax(0, 1fr) 72px 64px 64px 44px;
   column-gap: 8px;
   align-items: center;
 }
@@ -42,12 +42,14 @@
 }
 
 .heat-row {
-  min-height: 52px;
-  height: 52px;
-  border-radius: 10px;
-  padding: 0;
+  min-height: 64px;
+  height: auto;
+  padding: 8px;
+  border-radius: 12px;
   border: 0;
   background: transparent;
+  overflow: hidden;
+  cursor: pointer;
 }
 
 .heat-row:hover,
@@ -91,15 +93,21 @@
 
 .heat-thumb {
   position: relative;
-  width: 36px;
-  height: 36px;
+  display: block;
+  width: 40px;
+  height: 40px;
   overflow: hidden;
   border-radius: 6px;
   background: var(--surface-2, #1c1c28);
 }
 
 .heat-meta {
+  display: flex;
   min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  overflow: hidden;
 }
 
 .heat-track {
@@ -108,23 +116,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-figtree), system-ui, sans-serif;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 14px;
+  line-height: 20px;
   font-weight: 600;
   color: var(--ink, #f5f4f8);
   text-transform: none;
-}
-
-.heat-artist-line {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.heat-artist-line .heat-hit {
-  min-width: 0;
-  flex: 1 1 auto;
 }
 
 .heat-artist {
@@ -137,6 +133,7 @@
   line-height: 16px;
   color: var(--mute, #8b8896);
   text-transform: none;
+  text-decoration: none;
 }
 
 .heat-price,
@@ -186,7 +183,7 @@
   height: 44px;
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: 12px;
   background: transparent;
   color: var(--ink, #f5f4f8);
   cursor: pointer;
@@ -194,43 +191,6 @@
 
 .heat-play:hover {
   color: var(--accent, #7c7bff);
-}
-
-.heat-hit {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  min-height: 44px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  color: inherit;
-}
-
-.heat-cluster-inline {
-  display: none;
-  flex: 0 0 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-figtree), system-ui, sans-serif;
-  font-size: 12px;
-  line-height: 16px;
-  font-variant-numeric: tabular-nums;
-  text-decoration: none;
-  color: var(--mute, #8b8896);
-}
-
-.heat-cluster-inline .is-up {
-  color: var(--heat, #c8f542);
-  font-weight: 700;
-}
-
-.heat-cluster-inline .is-down {
-  color: var(--down, #ff4d6a);
-  font-weight: 700;
 }
 
 .heat-featured-meta {
@@ -254,56 +214,19 @@
   font-weight: 700;
 }
 
+/* Narrow Heat: keep TRACK | PRICE | 24H | MCAP — never paint those numbers on the artist line. */
 @container heat (max-width: 419px) {
   .heat-cols,
   .heat-row {
-    grid-template-columns: 24px 36px minmax(0, 1fr) 44px;
-  }
-
-  .heat-h-price,
-  .heat-h-chg,
-  .heat-h-mcap,
-  .heat-row > .heat-price,
-  .heat-row > .heat-chg,
-  .heat-row > .heat-mcap {
-    display: none;
-  }
-
-  .heat-cluster-inline {
-    display: inline;
+    grid-template-columns: 24px 40px minmax(0, 1fr) 56px 48px 52px 44px;
+    column-gap: 6px;
   }
 }
 
-/* Phone Heat: rank, thumb, title/artist cluster, play. No desktop tape headers. */
 @media (max-width: 767px) {
-  .heat-headers {
-    display: none;
-  }
-
   .heat-cols,
   .heat-row {
-    grid-template-columns: 24px 36px minmax(0, 1fr) 44px;
-  }
-
-  .heat-h-price,
-  .heat-h-chg,
-  .heat-h-mcap,
-  .heat-row > .heat-price,
-  .heat-row > .heat-chg,
-  .heat-row > .heat-mcap {
-    display: none;
-  }
-
-  .heat-cluster-inline {
-    display: inline;
-  }
-}
-
-/* 375: keep price + 24h on the artist line; drop mcap when the row is tight. */
-@media (max-width: 375px) {
-  .heat-cluster-inline .heat-cluster-mcap,
-  .heat-h-mcap,
-  .heat-row > .heat-mcap {
-    display: none;
+    grid-template-columns: 24px 40px minmax(0, 1fr) 56px 48px 52px 44px;
+    column-gap: 6px;
   }
 }

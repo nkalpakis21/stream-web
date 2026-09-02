@@ -10,7 +10,7 @@ export default function FeedPage() {
         <div className="mb-8">
           <h1 className="listen-h1 mb-2">Your Feed</h1>
           <p className="text-lg text-muted-foreground">
-            Songs from artists you follow
+            New music and coins from artists you follow
           </p>
         </div>
         <FeedPageClient />

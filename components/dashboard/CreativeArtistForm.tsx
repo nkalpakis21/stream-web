@@ -132,7 +132,7 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-card/60 shadow-lg">
+    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-card/60 shadow-lg">
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <div className="relative p-6 sm:p-8">
         <div className="flex items-start justify-between mb-6">
@@ -144,7 +144,7 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
             <button
               type="button"
               onClick={onCancel}
-              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+              className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
               aria-label="Cancel"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

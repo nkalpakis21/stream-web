@@ -28,7 +28,7 @@ export function HomeListenSkeleton() {
   return (
     <div className="mx-auto max-w-7xl animate-pulse px-4 py-6 sm:px-6 sm:py-10">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">
-        <section className="rounded-2xl border border-white/10 bg-card/60 p-4 sm:p-6">
+        <section className="rounded-xl border border-white/10 bg-card/60 p-4 sm:p-6">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
             <div className="relative w-full max-w-[280px] sm:w-[240px] sm:max-w-none">
               <div className="relative aspect-square overflow-hidden rounded-xl bg-muted">
@@ -40,14 +40,14 @@ export function HomeListenSkeleton() {
               <div className="h-9 w-2/3 rounded bg-muted" />
               <div className="h-4 w-1/3 rounded bg-muted" />
               <div className="flex flex-wrap gap-3 pt-2">
-                <div className="h-10 w-20 rounded-full bg-muted" />
-                <div className="h-10 w-24 rounded-full bg-muted" />
+                <div className="h-10 w-20 rounded-xl bg-muted" />
+                <div className="h-10 w-24 rounded-xl bg-muted" />
               </div>
             </div>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-card/60 p-4 sm:p-5">
+        <section className="rounded-xl border border-white/10 bg-card/60 p-4 sm:p-5">
           <div className="mb-3 h-4 w-12 rounded bg-muted" />
           <ol className="flex flex-col">
             {Array.from({ length: 6 }).map((_, i) => (

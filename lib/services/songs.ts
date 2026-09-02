@@ -34,6 +34,7 @@ import type {
 } from '@/types/firestore';
 import { getArtist } from './artists';
 import { getNotificationsBySong } from './notifications';
+import { SITE_ORIGIN } from '@/lib/brand/site';
 
 /**
  * Create a new song
@@ -120,7 +121,7 @@ export async function createSong(
         ? '/api/revalidate'
         : (process.env.NEXT_PUBLIC_APP_URL 
             ? `${process.env.NEXT_PUBLIC_APP_URL}/api/revalidate`
-            : 'https://www.streamstar.xyz/api/revalidate');
+            : `${SITE_ORIGIN}/api/revalidate`);
       
       await fetch(revalidateUrl, {
         method: 'POST',

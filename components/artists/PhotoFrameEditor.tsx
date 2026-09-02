@@ -153,7 +153,7 @@ export const PhotoFrameEditor = forwardRef<PhotoFrameEditorHandle, PhotoFrameEdi
     return (
       <div className="space-y-3">
         <div
-          className={`relative mx-auto overflow-hidden rounded-2xl bg-muted touch-none ${
+          className={`relative mx-auto overflow-hidden rounded-xl bg-muted touch-none ${
             disabled ? 'cursor-not-allowed opacity-70' : 'cursor-grab active:cursor-grabbing'
           }`}
           style={{ width: FRAME_VIEWPORT_PX, height: FRAME_VIEWPORT_PX }}

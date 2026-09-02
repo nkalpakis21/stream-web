@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { DEFAULT_AFTER_AUTH } from '@/lib/auth/returnTo';
 
 interface AuthFormProps {
   onSuccess?: () => void;
@@ -17,13 +18,13 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Listen surface after auth — studio stays at /dashboard, not the landing.
+  // Listen surface after auth. Studio is You / UserMenu, never the landing.
   useEffect(() => {
     if (user && !authLoading && !loading) {
       if (onSuccess) {
         onSuccess();
       } else {
-        router.push('/discover');
+        router.push(DEFAULT_AFTER_AUTH);
       }
     }
   }, [user, authLoading, loading, router, onSuccess]);
@@ -60,7 +61,7 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
 
   return (
     <div className="w-full max-w-md mx-auto">
-      <div className="bg-card p-8 lg:p-10 rounded-2xl shadow-soft border border-border">
+      <div className="bg-card p-8 lg:p-10 rounded-xl shadow-soft border border-border">
         <h2 className="text-3xl font-bold mb-8 text-center text-foreground">
           {isSignUp ? 'Create Account' : 'Sign In'}
         </h2>

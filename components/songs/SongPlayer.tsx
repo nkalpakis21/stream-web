@@ -9,14 +9,14 @@ interface SongPlayerProps {
 export function SongPlayer({ generation }: SongPlayerProps) {
   if (!generation.output.audioURL) {
     return (
-      <div className="p-8 border border-gray-200 dark:border-gray-800 rounded-lg text-center">
+      <div className="p-8 border border-gray-200 dark:border-gray-800 rounded-xl text-center">
         <p className="text-gray-500">Audio not available</p>
       </div>
     );
   }
 
   return (
-    <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+    <div className="border border-gray-200 dark:border-gray-800 rounded-xl p-6">
       <audio
         controls
         className="w-full"

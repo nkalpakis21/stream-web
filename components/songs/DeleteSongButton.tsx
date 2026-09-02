@@ -45,7 +45,7 @@ export function DeleteSongButton({ songId, songTitle }: DeleteSongButtonProps) {
     <>
       <button
         onClick={() => setIsModalOpen(true)}
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border bg-card hover:bg-muted hover:border-destructive/20 transition-all duration-200 text-sm font-medium text-destructive hover:text-destructive"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card hover:bg-muted hover:border-destructive/20 transition-all duration-200 text-sm font-medium text-destructive hover:text-destructive"
         aria-label="Delete song"
       >
         <svg

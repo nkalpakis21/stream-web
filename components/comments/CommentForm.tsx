@@ -96,7 +96,7 @@ export function CommentForm({
           id={parentCommentId ? undefined : 'comment-composer'}
           placeholder={parentCommentId ? 'Write a reply...' : 'Write a comment...'}
           rows={3}
-          className="w-full resize-none rounded-lg border border-border bg-background px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+          className="w-full resize-none rounded-xl border border-border bg-background px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
           disabled={submitting}
           maxLength={2000}
         />
@@ -118,7 +118,7 @@ export function CommentForm({
             <button
               type="submit"
               disabled={!content.trim() || submitting}
-              className="px-4 py-2 text-sm bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm bg-accent text-accent-foreground rounded-xl hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {submitting ? (
                 <>

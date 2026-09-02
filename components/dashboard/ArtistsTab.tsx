@@ -49,7 +49,7 @@ export function ArtistsTab({ artists, onArtistCreated }: ArtistsTabProps) {
       )}
 
       {artists.length === 0 && !showForm && (
-        <div className="text-center py-16 bg-card/60 rounded-2xl border border-white/10">
+        <div className="text-center py-16 bg-card/60 rounded-xl border border-white/10">
           <div className="max-w-md mx-auto">
             <h3 className="text-xl font-semibold mb-2">No artists yet</h3>
             <p className="text-muted-foreground">

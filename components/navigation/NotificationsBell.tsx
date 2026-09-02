@@ -16,7 +16,7 @@ export function NotificationsBell() {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center hover:bg-muted/50 transition-colors group"
+        className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors group"
         aria-label="Notifications"
       >
         <svg

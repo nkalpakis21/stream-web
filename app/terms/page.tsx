@@ -13,7 +13,7 @@ export default function TermsOfServicePage() {
           <h1 className="listen-h1 mb-8">Terms of Service</h1>
           
           <p className="text-muted-foreground mb-6">
-            <strong>Last updated:</strong> August 29, 2026
+            <strong>Last updated:</strong> September 2, 2026
           </p>
 
           <div className="space-y-8 text-foreground">
@@ -27,7 +27,7 @@ export default function TermsOfServicePage() {
             <section>
               <h2 className="text-2xl font-semibold mb-4">2. Description of Service</h2>
               <p className="text-muted-foreground leading-relaxed">
-                Streamstar is an AI-native music platform that allows users to generate, collaborate, and discover music powered by artificial intelligence. The Service includes tools for creating AI artists, generating musical compositions, and sharing content with other users.
+                Streamstar is a music app. You can listen to songs, create artists, and optionally launch an artist coin. The Service is for listening and creating artists — not a music generator.
               </p>
             </section>
 
@@ -73,15 +73,14 @@ export default function TermsOfServicePage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold mb-4">5. AI-Generated Content</h2>
+              <h2 className="text-2xl font-semibold mb-4">5. Songs and artists</h2>
               <p className="text-muted-foreground leading-relaxed">
-                The Service uses artificial intelligence to generate music and create AI artists. You understand and agree that:
+                You can listen to songs and create artists on the Service. An artist may have an optional artist coin. You understand and agree that:
               </p>
               <ul className="list-disc pl-6 space-y-2 text-muted-foreground mt-4">
-                <li>AI-generated content may not be unique and similar content may be generated for other users</li>
-                <li>We do not guarantee the quality, accuracy, or originality of AI-generated content</li>
-                <li>You are responsible for ensuring your use of AI-generated content complies with applicable laws</li>
-                <li>AI-generated content may be used to improve our AI models</li>
+                <li>Content on the Service may not be unique</li>
+                <li>We do not guarantee the quality, accuracy, or originality of content</li>
+                <li>You are responsible for ensuring your use of content complies with applicable laws</li>
               </ul>
             </section>
 

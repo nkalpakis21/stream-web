@@ -24,7 +24,7 @@ export function OverviewTab({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <Link
           href="/dashboard?tab=artists&new=1"
-          className="group rounded-2xl border border-white/10 bg-card/60 p-6 sm:p-8 hover:border-primary/40 transition-colors"
+          className="group rounded-xl border border-white/10 bg-card/60 p-6 sm:p-8 hover:border-primary/40 transition-colors"
         >
           <p className="text-xs font-medium uppercase tracking-wide text-primary">Create</p>
           <h3 className="mt-2 text-xl font-bold text-foreground">Artist</h3>
@@ -41,7 +41,7 @@ export function OverviewTab({
 
         <Link
           href="/dashboard?tab=songs&new=1"
-          className="group rounded-2xl border border-white/10 bg-card/60 p-6 sm:p-8 hover:border-primary/40 transition-colors"
+          className="group rounded-xl border border-white/10 bg-card/60 p-6 sm:p-8 hover:border-primary/40 transition-colors"
         >
           <p className="text-xs font-medium uppercase tracking-wide text-primary">Generate</p>
           <h3 className="mt-2 text-xl font-bold text-foreground">Song</h3>
@@ -88,11 +88,11 @@ export function OverviewTab({
       )}
 
       {artists.length === 0 && songs.length === 0 && (
-        <div className="text-center py-16 rounded-2xl border border-white/10 bg-card/40">
+        <div className="text-center py-16 rounded-xl border border-white/10 bg-card/40">
           <div className="max-w-md mx-auto">
             <Link
               href="/dashboard?tab=artists&new=1"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-full hover:opacity-90 transition-opacity font-medium"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-opacity font-medium"
             >
               Create your first artist
             </Link>

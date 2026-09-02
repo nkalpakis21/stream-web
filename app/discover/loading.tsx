@@ -6,10 +6,10 @@ export default function DiscoverLoading() {
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
         <div className="mb-12 animate-pulse">
           <div className="mb-8 h-10 w-48 rounded bg-muted lg:h-12" />
-          <div className="mb-6 h-12 rounded-full bg-muted" />
+          <div className="mb-6 h-12 rounded-xl bg-muted" />
           <div className="flex gap-2">
-            <div className="h-11 w-16 rounded-full bg-muted" />
-            <div className="h-11 w-16 rounded-full bg-muted" />
+            <div className="h-11 w-16 rounded-xl bg-muted" />
+            <div className="h-11 w-16 rounded-xl bg-muted" />
           </div>
         </div>
         <SongCardSkeletonGrid showCluster />

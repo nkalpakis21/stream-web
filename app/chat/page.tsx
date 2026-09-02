@@ -161,7 +161,7 @@ function ChatPageContent() {
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-300px)] min-h-[600px]">
-          <div className="lg:col-span-1 border border-border rounded-lg bg-card overflow-hidden">
+          <div className="lg:col-span-1 border border-border rounded-xl bg-card overflow-hidden">
             <ChatList
               selectedConversationId={selectedConversationId}
               onSelectConversation={handleSelectConversation}
@@ -169,7 +169,7 @@ function ChatPageContent() {
             />
           </div>
           
-          <div className="lg:col-span-2 border border-border rounded-lg bg-card overflow-hidden">
+          <div className="lg:col-span-2 border border-border rounded-xl bg-card overflow-hidden">
             <ChatView conversationId={selectedConversationId} />
           </div>
         </div>

@@ -81,7 +81,7 @@ export function SongActionsMenu({
       <div className="relative inline-flex" ref={menuRef}>
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted/50 transition-colors group focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-background"
+          className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors group focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-background"
           aria-label="Song options"
           aria-expanded={isOpen}
           aria-haspopup="true"
@@ -110,7 +110,7 @@ export function SongActionsMenu({
             />
 
             {/* Menu */}
-            <div className="absolute right-0 top-full mt-2 w-56 bg-card/95 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="absolute right-0 top-full mt-2 w-56 bg-card/95 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="py-1.5">
                 <button
                   onClick={() => {

@@ -26,8 +26,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Hardcode webhook URL to production
-    const webhookBaseUrl = 'https://www.streamstar.xyz';
+    // Hardcode webhook URL to production (apex — www redirects here)
+    const webhookBaseUrl = 'https://streamstar.xyz';
     const webhookUrl = `${webhookBaseUrl}/api/webhooks/musicgpt`;
 
     console.log('[MusicGPT API Route] Webhook URL being set:', webhookUrl);

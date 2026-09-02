@@ -118,7 +118,7 @@ export function SongVersionsSection({
               return (
                 <div
                   key={version.id}
-                  className={`bg-card rounded-2xl p-6 shadow-soft border transition-all duration-200 ${
+                  className={`bg-card rounded-xl p-6 shadow-soft border transition-all duration-200 ${
                     isPrimary
                       ? 'border-accent/50 bg-accent/5 shadow-lg'
                       : 'border-border/50'
@@ -128,7 +128,7 @@ export function SongVersionsSection({
                     <div className="flex items-center gap-3">
                       <span className="text-lg font-semibold">Version {label}</span>
                       {isPrimary && (
-                        <span className="px-3 py-1.5 text-xs font-medium rounded-full bg-accent/20 text-accent border border-accent/30 flex items-center gap-1.5">
+                        <span className="px-3 py-1.5 text-xs font-medium rounded-xl bg-accent/20 text-accent border border-accent/30 flex items-center gap-1.5">
                           <Star className="w-3 h-3 fill-accent" />
                           Primary
                         </span>
@@ -138,7 +138,7 @@ export function SongVersionsSection({
                       <button
                         onClick={() => handleSetPrimary(version.id)}
                         disabled={updatingPrimary === version.id || isPrimary}
-                        className={`flex items-center gap-2 text-sm px-4 py-2 rounded-full border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        className={`flex items-center gap-2 text-sm px-4 py-2 rounded-xl border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
                           isPrimary
                             ? 'border-accent/30 bg-accent/10 text-accent cursor-default'
                             : 'border-border hover:bg-muted hover:border-accent/20 text-muted-foreground hover:text-foreground'
@@ -169,7 +169,7 @@ export function SongVersionsSection({
                   <div className="relative">
                     <audio
                       controls
-                      className="w-full h-12 rounded-lg"
+                      className="w-full h-12 rounded-xl"
                       src={version.audioURL || undefined}
                       preload="metadata"
                       onError={(e) => {
@@ -192,7 +192,7 @@ export function SongVersionsSection({
           })}
         </div>
       ) : (
-        <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
+        <div className="p-12 border-2 border-dashed border-border rounded-xl text-center bg-muted/30">
           <div className="max-w-sm mx-auto">
             <svg
               className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4"
