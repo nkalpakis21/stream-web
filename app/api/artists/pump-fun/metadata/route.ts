@@ -2,7 +2,9 @@
  * POST /api/artists/pump-fun/metadata
  *
  * Hosts pump.fun coin metadata JSON on Firebase Storage (image = locked look URL).
- * Returns a public HTTPS URI for create_v2. Never takes a wallet private key.
+ * Returns a short Streamstar HTTPS URI (`/c/{id}`) for create_v2 — never a
+ * firebasestorage.googleapis.com download URL (those exceed the 200-char cap).
+ * Never takes a wallet private key.
  */
 
 import { randomUUID } from 'crypto';
@@ -13,10 +15,14 @@ import { getAdminBucket } from '@/lib/firebase/admin';
 import {
   MAX_COIN_NAME_LENGTH,
   MAX_TICKER_LENGTH,
+  METADATA_URI_TOO_LONG_NOTICE,
   MIN_TICKER_LENGTH,
   isHttpsUrl,
+  isMetadataUriTooLong,
   isValidTicker,
   normalizeTicker,
+  pumpFunMetadataObjectPath,
+  pumpFunMetadataPublicUri,
 } from '@/lib/solana/pumpFun';
 
 export const dynamic = 'force-dynamic';
@@ -80,8 +86,13 @@ export async function POST(request: NextRequest) {
       website: process.env.NEXT_PUBLIC_APP_URL || 'https://streamstar.xyz',
     };
 
-    const objectPath = `pump-fun-metadata/${userId}/${randomUUID()}.json`;
-    const downloadToken = randomUUID();
+    const id = randomUUID().replace(/-/g, '');
+    const uri = pumpFunMetadataPublicUri(id);
+    if (isMetadataUriTooLong(uri)) {
+      throw new HttpError(400, METADATA_URI_TOO_LONG_NOTICE);
+    }
+
+    const objectPath = pumpFunMetadataObjectPath(id);
     const objectFile = bucket.file(objectPath);
     const body = Buffer.from(JSON.stringify(metadata), 'utf8');
 
@@ -92,7 +103,7 @@ export async function POST(request: NextRequest) {
           contentType: 'application/json',
           cacheControl: 'public, max-age=31536000, immutable',
           metadata: {
-            firebaseStorageDownloadTokens: downloadToken,
+            uploadedBy: userId,
           },
         },
       });
@@ -106,9 +117,6 @@ export async function POST(request: NextRequest) {
       }
       throw err;
     }
-
-    const encodedPath = encodeURIComponent(objectPath);
-    const uri = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${downloadToken}`;
 
     return NextResponse.json({ uri });
   } catch (error) {

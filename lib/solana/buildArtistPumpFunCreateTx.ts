@@ -13,10 +13,12 @@ import {
 } from '@solana/web3.js';
 import { PUMP_SDK } from '@pump-fun/pump-sdk';
 import {
+  METADATA_URI_TOO_LONG_NOTICE,
   PUMP_ALT_ADDRESS_MAINNET,
   PUMP_CREATE_COMPUTE_UNITS,
   PUMP_PRIORITY_MICRO_LAMPORTS,
   getSolanaRpcUrl,
+  isMetadataUriTooLong,
 } from '@/lib/solana/pumpFun';
 
 export type BuildArtistPumpFunCreateTxInput = {
@@ -39,11 +41,14 @@ export class PumpFunCreateTxBuildError extends Error {
 
 function formatSimFailure(err: unknown, logs: string[] | null | undefined): string {
   const logText = (logs ?? []).join('\n');
+  const errText = typeof err === 'string' ? err : JSON.stringify(err);
+  if (/UriTooLong|Error Number:\s*6045|Custom["\s:]*6045/i.test(`${errText}\n${logText}`)) {
+    return METADATA_URI_TOO_LONG_NOTICE;
+  }
   if (/insufficient lamports|insufficient funds/i.test(logText)) {
     return 'Not enough SOL for network fees (about 0.02 SOL).';
   }
 
-  const errText = typeof err === 'string' ? err : JSON.stringify(err);
   const tail = (logs ?? []).filter(Boolean).slice(-6);
   const combined = tail.length
     ? `Launch simulation failed (${errText}). Logs: ${tail.join(' | ')}`
@@ -80,6 +85,10 @@ async function assertUnsignedCreateTxSimulates(
 export async function buildUnsignedArtistPumpFunCreateTx(
   input: BuildArtistPumpFunCreateTxInput
 ): Promise<VersionedTransaction> {
+  if (isMetadataUriTooLong(input.uri)) {
+    throw new PumpFunCreateTxBuildError(METADATA_URI_TOO_LONG_NOTICE);
+  }
+
   const connection = new Connection(getSolanaRpcUrl(), 'confirmed');
 
   const createIx = await PUMP_SDK.createV2Instruction({
