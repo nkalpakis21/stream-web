@@ -39,5 +39,11 @@ export function getInitials(name: string): string {
   return trimmed.substring(0, 2).toUpperCase();
 }
 
+/** Header chip label: first name, or "You" when none. */
+export function headerChipLabel(displayName?: string | null): string {
+  const first = displayName?.trim().split(/\s+/)[0];
+  return first || 'You';
+}
+
 
 

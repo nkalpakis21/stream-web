@@ -4,8 +4,16 @@ import { useEffect, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getFreshIdToken } from '@/lib/api/clientAuth';
+import { setWalletLiveStatus } from '@/lib/wallet/liveStatus';
 
 const linkedThisSession = new Set<string>();
+
+function adapterAddress(
+  publicKey: { toBase58(): string } | null | undefined,
+  wallet: { adapter?: { publicKey?: { toBase58(): string } | null } } | null | undefined
+): string | null {
+  return publicKey?.toBase58() ?? wallet?.adapter?.publicKey?.toBase58() ?? null;
+}
 
 /**
  * After the user picks a wallet in the picker, connect it.
@@ -24,18 +32,63 @@ export function useAutoConnectSelectedWallet() {
 }
 
 /**
+ * Push adapter connect/disconnect into a module store so the user menu
+ * flips to Connected · last 4 without a reload.
+ */
+export function usePublishWalletLiveStatus() {
+  const { publicKey, connected, connecting, wallet } = useWallet();
+
+  useEffect(() => {
+    const adapter = wallet?.adapter;
+    const publish = () => {
+      // Prefer the adapter's live key so connect/disconnect events
+      // are not stuck on a stale React publicKey from this effect.
+      const address = adapter
+        ? adapter.publicKey?.toBase58() ?? null
+        : publicKey?.toBase58() ?? null;
+      const adapterConnected = Boolean(
+        address && (connected || adapter?.connected || adapter?.publicKey)
+      );
+      const adapterConnecting = Boolean(
+        connecting || (adapter && 'connecting' in adapter && adapter.connecting)
+      );
+      setWalletLiveStatus({
+        address,
+        connected: adapterConnected,
+        connecting: adapterConnecting && !address,
+      });
+    };
+
+    publish();
+    if (!adapter) return undefined;
+
+    adapter.on('connect', publish);
+    adapter.on('disconnect', publish);
+    adapter.on('readyStateChange', publish);
+    return () => {
+      adapter.off('connect', publish);
+      adapter.off('disconnect', publish);
+      adapter.off('readyStateChange', publish);
+    };
+  }, [publicKey, connected, connecting, wallet]);
+}
+
+/**
  * Link the connected wallet to the signed-in Firebase account.
  * No second "Link to account" step.
  */
 export function useAutoLinkWallet() {
   const { user } = useAuth();
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected, wallet } = useWallet();
   const inFlight = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!user || !connected || !publicKey) return;
+    const address = adapterAddress(publicKey, wallet);
+    if (!user || !address) return;
+    if (!connected && !wallet?.adapter?.connected && !wallet?.adapter?.publicKey) {
+      return;
+    }
 
-    const address = publicKey.toBase58();
     const key = `${user.uid}:${address}`;
     if (linkedThisSession.has(key) || inFlight.current === key) return;
 
@@ -68,11 +121,12 @@ export function useAutoLinkWallet() {
     return () => {
       cancelled = true;
     };
-  }, [user, connected, publicKey]);
+  }, [user, connected, publicKey, wallet]);
 }
 
 export function WalletSessionEffects() {
   useAutoConnectSelectedWallet();
+  usePublishWalletLiveStatus();
   useAutoLinkWallet();
   return null;
 }
