@@ -18,18 +18,6 @@ const nextConfig = {
   async redirects() {
     return [
       {
-        source: '/',
-        has: [{ type: 'host', value: 'www.streamstar.xyz' }],
-        destination: 'https://streamstar.xyz/',
-        permanent: true,
-      },
-      {
-        source: '/:path*',
-        has: [{ type: 'host', value: 'www.streamstar.xyz' }],
-        destination: 'https://streamstar.xyz/:path*',
-        permanent: true,
-      },
-      {
         source: '/investors',
         destination: '/investing',
         permanent: true,
