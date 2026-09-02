@@ -38,6 +38,40 @@ export const LAUNCH_SIM_FAILED_NOTICE = `Phantom couldn't simulate the launch. $
 
 export const LAUNCH_SEND_FAILED_NOTICE = `The launch didn't confirm on-chain. ${LAUNCH_NO_TOKEN_NOTICE}`;
 
+/**
+ * pump.fun create_v2 on-chain uri max (Anchor UriTooLong = 6045).
+ * Do not send a firebasestorage.googleapis.com download URL — those exceed 200.
+ */
+export const MAX_METADATA_URI_LENGTH = 200;
+
+/**
+ * www is the Vercel primary. Apex 307s to www. Do not change SITE_ORIGIN or
+ * add www↔apex redirects. Use www so pump.fun can HTTP GET without a hop.
+ */
+export const PUMP_FUN_METADATA_ORIGIN = 'https://www.streamstar.xyz';
+
+export const METADATA_URI_TOO_LONG_NOTICE =
+  'The coin metadata URL is too long for pump.fun (max 200 characters). No token was created.';
+
+/** uuid without hyphens — keeps https://www.streamstar.xyz/c/{id} well under 200. */
+export const PUMP_FUN_METADATA_ID_PATTERN = /^[0-9a-f]{32}$/;
+
+export function isValidPumpFunMetadataId(id: string): boolean {
+  return PUMP_FUN_METADATA_ID_PATTERN.test(id);
+}
+
+export function pumpFunMetadataObjectPath(id: string): string {
+  return `c/${id}.json`;
+}
+
+export function pumpFunMetadataPublicUri(id: string): string {
+  return `${PUMP_FUN_METADATA_ORIGIN}/c/${id}`;
+}
+
+export function isMetadataUriTooLong(uri: string): boolean {
+  return uri.length > MAX_METADATA_URI_LENGTH;
+}
+
 export function pumpFunCoinUrl(mint: string): string {
   return `${PUMP_FUN_COIN_URL_PREFIX}${mint}`;
 }
