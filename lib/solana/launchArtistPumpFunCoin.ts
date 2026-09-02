@@ -3,7 +3,9 @@
  *
  * Official SDK: @pump-fun/pump-sdk (`createV2Instruction` — create only, no first buy).
  * The manager's connected wallet signs once. The mint keypair is generated in the
- * browser, used to co-sign create_v2, and discarded. Never takes a private key or seed.
+ * browser, passed as an extra signer to sendTransaction, and discarded. Never takes
+ * a private key or seed. Do not pre-sign the mint then call signTransaction —
+ * Phantom cannot simulate that v0 create_v2.
  *
  * Persist mint + pump.fun URL only after the transaction is confirmed.
  * If launch fails, the caller still creates the artist with empty pump.fun fields.
@@ -16,11 +18,16 @@ import {
   type Connection,
   type Transaction,
 } from '@solana/web3.js';
+import type { SendTransactionOptions } from '@solana/wallet-adapter-base';
 import { Timestamp } from 'firebase/firestore';
 import { emptyPumpFunCoin, type PumpFunCoin } from '@/types/firestore';
 import { userFacingApiError } from '@/lib/api/clientAuth';
 import {
   LAUNCH_FAILED_NOTICE,
+  LAUNCH_NO_TOKEN_NOTICE,
+  LAUNCH_SEND_FAILED_NOTICE,
+  LAUNCH_SIM_FAILED_NOTICE,
+  LAUNCH_WALLET_BLOCKED_NOTICE,
   MIN_LAUNCH_LAMPORTS,
   isHttpsUrl,
   isValidCoinName,
@@ -29,9 +36,19 @@ import {
   pumpFunCoinUrl,
 } from '@/lib/solana/pumpFun';
 
+/**
+ * Wallet surface from the Solana adapter used for create_v2.
+ * sendTransaction({ signers }) is required so Phantom simulates with the mint.
+ * signTransaction is the adapter method; do not pre-sign then call it.
+ */
 export type ArtistPumpFunWallet = {
   publicKey: PublicKey;
-  signTransaction: <T extends Transaction | VersionedTransaction>(
+  sendTransaction: (
+    transaction: Transaction | VersionedTransaction,
+    connection: Connection,
+    options?: SendTransactionOptions
+  ) => Promise<string>;
+  signTransaction?: <T extends Transaction | VersionedTransaction>(
     transaction: T
   ) => Promise<T>;
 };
@@ -54,18 +71,110 @@ function fail(reason: string): ArtistPumpFunLaunchResult {
   return { ok: false, reason };
 }
 
-function launchErrorMessage(error: unknown): string {
-  const raw = error instanceof Error ? error.message : String(error ?? '');
-  if (/user rejected|rejected the request|cancelled|canceled/i.test(raw)) {
-    return `You cancelled the wallet signature. ${LAUNCH_FAILED_NOTICE}`;
+function collectErrorText(error: unknown): string {
+  if (typeof error === 'string') return error;
+  if (!error || typeof error !== 'object') return String(error ?? '');
+  const parts: string[] = [];
+  if (error instanceof Error && error.message) parts.push(error.message);
+  const nested = 'error' in error ? error.error : undefined;
+  if (nested instanceof Error && nested.message) parts.push(nested.message);
+  else if (typeof nested === 'string') parts.push(nested);
+  else if (
+    nested &&
+    nested !== error &&
+    typeof nested === 'object' &&
+    'message' in nested &&
+    typeof nested.message === 'string'
+  ) {
+    parts.push(nested.message);
   }
-  if (/insufficient|0x1$/i.test(raw) || /no record of a prior credit/i.test(raw)) {
-    return `Not enough SOL for network fees. ${LAUNCH_FAILED_NOTICE}`;
+  const code = 'code' in error ? error.code : undefined;
+  if (typeof code === 'string' || typeof code === 'number') parts.push(String(code));
+  const txError =
+    'transactionError' in error && error.transactionError && typeof error.transactionError === 'object'
+      ? error.transactionError
+      : undefined;
+  if (txError && 'message' in txError && typeof txError.message === 'string') {
+    parts.push(txError.message);
+  }
+  const logs = collectErrorLogs(error);
+  if (logs.length) parts.push(logs.slice(-4).join(' | '));
+  return parts.join(' ');
+}
+
+function collectErrorLogs(error: unknown): string[] {
+  if (!error || typeof error !== 'object') return [];
+  const fromArray = (value: unknown): string[] =>
+    Array.isArray(value) ? value.filter((line): line is string => typeof line === 'string') : [];
+  if ('logs' in error) {
+    const logs = fromArray(error.logs);
+    if (logs.length) return logs;
+  }
+  if (
+    'transactionError' in error &&
+    error.transactionError &&
+    typeof error.transactionError === 'object' &&
+    'logs' in error.transactionError
+  ) {
+    const logs = fromArray(error.transactionError.logs);
+    if (logs.length) return logs;
+  }
+  if ('error' in error && error.error && error.error !== error) {
+    return collectErrorLogs(error.error);
+  }
+  return [];
+}
+
+function withErrorDetail(notice: string, error: unknown): string {
+  const detail = collectErrorText(error).replace(/\s+/g, ' ').trim();
+  if (!detail) return notice;
+  if (notice.toLowerCase().includes(detail.toLowerCase())) return notice;
+  const clipped = detail.length > 180 ? `${detail.slice(0, 177)}...` : detail;
+  const combined = `${notice} (${clipped})`;
+  return combined.length > 280 ? `${combined.slice(0, 277)}...` : combined;
+}
+
+function launchWalletErrorMessage(error: unknown): string {
+  const raw = collectErrorText(error);
+  if (/user rejected|rejected the request|cancelled|canceled/i.test(raw)) {
+    return `You cancelled the wallet signature. ${LAUNCH_NO_TOKEN_NOTICE}`;
+  }
+  if (/blocked|malicious|not been authorized|unauthorized/i.test(raw)) {
+    return withErrorDetail(LAUNCH_WALLET_BLOCKED_NOTICE, error);
+  }
+  if (/simulat|preflight/i.test(raw)) {
+    return withErrorDetail(LAUNCH_SIM_FAILED_NOTICE, error);
+  }
+  if (/insufficient|0x1$|no record of a prior credit/i.test(raw)) {
+    return withErrorDetail(
+      `Not enough SOL for network fees. ${LAUNCH_NO_TOKEN_NOTICE}`,
+      error
+    );
   }
   if (/blockhash|expired|timed out|timeout/i.test(raw)) {
-    return `The launch transaction expired. ${LAUNCH_FAILED_NOTICE}`;
+    return `The launch transaction expired. ${LAUNCH_NO_TOKEN_NOTICE}`;
   }
-  return LAUNCH_FAILED_NOTICE;
+  return withErrorDetail(
+    `Phantom couldn't complete the signature. ${LAUNCH_NO_TOKEN_NOTICE}`,
+    error
+  );
+}
+
+function launchSendErrorMessage(error: unknown): string {
+  const raw = collectErrorText(error);
+  if (/insufficient|0x1$|no record of a prior credit/i.test(raw)) {
+    return withErrorDetail(
+      `Not enough SOL for network fees. ${LAUNCH_NO_TOKEN_NOTICE}`,
+      error
+    );
+  }
+  if (/blockhash|expired|timed out|timeout/i.test(raw)) {
+    return `The launch transaction expired. ${LAUNCH_NO_TOKEN_NOTICE}`;
+  }
+  if (/simulat|preflight/i.test(raw)) {
+    return withErrorDetail(LAUNCH_SIM_FAILED_NOTICE, error);
+  }
+  return withErrorDetail(LAUNCH_SEND_FAILED_NOTICE, error);
 }
 
 async function postJson<T>(
@@ -103,8 +212,8 @@ export async function launchArtistPumpFunCoin(
       `Lock a look first — that image is the coin. ${LAUNCH_FAILED_NOTICE}`
     );
   }
-  if (!input.wallet.signTransaction) {
-    return fail(`Connect a wallet that can sign. ${LAUNCH_FAILED_NOTICE}`);
+  if (typeof input.wallet.sendTransaction !== 'function') {
+    return fail(`Connect a wallet that can sign. ${LAUNCH_NO_TOKEN_NOTICE}`);
   }
 
   const creatorWallet = input.wallet.publicKey.toBase58();
@@ -113,18 +222,18 @@ export async function launchArtistPumpFunCoin(
     const balance = await input.connection.getBalance(input.wallet.publicKey);
     if (balance < MIN_LAUNCH_LAMPORTS) {
       return fail(
-        `A little SOL is needed for network fees (about 0.02 SOL). ${LAUNCH_FAILED_NOTICE}`
+        `A little SOL is needed for network fees (about 0.02 SOL). ${LAUNCH_NO_TOKEN_NOTICE}`
       );
     }
   } catch {
-    return fail(`Could not check wallet balance. ${LAUNCH_FAILED_NOTICE}`);
+    return fail(`Could not check wallet balance. ${LAUNCH_NO_TOKEN_NOTICE}`);
   }
 
   let token: string;
   try {
     token = await input.getIdToken();
   } catch (error) {
-    return fail(userFacingApiError(undefined, error, LAUNCH_FAILED_NOTICE));
+    return fail(userFacingApiError(undefined, error, LAUNCH_NO_TOKEN_NOTICE));
   }
 
   const metadataRes = await postJson<{ uri: string }>(
@@ -139,12 +248,12 @@ export async function launchArtistPumpFunCoin(
   );
   if (!metadataRes.ok) {
     return fail(
-      userFacingApiError(metadataRes.status, metadataRes.error, LAUNCH_FAILED_NOTICE)
+      userFacingApiError(metadataRes.status, metadataRes.error, LAUNCH_NO_TOKEN_NOTICE)
     );
   }
   const metadataUri = metadataRes.data.uri;
   if (!metadataUri || !isHttpsUrl(metadataUri)) {
-    return fail(LAUNCH_FAILED_NOTICE);
+    return fail(LAUNCH_NO_TOKEN_NOTICE);
   }
 
   const mintKeypair = Keypair.generate();
@@ -162,39 +271,48 @@ export async function launchArtistPumpFunCoin(
     }
   );
   if (!txRes.ok) {
-    return fail(userFacingApiError(txRes.status, txRes.error, LAUNCH_FAILED_NOTICE));
+    return fail(userFacingApiError(txRes.status, txRes.error, LAUNCH_NO_TOKEN_NOTICE));
   }
   if (!txRes.data.transaction || txRes.data.mint !== mint) {
-    return fail(LAUNCH_FAILED_NOTICE);
+    return fail(LAUNCH_NO_TOKEN_NOTICE);
   }
 
-  let signed: VersionedTransaction;
+  let signature: string;
   try {
     const txBytes = Uint8Array.from(atob(txRes.data.transaction), c =>
       c.charCodeAt(0)
     );
     const tx = VersionedTransaction.deserialize(txBytes);
-    tx.sign([mintKeypair]);
-    signed = await input.wallet.signTransaction(tx);
+    // Extra signers go to sendTransaction so Phantom can simulate mint + user.
+    // Do not mint-sign then signTransaction (Phantom sim fails). Do not
+    // sendRawTransaction after a wallet signature: skipPreflight:false
+    // preflight re-simulates and drops a Confirm-unsafe signature with no
+    // on-chain activity.
+    signature = await input.wallet.sendTransaction(tx, input.connection, {
+      signers: [mintKeypair],
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+    });
   } catch (error) {
-    return fail(launchErrorMessage(error));
+    return fail(launchWalletErrorMessage(error));
   }
 
   try {
     const latest = await input.connection.getLatestBlockhash('confirmed');
-    const signature = await input.connection.sendRawTransaction(signed.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: 'confirmed',
-    });
     const confirmation = await input.connection.confirmTransaction(
       { signature, ...latest },
       'confirmed'
     );
     if (confirmation.value.err) {
-      return fail(LAUNCH_FAILED_NOTICE);
+      return fail(
+        withErrorDetail(
+          LAUNCH_SEND_FAILED_NOTICE,
+          JSON.stringify(confirmation.value.err)
+        )
+      );
     }
   } catch (error) {
-    return fail(launchErrorMessage(error));
+    return fail(launchSendErrorMessage(error));
   }
 
   return {
@@ -275,7 +393,7 @@ export async function launchPumpFunForExistingArtist(
   if (!input.wallet || !input.connection || !input.getIdToken) {
     return {
       coin: null,
-      launchNotice: `Connect your wallet in the nav, then try again next time. ${LAUNCH_FAILED_NOTICE}`,
+      launchNotice: `Connect your wallet in the nav, then try again next time. ${LAUNCH_NO_TOKEN_NOTICE}`,
     };
   }
 

@@ -6,7 +6,7 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { LaunchCoinToggle } from '@/components/artists/LaunchCoinToggle';
 import { getFreshIdToken, userFacingApiError } from '@/lib/api/clientAuth';
 import { launchPumpFunForExistingArtist } from '@/lib/solana/launchArtistPumpFunCoin';
-import { LAUNCH_FAILED_NOTICE } from '@/lib/solana/pumpFun';
+import { LAUNCH_NO_TOKEN_NOTICE } from '@/lib/solana/pumpFun';
 import type { PumpFunCoin } from '@/types/firestore';
 import { useToast, ToastContainer } from '@/components/ui/toast';
 
@@ -34,7 +34,7 @@ export function LaunchExistingArtistCoin({
 }: LaunchExistingArtistCoinProps) {
   const { user } = useAuth();
   const { connection } = useConnection();
-  const { publicKey, connected, signTransaction } = useWallet();
+  const { publicKey, connected, signTransaction, sendTransaction } = useWallet();
   const [launchCoin, setLaunchCoin] = useState(false);
   const [coinName, setCoinName] = useState('');
   const [ticker, setTicker] = useState('');
@@ -61,7 +61,11 @@ export function LaunchExistingArtistCoin({
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(
-        userFacingApiError(res.status, data.error, LAUNCH_FAILED_NOTICE)
+        userFacingApiError(
+          res.status,
+          data.error,
+          'Coin launched but saving it failed. Try again.'
+        )
       );
     }
   };
@@ -72,8 +76,8 @@ export function LaunchExistingArtistCoin({
     setLaunching(true);
     try {
       const pumpWallet =
-        connected && publicKey && signTransaction
-          ? { publicKey, signTransaction }
+        connected && publicKey
+          ? { publicKey, signTransaction, sendTransaction }
           : null;
 
       const { coin, launchNotice } = await launchPumpFunForExistingArtist({
@@ -87,7 +91,7 @@ export function LaunchExistingArtistCoin({
       });
 
       if (!coin) {
-        showToast(launchNotice || LAUNCH_FAILED_NOTICE, 'error');
+        showToast(launchNotice || LAUNCH_NO_TOKEN_NOTICE, 'error');
         return;
       }
 
@@ -105,7 +109,10 @@ export function LaunchExistingArtistCoin({
       onLaunched(coin);
     } catch (error) {
       console.error('Failed to launch artist coin:', error);
-      showToast(userFacingApiError(undefined, error, LAUNCH_FAILED_NOTICE), 'error');
+      showToast(
+        userFacingApiError(undefined, error, 'Could not save the coin. Try again.'),
+        'error'
+      );
     } finally {
       setLaunching(false);
     }

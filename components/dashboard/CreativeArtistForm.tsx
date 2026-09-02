@@ -23,7 +23,7 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
   const { user } = useAuth();
   const router = useRouter();
   const { connection } = useConnection();
-  const { publicKey, connected, signTransaction } = useWallet();
+  const { publicKey, connected, signTransaction, sendTransaction } = useWallet();
   const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [formData, setFormData] = useState({
@@ -61,8 +61,8 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
       };
 
       const pumpWallet =
-        connected && publicKey && signTransaction
-          ? { publicKey, signTransaction }
+        connected && publicKey
+          ? { publicKey, signTransaction, sendTransaction }
           : null;
 
       const { pumpFun, launchNotice } = await resolvePumpFunForArtistCreate({

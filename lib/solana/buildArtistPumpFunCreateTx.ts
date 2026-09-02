@@ -27,6 +27,56 @@ export type BuildArtistPumpFunCreateTxInput = {
   uri: string;
 };
 
+export class PumpFunCreateTxBuildError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status = 400) {
+    super(message);
+    this.name = 'PumpFunCreateTxBuildError';
+    this.status = status;
+  }
+}
+
+function formatSimFailure(err: unknown, logs: string[] | null | undefined): string {
+  const logText = (logs ?? []).join('\n');
+  if (/insufficient lamports|insufficient funds/i.test(logText)) {
+    return 'Not enough SOL for network fees (about 0.02 SOL).';
+  }
+
+  const errText = typeof err === 'string' ? err : JSON.stringify(err);
+  const tail = (logs ?? []).filter(Boolean).slice(-6);
+  const combined = tail.length
+    ? `Launch simulation failed (${errText}). Logs: ${tail.join(' | ')}`
+    : `Launch simulation failed (${errText}).`;
+  return combined.length > 500 ? `${combined.slice(0, 497)}...` : combined;
+}
+
+async function assertUnsignedCreateTxSimulates(
+  connection: Connection,
+  tx: VersionedTransaction
+): Promise<void> {
+  let sim;
+  try {
+    sim = await connection.simulateTransaction(tx, {
+      sigVerify: false,
+      replaceRecentBlockhash: true,
+      commitment: 'confirmed',
+    });
+  } catch (err) {
+    console.error('[pump.fun] create_v2 simulation RPC failed', err);
+    throw new PumpFunCreateTxBuildError(
+      'Could not simulate the launch transaction. Try again.',
+      503
+    );
+  }
+
+  if (sim.value.err) {
+    throw new PumpFunCreateTxBuildError(
+      formatSimFailure(sim.value.err, sim.value.logs)
+    );
+  }
+}
+
 export async function buildUnsignedArtistPumpFunCreateTx(
   input: BuildArtistPumpFunCreateTxInput
 ): Promise<VersionedTransaction> {
@@ -53,16 +103,20 @@ export async function buildUnsignedArtistPumpFunCreateTx(
     createIx,
   ];
 
-  const addressLookupTableAccounts = [];
+  let addressLookupTableAccount = null;
   try {
     const alt = await connection.getAddressLookupTable(
       new PublicKey(PUMP_ALT_ADDRESS_MAINNET)
     );
-    if (alt.value) {
-      addressLookupTableAccounts.push(alt.value);
-    }
+    addressLookupTableAccount = alt.value;
   } catch (err) {
-    console.warn('[pump.fun] Address lookup table unavailable, sending without ALT', err);
+    console.warn('[pump.fun] Address lookup table unavailable', err);
+  }
+
+  if (!addressLookupTableAccount) {
+    throw new PumpFunCreateTxBuildError(
+      'Pump.fun address lookup table is unavailable. Try again.'
+    );
   }
 
   const { blockhash } = await connection.getLatestBlockhash('confirmed');
@@ -70,7 +124,9 @@ export async function buildUnsignedArtistPumpFunCreateTx(
     payerKey: input.user,
     recentBlockhash: blockhash,
     instructions,
-  }).compileToV0Message(addressLookupTableAccounts);
+  }).compileToV0Message([addressLookupTableAccount]);
 
-  return new VersionedTransaction(message);
+  const tx = new VersionedTransaction(message);
+  await assertUnsignedCreateTxSimulates(connection, tx);
+  return tx;
 }
