@@ -2,7 +2,8 @@
 
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletConnectControl } from '@/components/wallet/WalletConnectControl';
-import { WALLET_COPY, connectedLabel } from '@/lib/wallet/copy';
+import { WALLET_COPY } from '@/lib/wallet/copy';
+import { useWalletLiveStatus } from '@/lib/wallet/liveStatus';
 import {
   defaultTickerFromName,
   MAX_COIN_NAME_LENGTH,
@@ -38,7 +39,10 @@ export function LaunchCoinToggle({
   onTickerChange,
   lookUrl,
 }: LaunchCoinToggleProps) {
-  const { connected, publicKey } = useWallet();
+  const live = useWalletLiveStatus();
+  const { publicKey, connected: adapterConnected } = useWallet();
+  const address = live.address ?? publicKey?.toBase58() ?? null;
+  const connected = Boolean(address) && (live.connected || adapterConnected);
 
   const handleToggle = (next: boolean) => {
     onChange(next);
@@ -51,8 +55,6 @@ export function LaunchCoinToggle({
       }
     }
   };
-
-  const address = publicKey?.toBase58() ?? null;
 
   return (
     <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
@@ -80,8 +82,7 @@ export function LaunchCoinToggle({
       ) : (
         <div className="pl-7 space-y-4">
           <p className="text-xs text-muted-foreground">
-            Stay here to launch. {WALLET_COPY.launchHint} No first buy. Fans get a
-            Buy link out.
+            Stay here to launch. No first buy. Fans get a Buy link out.
           </p>
 
           <div>
@@ -139,10 +140,15 @@ export function LaunchCoinToggle({
 
           {connected && address ? (
             <p className="text-xs text-muted-foreground">
-              {connectedLabel(address)}. {WALLET_COPY.launchHint}
+              {WALLET_COPY.launchReady}
             </p>
           ) : (
-            <WalletConnectControl disabled={disabled} />
+            <div className="space-y-2">
+              <WalletConnectControl disabled={disabled} />
+              <p className="text-xs text-muted-foreground">
+                {WALLET_COPY.launchHint}
+              </p>
+            </div>
           )}
         </div>
       )}
