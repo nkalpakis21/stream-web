@@ -296,11 +296,11 @@ export function SpotifyPlayer({
       <div className="max-w-7xl mx-auto px-4 py-3">
         {/* Progress Bar */}
         <div
-          className="h-1 bg-muted cursor-pointer hover:h-1.5 transition-all mb-3 rounded-full overflow-hidden"
+          className="h-1 bg-muted cursor-pointer hover:h-1.5 transition-all mb-3 rounded-xl overflow-hidden"
           onClick={handleProgressClick}
         >
           <div
-            className="h-full bg-accent transition-all rounded-full"
+            className="h-full bg-accent transition-all rounded-xl"
             style={{ width: `${progressPercentage}%` }}
           />
         </div>
@@ -310,7 +310,7 @@ export function SpotifyPlayer({
           {/* Left: Song Info */}
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {albumCoverUrl ? (
-              <div className="relative w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0 rounded-lg overflow-hidden">
+              <div className="relative w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0 rounded-xl overflow-hidden">
                 <Image
                   src={albumCoverUrl}
                   alt={songTitle}
@@ -321,7 +321,7 @@ export function SpotifyPlayer({
                 />
               </div>
             ) : (
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-muted rounded-xl flex items-center justify-center flex-shrink-0">
                 <Play className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground" />
               </div>
             )}
@@ -359,7 +359,7 @@ export function SpotifyPlayer({
                 step="0.01"
                 value={volume}
                 onChange={handleVolumeChange}
-                className="w-24 h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-accent [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-accent [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+                className="w-24 h-1.5 bg-muted rounded-xl appearance-none cursor-pointer accent-accent [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-accent [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
                 style={{
                   background: `linear-gradient(to right, var(--listen-accent, hsl(var(--accent))) 0%, var(--listen-accent, hsl(var(--accent))) ${volume * 100}%, var(--listen-surface-2, hsl(var(--muted))) ${volume * 100}%, var(--listen-surface-2, hsl(var(--muted))) 100%)`
                 }}

@@ -22,7 +22,7 @@ function DiscoverPill({
     <button
       type="button"
       onClick={onClick}
-      className="min-h-11 rounded-full px-5 text-sm font-semibold transition-colors"
+      className="h-11 rounded-xl px-5 text-sm font-semibold transition-colors"
       style={
         active
           ? { background: 'var(--accent)', color: 'var(--accent-ink)' }
@@ -116,16 +116,14 @@ function DiscoverPageInner() {
     writeUrl('', sort);
   }, [sort, writeUrl]);
 
-  const canSearch = Boolean(searchQuery.trim());
-
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         <section className="mb-12">
           <h1 className="listen-h1 mb-8">Discover</h1>
 
-          <form onSubmit={handleSearch} className="mb-6 flex gap-2">
-            <label className="relative block min-w-0 flex-1">
+          <form onSubmit={handleSearch} className="mb-6">
+            <label className="relative block min-w-0">
               <span className="sr-only">Search</span>
               <Search
                 className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2"
@@ -137,22 +135,15 @@ function DiscoverPageInner() {
                 value={searchQuery}
                 onChange={e => handleChange(e.target.value)}
                 placeholder="Songs, artists, titles."
-                className="h-12 w-full border bg-card pl-12 pr-5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:border-transparent transition-all"
+                className="h-12 w-full rounded-xl border pl-12 pr-5 focus:outline-none transition-all"
                 style={{
-                  borderRadius: 9999,
+                  borderRadius: 'var(--radius, 12px)',
                   borderColor: 'var(--line)',
-                  background: 'var(--surface)',
+                  background: 'var(--surface-2)',
                   color: 'var(--ink)',
                 }}
               />
             </label>
-            <button
-              type="submit"
-              disabled={!canSearch}
-              className="listen-btn-primary disabled:opacity-50"
-            >
-              Search
-            </button>
           </form>
 
           <div className="flex flex-wrap gap-2">
@@ -164,7 +155,7 @@ function DiscoverPageInner() {
         {loading ? (
           <SongCardSkeletonGrid showCluster />
         ) : error ? (
-          <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
+          <div className="p-12 border-2 border-dashed border-border rounded-xl text-center bg-muted/30">
             <p className="text-muted-foreground text-lg mb-4">
               {error.message || 'Failed to load songs'}
             </p>
@@ -176,7 +167,7 @@ function DiscoverPageInner() {
             </button>
           </div>
         ) : songs.length === 0 ? (
-          <div className="p-12 border-2 border-dashed border-border rounded-2xl text-center bg-muted/30">
+          <div className="p-12 border-2 border-dashed border-border rounded-xl text-center bg-muted/30">
             {activeQuery ? (
               <div className="space-y-4">
                 <p className="text-muted-foreground text-lg">

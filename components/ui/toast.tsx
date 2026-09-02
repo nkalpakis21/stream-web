@@ -39,7 +39,7 @@ function ToastItem({ toast, onDismiss }: ToastProps) {
 
   return (
     <div
-      className={`flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${bgColors[toast.type]} animate-in slide-in-from-top-2 duration-200`}
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg ${bgColors[toast.type]} animate-in slide-in-from-top-2 duration-200`}
     >
       {icons[toast.type]}
       <p className="flex-1 text-sm font-medium text-foreground">{toast.message}</p>

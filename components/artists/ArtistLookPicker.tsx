@@ -285,7 +285,7 @@ export function ArtistLookPicker({
           accept="image/jpeg,image/png,image/webp,image/gif"
           disabled={busy}
           onChange={e => handlePhotoChange(e.target.files?.[0] ?? null)}
-          className="block w-full text-sm text-muted-foreground file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-accent/10 file:text-accent file:font-medium"
+          className="block w-full text-sm text-muted-foreground file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:bg-accent/10 file:text-accent file:font-medium"
         />
         {photoSrc && (
           <div className="mt-4 space-y-3">

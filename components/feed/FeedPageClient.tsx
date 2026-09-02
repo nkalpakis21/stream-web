@@ -381,7 +381,7 @@ export function FeedPageClient() {
             hasLoadedInitialRef.current = false;
             loadInitial();
           }}
-          className="px-4 py-2 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors"
+          className="px-4 py-2 bg-accent text-accent-foreground rounded-xl hover:bg-accent/90 transition-colors"
         >
           Retry
         </button>

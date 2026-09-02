@@ -143,6 +143,9 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--line, #2a2a38);
+  border-radius: var(--radius, 12px);
   font-size: 12px;
   line-height: 16px;
   font-variant-numeric: tabular-nums;
@@ -260,14 +263,14 @@
     top: 50%;
     height: 4px;
     transform: translateY(-50%);
-    border-radius: 999px;
+    border-radius: var(--radius, 12px);
     background: var(--line, #2a2a38);
     pointer-events: none;
   }
 
   .listen-player-scrub-fill {
     height: 100%;
-    border-radius: 999px;
+    border-radius: var(--radius, 12px);
     background: var(--accent, #7c7bff);
   }
 

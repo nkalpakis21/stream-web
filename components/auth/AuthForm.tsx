@@ -61,7 +61,7 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
 
   return (
     <div className="w-full max-w-md mx-auto">
-      <div className="bg-card p-8 lg:p-10 rounded-2xl shadow-soft border border-border">
+      <div className="bg-card p-8 lg:p-10 rounded-xl shadow-soft border border-border">
         <h2 className="text-3xl font-bold mb-8 text-center text-foreground">
           {isSignUp ? 'Create Account' : 'Sign In'}
         </h2>

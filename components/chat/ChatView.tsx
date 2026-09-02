@@ -362,7 +362,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
                   </span>
                 )}
                 <div
-                  className={`rounded-lg px-4 py-2 ${
+                  className={`rounded-xl px-4 py-2 ${
                     isOwn
                       ? 'bg-accent text-accent-foreground'
                       : 'bg-muted text-foreground'

@@ -25,7 +25,7 @@ export function ProgressIndicator({ currentStep, artistCreated, hasArtists = fal
               {/* Step Circle */}
               <div className="flex flex-col items-center flex-1">
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-all duration-300 ${
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center font-semibold text-sm transition-all duration-300 ${
                     isCompleted
                       ? 'bg-accent text-accent-foreground'
                       : isActive

@@ -105,14 +105,14 @@ export function EditArtistName({ artistId, currentName, onUpdate }: EditArtistNa
             onChange={(e) => setName(e.target.value)}
             placeholder="Enter artist name"
             maxLength={50}
-            className="px-3 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+            className="px-3 py-1.5 text-sm border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             disabled={saving}
             autoFocus
           />
           <button
             onClick={handleSave}
             disabled={saving || !name.trim()}
-            className="p-1.5 text-accent hover:bg-accent/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-1.5 text-accent hover:bg-accent/10 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label="Save"
           >
             {saving ? (
@@ -135,7 +135,7 @@ export function EditArtistName({ artistId, currentName, onUpdate }: EditArtistNa
           <span className="listen-h1" data-entity="artist">{name}</span>
           <button
             onClick={() => setEditing(true)}
-            className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted"
+            className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted"
             aria-label="Edit artist name"
           >
             <Edit2 className="w-4 h-4" />

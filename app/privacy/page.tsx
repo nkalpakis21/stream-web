@@ -13,14 +13,14 @@ export default function PrivacyPolicyPage() {
           <h1 className="listen-h1 mb-8">Privacy Policy</h1>
           
           <p className="text-muted-foreground mb-6">
-            <strong>Last updated:</strong> August 29, 2026
+            <strong>Last updated:</strong> September 2, 2026
           </p>
 
           <div className="space-y-8 text-foreground">
             <section>
               <h2 className="text-2xl font-semibold mb-4">1. Introduction</h2>
               <p className="text-muted-foreground leading-relaxed">
-                Welcome to Streamstar (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). We are committed to protecting your privacy and ensuring you have a positive experience on our platform. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our AI-native music platform.
+                Welcome to Streamstar (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). We are committed to protecting your privacy and ensuring you have a positive experience on our platform. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use Streamstar, a music app for listening, creating artists, and optionally launching an artist coin.
               </p>
             </section>
 
@@ -65,9 +65,9 @@ export default function PrivacyPolicyPage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold mb-4">4. AI and Machine Learning</h2>
+              <h2 className="text-2xl font-semibold mb-4">4. Content you create</h2>
               <p className="text-muted-foreground leading-relaxed">
-                Our platform uses artificial intelligence and machine learning to generate music and create AI artists. The content you create, including prompts and preferences, may be used to train and improve our AI models. By using our service, you consent to this use of your data for AI training purposes.
+                We use the content you create — including artist profiles, songs, and preferences — to operate Streamstar as a music app. That includes listening, artist creation, and optional artist-coin features. By using the Service, you consent to this use of your data to provide those features.
               </p>
             </section>
 

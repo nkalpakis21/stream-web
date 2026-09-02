@@ -84,7 +84,7 @@ export function VersionCards({
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {hasPendingGeneration ? (
         <div
-          className="mb-8 rounded-2xl border px-5 py-6"
+          className="mb-8 rounded-xl border px-5 py-6"
           style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}
         >
           <h3 className="text-base font-semibold text-foreground">Making the track</h3>

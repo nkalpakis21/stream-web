@@ -1,0 +1,16 @@
+{
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "www.streamstar.xyz" }],
+      "destination": "https://streamstar.xyz/",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.streamstar.xyz" }],
+      "destination": "https://streamstar.xyz/:path*",
+      "permanent": true
+    }
+  ]
+}

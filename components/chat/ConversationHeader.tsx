@@ -238,14 +238,14 @@ export function ConversationHeader({ conversationId }: ConversationHeaderProps) 
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Enter group chat title"
                   maxLength={100}
-                  className="px-3 py-1.5 text-lg font-semibold border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent flex-1"
+                  className="px-3 py-1.5 text-lg font-semibold border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent flex-1"
                   disabled={savingTitle}
                   autoFocus
                 />
                 <button
                   onClick={handleSaveTitle}
                   disabled={savingTitle || !title.trim()}
-                  className="p-1.5 text-accent hover:bg-accent/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-1.5 text-accent hover:bg-accent/10 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   aria-label="Save"
                 >
                   {savingTitle ? (
@@ -269,7 +269,7 @@ export function ConversationHeader({ conversationId }: ConversationHeaderProps) 
                 {conversation.type === 'group' && isCreator && !editingTitle && (
                   <button
                     onClick={() => setEditingTitle(true)}
-                    className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted"
+                    className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted"
                     aria-label="Edit group chat title"
                   >
                     <Edit2 className="w-4 h-4" />

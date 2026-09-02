@@ -1,8 +1,8 @@
-export const SITE_ORIGIN = 'https://www.streamstar.xyz';
+export const SITE_ORIGIN = 'https://streamstar.xyz';
 export const SITE_NAME = 'Streamstar';
 export const LEGAL_EMAIL = 'legal@streamstar.xyz';
 export const PRIVACY_EMAIL = 'privacy@streamstar.xyz';
-export const LEGAL_UPDATED = 'August 29, 2026';
+export const LEGAL_UPDATED = 'September 2, 2026';
 export const THEME_COLOR = '#0A0A10';
 
 export function publicPath(path: string): string {

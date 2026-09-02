@@ -101,7 +101,7 @@ export function NotificationsDropdown({ isOpen, onClose }: NotificationsDropdown
       {/* Dropdown */}
       <div
         ref={dropdownRef}
-        className="fixed right-4 sm:right-6 md:right-8 top-[72px] sm:top-[80px] w-[calc(100vw-2rem)] sm:w-[360px] md:w-[400px] max-h-[500px] bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+        className="fixed right-4 sm:right-6 md:right-8 top-[72px] sm:top-[80px] w-[calc(100vw-2rem)] sm:w-[360px] md:w-[400px] max-h-[500px] bg-card border border-border/50 rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
       >
         {/* Header */}
         <div className="px-6 py-4 border-b border-border/50">
@@ -132,7 +132,7 @@ export function NotificationsDropdown({ isOpen, onClose }: NotificationsDropdown
                     className="w-full px-6 py-4 text-left hover:bg-muted/50 transition-colors group"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
                         <span className="text-xs font-semibold text-accent">New</span>
                       </div>
                       <div className="flex-1 min-w-0">
