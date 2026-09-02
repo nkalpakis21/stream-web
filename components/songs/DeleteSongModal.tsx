@@ -44,7 +44,7 @@ export function DeleteSongModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-4 mb-4">
-          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+          <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center">
             <svg
               className="w-6 h-6 text-destructive"
               fill="none"
@@ -70,7 +70,7 @@ export function DeleteSongModal({
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-xl">
             <p className="text-sm text-destructive">{error}</p>
           </div>
         )}
@@ -79,14 +79,14 @@ export function DeleteSongModal({
           <button
             onClick={onClose}
             disabled={isDeleting}
-            className="px-4 py-2 rounded-lg border border-border bg-card hover:bg-muted transition-colors text-sm font-medium text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-xl border border-border bg-card hover:bg-muted transition-colors text-sm font-medium text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={isDeleting}
-            className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isDeleting ? (
               <>

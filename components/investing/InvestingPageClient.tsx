@@ -62,7 +62,7 @@ function SignInGate({
           type="button"
           onClick={handleSignIn}
           disabled={signingIn}
-          className="inline-flex items-center justify-center gap-3 px-6 py-3 bg-accent text-accent-foreground rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-3 px-6 py-3 bg-accent text-accent-foreground rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
         >
           <GoogleMark />
           {signingIn ? 'Signing in...' : 'Sign in with Google'}
@@ -177,9 +177,9 @@ function InvestingMemo() {
               {HOW_IT_WORKS.map((step, index) => (
                 <li
                   key={step}
-                  className="flex items-start gap-4 rounded-2xl border border-border/50 bg-card/40 px-5 py-4"
+                  className="flex items-start gap-4 rounded-xl border border-border/50 bg-card/40 px-5 py-4"
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-sm font-semibold text-primary">
                     {index + 1}
                   </span>
                   <span className="pt-1 text-foreground leading-relaxed">
@@ -193,14 +193,14 @@ function InvestingMemo() {
           <section>
             <SectionLabel>Live vs not</SectionLabel>
             <div className="grid sm:grid-cols-2 gap-4">
-              <div className="rounded-2xl border border-primary/25 bg-primary/5 p-6">
+              <div className="rounded-xl border border-primary/25 bg-primary/5 p-6">
                 <p className="text-sm font-semibold text-primary mb-3">Live</p>
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   AI artists, generation, catalogs, social (comments, follows,
                   chat). Pump.fun opt-in on create; launch is not live.
                 </p>
               </div>
-              <div className="rounded-2xl border border-border/50 bg-card/40 p-6">
+              <div className="rounded-xl border border-border/50 bg-card/40 p-6">
                 <p className="text-sm font-semibold text-foreground mb-3">
                   Not live
                 </p>
@@ -230,7 +230,7 @@ function InvestingMemo() {
               ].map(row => (
                 <div
                   key={row.label}
-                  className="rounded-2xl border border-border/50 bg-card/40 px-5 py-4"
+                  className="rounded-xl border border-border/50 bg-card/40 px-5 py-4"
                 >
                   <p className="text-sm font-semibold text-foreground mb-1">
                     {row.label}
@@ -252,7 +252,7 @@ function InvestingMemo() {
 
           <section>
             <SectionLabel>Team</SectionLabel>
-            <div className="rounded-2xl border border-border/50 bg-card/40 px-5 py-6">
+            <div className="rounded-xl border border-border/50 bg-card/40 px-5 py-6">
               <p className="text-xl font-semibold text-foreground">
                 Nick Kalpakis
               </p>
@@ -262,7 +262,7 @@ function InvestingMemo() {
 
           <section>
             <SectionLabel>The ask</SectionLabel>
-            <div className="rounded-2xl border border-border/50 bg-card/40 p-6 md:p-8 space-y-6">
+            <div className="rounded-xl border border-border/50 bg-card/40 p-6 md:p-8 space-y-6">
               <div>
                 <p className="text-4xl md:text-5xl font-semibold tracking-tight">
                   $500k pre-seed

@@ -108,7 +108,7 @@ function SignInPageContent() {
             </p>
           </div>
 
-          <div className="bg-card p-8 lg:p-10 rounded-2xl shadow-lg border border-border">
+          <div className="bg-card p-8 lg:p-10 rounded-xl shadow-lg border border-border">
             {error && (
               <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-sm">
                 {error}

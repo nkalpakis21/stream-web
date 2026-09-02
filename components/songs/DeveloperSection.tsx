@@ -216,7 +216,7 @@ export function DeveloperSection({ generations, songId }: DeveloperSectionProps)
     <section className="border-t border-gray-200 dark:border-gray-800 pt-8 mt-8">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4 text-left hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors"
+        className="w-full bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 mb-4 text-left hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors"
       >
         <div className="flex justify-between items-center">
           <div>
@@ -236,7 +236,7 @@ export function DeveloperSection({ generations, songId }: DeveloperSectionProps)
       {isOpen && (
         <div>
           {musicGPTGenerations.map((generation) => (
-            <div key={generation.id} className="mb-6 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+            <div key={generation.id} className="mb-6 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
               <h3 className="font-semibold mb-3">Generation: {generation.id}</h3>
               <div className="space-y-2 text-sm font-mono">
                 <div>
@@ -322,13 +322,13 @@ export function DeveloperSection({ generations, songId }: DeveloperSectionProps)
             <button
               onClick={handleSimulateWebhooks}
               disabled={simulating}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {simulating ? 'Simulating Webhooks...' : 'Simulate Webhook Events'}
             </button>
 
             {simulationResults.length > 0 && (
-              <div className="mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+              <div className="mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-xl">
                 <h4 className="font-semibold mb-2">Simulation Results:</h4>
                 <ul className="space-y-1 text-sm">
                   {simulationResults.map((result, idx) => (

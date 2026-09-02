@@ -152,14 +152,14 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
       onClick={onClose}
     >
       <div 
-        className="bg-card border border-border rounded-lg w-full max-w-md p-6 shadow-lg max-h-[90vh] flex flex-col"
+        className="bg-card border border-border rounded-xl w-full max-w-md p-6 shadow-lg max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">New Chat</h2>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-muted rounded-lg transition-colors"
+            className="p-1 hover:bg-muted rounded-xl transition-colors"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -168,7 +168,7 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
 
         {/* Selected Artists Chips */}
         {selectedArtistIds.length > 0 && (
-          <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
+          <div className="mb-4 p-3 bg-muted/50 rounded-xl border border-border">
             <div className="flex items-center gap-2 mb-2">
               <Users className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium text-muted-foreground">
@@ -185,7 +185,7 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
                 return (
                   <div
                     key={artistId}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-background border border-border rounded-full text-sm"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-background border border-border rounded-xl text-sm"
                   >
                     {artistDoc?.avatarURL ? (
                       <div className="w-5 h-5 rounded-full overflow-hidden flex-shrink-0">
@@ -229,7 +229,7 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search artists you follow..."
-            className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             autoFocus
             disabled // Disabled until artist search is implemented
           />
@@ -283,7 +283,7 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
                       e.preventDefault();
                       handleToggleArtist(artist.id, e);
                     }}
-                    className={`w-full p-3 text-left hover:bg-muted rounded-lg transition-colors flex items-center gap-3 ${
+                    className={`w-full p-3 text-left hover:bg-muted rounded-xl transition-colors flex items-center gap-3 ${
                       selected ? 'bg-muted border-2 border-accent' : ''
                     }`}
                   >
@@ -316,7 +316,7 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
                       )}
                     </div>
                     {selected ? (
-                      <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
+                      <div className="w-6 h-6 rounded-xl bg-accent flex items-center justify-center flex-shrink-0">
                         <Check className="w-4 h-4 text-accent-foreground" />
                       </div>
                     ) : (
@@ -334,7 +334,7 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
           <div className="mt-4 pt-4 border-t border-border">
             <button
               onClick={handleStartChat}
-              className="w-full px-4 py-2 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors flex items-center justify-center gap-2"
+              className="w-full px-4 py-2 bg-accent text-accent-foreground rounded-xl hover:bg-accent/90 transition-colors flex items-center justify-center gap-2"
             >
               <Users className="w-4 h-4" />
               <span>

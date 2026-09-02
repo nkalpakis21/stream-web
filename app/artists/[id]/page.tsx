@@ -139,7 +139,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border-2 border-dashed border-border bg-muted/30 p-12 text-center">
+            <div className="rounded-xl border-2 border-dashed border-border bg-muted/30 p-12 text-center">
               <EmptyAction message="No songs yet." href="/discover" label="Discover" />
             </div>
           )}

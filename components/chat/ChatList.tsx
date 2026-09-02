@@ -178,7 +178,7 @@ export function ChatList({ selectedConversationId, onSelectConversation, onNewCh
         <h2 className="text-lg font-semibold">Conversations</h2>
         <button
           onClick={onNewChat}
-          className="p-2 rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 transition-colors"
+          className="p-2 rounded-xl bg-accent text-accent-foreground hover:bg-accent/90 transition-colors"
           aria-label="New chat"
         >
           <Plus className="w-5 h-5" />
@@ -191,7 +191,7 @@ export function ChatList({ selectedConversationId, onSelectConversation, onNewCh
           <p className="mb-4">No conversations yet</p>
           <button
             onClick={onNewChat}
-            className="px-4 py-2 rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 transition-colors flex items-center gap-2"
+            className="px-4 py-2 rounded-xl bg-accent text-accent-foreground hover:bg-accent/90 transition-colors flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             <span>Start a new chat</span>

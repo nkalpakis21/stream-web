@@ -51,7 +51,7 @@ export function LyricsSection({
     <section className="w-full">
       {mode === 'minimal' && (
         <div
-          className={`relative bg-gradient-to-br from-card via-card to-card/95 rounded-2xl border border-border/50 overflow-hidden shadow-2xl backdrop-blur-sm transition-all duration-700 ${
+          className={`relative bg-gradient-to-br from-card via-card to-card/95 rounded-xl border border-border/50 overflow-hidden shadow-2xl backdrop-blur-sm transition-all duration-700 ${
             isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
           }`}
           style={{
@@ -71,8 +71,8 @@ export function LyricsSection({
             >
               <div className="flex items-center gap-4">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-accent/20 rounded-lg blur-xl group-hover:bg-accent/30 transition-all duration-300" />
-                  <div className="relative p-2 bg-gradient-to-br from-accent/10 to-accent/5 rounded-lg">
+                  <div className="absolute inset-0 bg-accent/20 rounded-xl blur-xl group-hover:bg-accent/30 transition-all duration-300" />
+                  <div className="relative p-2 bg-gradient-to-br from-accent/10 to-accent/5 rounded-xl">
                     <svg
                       className="w-6 h-6 text-accent"
                       fill="none"
@@ -146,7 +146,7 @@ export function LyricsSection({
                 className="mb-12 flex items-center gap-3 text-muted-foreground hover:text-foreground transition-all duration-300 group"
                 aria-label="Close immersive view"
               >
-                <div className="p-2 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors">
+                <div className="p-2 rounded-xl bg-muted/50 group-hover:bg-muted transition-colors">
                   <svg
                     className="w-5 h-5"
                     fill="none"

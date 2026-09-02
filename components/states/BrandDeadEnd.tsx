@@ -2,9 +2,9 @@ import Link from 'next/link';
 import { LogoIcon } from '@/components/branding/LogoIcon';
 
 export const listenPrimaryClass =
-  'inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground';
+  'inline-flex rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground';
 export const listenSecondaryClass =
-  'inline-flex rounded-full border border-border px-5 py-2.5 text-sm font-medium text-foreground';
+  'inline-flex rounded-xl border border-border px-5 py-2.5 text-sm font-medium text-foreground';
 
 interface BrandDeadEndProps {
   line: string;
