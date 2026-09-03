@@ -1,4 +1,5 @@
 import { ArtistCardSkeletonGrid } from '@/components/artists/ArtistCardSkeleton';
+import '@/components/artists/artist-card.css';
 
 export default function ArtistsLoading() {
   return (

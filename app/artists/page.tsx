@@ -3,6 +3,7 @@ import { getPublicArtists } from '@/lib/services/artists';
 import { getPublicSongs } from '@/lib/services/songs';
 import { ArtistCard } from '@/components/artists/ArtistCard';
 import { EmptyAction } from '@/components/states/EmptyAction';
+import '@/components/artists/artist-card.css';
 import { hasLaunchedCoin } from '@/lib/brand/coin';
 import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
 import type { SongDocument } from '@/types/firestore';
@@ -18,14 +19,16 @@ export const metadata: Metadata = {
 export default async function ArtistsPage() {
   const [artists, songs] = await Promise.all([
     getPublicArtists(50),
-    getPublicSongs(80),
+    getPublicSongs(400),
   ]);
 
   const playableByArtist = new Map<string, SongDocument>();
+  const trackCountByArtist = new Map<string, number>();
   songs.forEach(song => {
     if (!playableByArtist.has(song.artistId)) {
       playableByArtist.set(song.artistId, song);
     }
+    trackCountByArtist.set(song.artistId, (trackCountByArtist.get(song.artistId) || 0) + 1);
   });
 
   const mintByArtist = new Map<string, string>();
@@ -48,17 +51,20 @@ export default async function ArtistsPage() {
         <div className="flex items-center justify-between mb-12">
           <h1 className="listen-h1">All Artists</h1>
           {artists.length > 0 && (
-            <span className="text-sm text-muted-foreground">{artists.length} {artists.length === 1 ? 'artist' : 'artists'}</span>
+            <span className="text-sm" style={{ color: 'var(--mute)' }}>
+              {artists.length} {artists.length === 1 ? 'artist' : 'artists'}
+            </span>
           )}
         </div>
 
         {artists.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+          <div className="artist-index-grid">
             {artists.map(artist => (
               <ArtistCard
                 key={artist.id}
                 artist={artist}
                 playable={playableByArtist.get(artist.id) || null}
+                trackCount={trackCountByArtist.get(artist.id)}
                 coin={coinByArtist.get(artist.id) || null}
               />
             ))}
