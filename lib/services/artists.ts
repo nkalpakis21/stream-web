@@ -24,6 +24,7 @@ import {
   getArtistVersionPath,
 } from '@/lib/firebase/collections';
 import { hasLaunchedCoin } from '@/lib/brand/coin';
+import { MAX_ARTIST_BIO_LENGTH } from '@/lib/brand/bio';
 import {
   emptyPumpFunCoin,
   emptyXConnection,
@@ -380,6 +381,41 @@ export async function updateArtistName(
   });
 
   // Return updated artist
+  const updatedArtist = await getArtist(artistId);
+  if (!updatedArtist) {
+    throw new Error('Failed to retrieve updated artist');
+  }
+
+  return updatedArtist;
+}
+
+/**
+ * Owner-only bio (`lore`) update from the artist page. Empty is allowed.
+ */
+export async function updateArtistLore(
+  artistId: string,
+  userId: string,
+  lore: string
+): Promise<AIArtistDocument> {
+  const trimmed = lore.trim();
+  if (trimmed.length > MAX_ARTIST_BIO_LENGTH) {
+    throw new Error(`Bio must be ${MAX_ARTIST_BIO_LENGTH} characters or less`);
+  }
+
+  const artist = await getArtist(artistId);
+  if (!artist) {
+    throw new Error('Artist not found');
+  }
+  if (artist.ownerId !== userId) {
+    throw new Error('Only the owner can update the artist bio');
+  }
+
+  if (artist.lore === trimmed) {
+    return artist;
+  }
+
+  await createArtistVersion(artistId, userId, { lore: trimmed });
+
   const updatedArtist = await getArtist(artistId);
   if (!updatedArtist) {
     throw new Error('Failed to retrieve updated artist');

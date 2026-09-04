@@ -25,10 +25,17 @@ export interface PhotoFrameEditorHandle {
 interface PhotoFrameEditorProps {
   src: string;
   disabled?: boolean;
+  /** On-screen crop viewport. Export still writes FRAME_OUTPUT_PX. */
+  viewportPx?: number;
+  /** Circular clip for the owner-panel face. */
+  circular?: boolean;
 }
 
 export const PhotoFrameEditor = forwardRef<PhotoFrameEditorHandle, PhotoFrameEditorProps>(
-  function PhotoFrameEditor({ src, disabled = false }, ref) {
+  function PhotoFrameEditor(
+    { src, disabled = false, viewportPx = FRAME_VIEWPORT_PX, circular = false },
+    ref
+  ) {
     const imageRef = useRef<HTMLImageElement | null>(null);
     const dragRef = useRef<{
       pointerId: number;
@@ -43,30 +50,30 @@ export const PhotoFrameEditor = forwardRef<PhotoFrameEditorHandle, PhotoFrameEdi
     const [offset, setOffset] = useState({ x: 0, y: 0 });
 
     const baseScale = natural
-      ? coverScale(natural.w, natural.h, FRAME_VIEWPORT_PX)
+      ? coverScale(natural.w, natural.h, viewportPx)
       : 1;
     const scale = baseScale * zoom;
-    const drawnW = natural ? natural.w * scale : FRAME_VIEWPORT_PX;
-    const drawnH = natural ? natural.h * scale : FRAME_VIEWPORT_PX;
+    const drawnW = natural ? natural.w * scale : viewportPx;
+    const drawnH = natural ? natural.h * scale : viewportPx;
 
     const applyClampedOffset = useCallback(
       (x: number, y: number, nextDrawnW: number, nextDrawnH: number) => {
         setOffset({
-          x: clampOffset(x, nextDrawnW, FRAME_VIEWPORT_PX),
-          y: clampOffset(y, nextDrawnH, FRAME_VIEWPORT_PX),
+          x: clampOffset(x, nextDrawnW, viewportPx),
+          y: clampOffset(y, nextDrawnH, viewportPx),
         });
       },
-      []
+      [viewportPx]
     );
 
     const handleImageLoad = (img: HTMLImageElement) => {
       const w = img.naturalWidth;
       const h = img.naturalHeight;
       setNatural({ w, h });
-      const cover = coverScale(w, h, FRAME_VIEWPORT_PX);
+      const cover = coverScale(w, h, viewportPx);
       applyClampedOffset(
-        (FRAME_VIEWPORT_PX - w * cover) / 2,
-        (FRAME_VIEWPORT_PX - h * cover) / 2,
+        (viewportPx - w * cover) / 2,
+        (viewportPx - h * cover) / 2,
         w * cover,
         h * cover
       );
@@ -81,7 +88,7 @@ export const PhotoFrameEditor = forwardRef<PhotoFrameEditorHandle, PhotoFrameEdi
         nextScale,
         offset.x,
         offset.y,
-        FRAME_VIEWPORT_PX
+        viewportPx
       );
       setZoom(nextZoom);
       applyClampedOffset(
@@ -132,7 +139,7 @@ export const PhotoFrameEditor = forwardRef<PhotoFrameEditorHandle, PhotoFrameEdi
         canvas.height = FRAME_OUTPUT_PX;
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('Could not frame that photo.');
-        const ratio = FRAME_OUTPUT_PX / FRAME_VIEWPORT_PX;
+        const ratio = FRAME_OUTPUT_PX / viewportPx;
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, FRAME_OUTPUT_PX, FRAME_OUTPUT_PX);
         ctx.drawImage(
@@ -153,10 +160,10 @@ export const PhotoFrameEditor = forwardRef<PhotoFrameEditorHandle, PhotoFrameEdi
     return (
       <div className="space-y-3">
         <div
-          className={`relative mx-auto overflow-hidden rounded-xl bg-muted touch-none ${
-            disabled ? 'cursor-not-allowed opacity-70' : 'cursor-grab active:cursor-grabbing'
-          }`}
-          style={{ width: FRAME_VIEWPORT_PX, height: FRAME_VIEWPORT_PX }}
+          className={`relative mx-auto overflow-hidden bg-muted touch-none ${
+            circular ? 'rounded-full' : 'rounded-xl'
+          } ${disabled ? 'cursor-not-allowed opacity-70' : 'cursor-grab active:cursor-grabbing'}`}
+          style={{ width: viewportPx, height: viewportPx }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}

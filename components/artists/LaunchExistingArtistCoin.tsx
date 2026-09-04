@@ -119,9 +119,10 @@ export function LaunchExistingArtistCoin({
   };
 
   return (
-    <div className="space-y-4">
+    <div>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <LaunchCoinToggle
+        variant="flat"
         checked={launchCoin}
         onChange={setLaunchCoin}
         disabled={busy}
@@ -133,14 +134,16 @@ export function LaunchExistingArtistCoin({
         lookUrl={lookUrl}
       />
       {launchCoin && (
-        <button
-          type="button"
-          onClick={handleLaunch}
-          disabled={busy}
-          className="w-full px-6 py-3 bg-accent text-accent-foreground rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-soft"
-        >
-          {launching ? 'Launching…' : 'Launch coin'}
-        </button>
+        <div className="owner-flat-extra">
+          <button
+            type="button"
+            onClick={handleLaunch}
+            disabled={busy}
+            className="btn-primary w-full"
+          >
+            {launching ? 'Launching…' : 'Launch coin'}
+          </button>
+        </div>
       )}
     </div>
   );
