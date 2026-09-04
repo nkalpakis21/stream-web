@@ -22,6 +22,8 @@ const ALLOWED_SOURCE_TYPES = new Set([
   'image/gif',
 ]);
 
+const OWNER_FACE_PX = 232;
+
 interface ArtistLookPickerProps {
   artistName: string;
   lore: string;
@@ -36,6 +38,8 @@ interface ArtistLookPickerProps {
    * pick a look to persist `avatarURL`. Same Fal endpoint either way.
    */
   mode?: 'create' | 'lock';
+  /** Current locked face on the artist page. Ignored in create mode. */
+  lockedUrl?: string | null;
 }
 
 function splitCsv(value: string): string[] {
@@ -79,6 +83,7 @@ export function ArtistLookPicker({
   onSelectedUrlChange,
   disabled = false,
   mode = 'create',
+  lockedUrl = null,
 }: ArtistLookPickerProps) {
   const { user } = useAuth();
   const isLockMode = mode === 'lock';
@@ -100,6 +105,7 @@ export function ArtistLookPicker({
   const [uploading, setUploading] = useState(false);
   const [showGenerate, setShowGenerate] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -183,6 +189,12 @@ export function ArtistLookPicker({
         );
       }
       setUploadedUrl(data.url);
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+      setPhotoSrc(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       onSelectedUrlChange(data.url);
     } catch (err) {
       setError(userFacingApiError(undefined, err, 'Failed to upload photo.'));
@@ -256,6 +268,231 @@ export function ArtistLookPicker({
   const generateDisabled = busy || !artistName.trim();
   const showGeneratePath = available === true;
   const usingUploadedPhoto = Boolean(uploadedUrl && selectedUrl === uploadedUrl);
+  const faceUrl = photoSrc ? null : selectedUrl || lockedUrl;
+  const isLockedFace = Boolean(faceUrl) && !photoSrc;
+
+  const openFilePicker = () => {
+    if (busy) return;
+    fileInputRef.current?.click();
+  };
+
+  const acceptDroppedFile = (fileList: FileList | null) => {
+    const file = fileList?.[0] ?? null;
+    if (!file) return;
+    handlePhotoChange(file);
+  };
+
+  const hiddenFileInput = (
+    <input
+      id={fileInputId}
+      ref={fileInputRef}
+      type="file"
+      accept="image/jpeg,image/png,image/webp,image/gif"
+      disabled={busy}
+      onChange={e => handlePhotoChange(e.target.files?.[0] ?? null)}
+      className="sr-only"
+      tabIndex={-1}
+    />
+  );
+
+  const generatePanel = showGenerate && showGeneratePath ? (
+    <div id={generatePanelId} className={isLockMode ? 'owner-look-generate-panel space-y-4' : 'mt-4 space-y-4'}>
+      <div>
+        <label htmlFor={lookNotesId} className="block text-sm font-medium mb-2 text-foreground">
+          Look notes (optional)
+        </label>
+        <input
+          id={lookNotesId}
+          type="text"
+          maxLength={500}
+          value={lookNotes}
+          disabled={busy}
+          onChange={e => setLookNotes(e.target.value)}
+          placeholder="e.g. silver hair, neon jacket, 80s album-cover lighting"
+          className="w-full px-4 py-3 border border-border rounded-xl bg-background/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+        />
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Optional notes plus the framed photo are sent as a reference.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={handleGenerate}
+        disabled={generateDisabled}
+        className="w-full px-4 py-2.5 border border-border rounded-xl hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-sm text-foreground"
+      >
+        {generating ? 'Generating looks…' : 'Generate looks'}
+      </button>
+
+      {looks.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Pick one generated look</p>
+          <div className={`grid gap-3 ${isLockMode ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}>
+            {looks.map((url, index) => {
+              const isSelected = selectedUrl === url;
+              return (
+                <button
+                  key={url}
+                  type="button"
+                  onClick={() => onSelectedUrlChange(url)}
+                  disabled={busy}
+                  aria-pressed={isSelected}
+                  aria-label={`Select look ${index + 1}`}
+                  className={`relative aspect-square rounded-xl overflow-hidden ring-2 transition-all ${
+                    isSelected ? 'ring-accent scale-[1.02]' : 'ring-transparent hover:ring-border'
+                  } disabled:opacity-60 disabled:cursor-not-allowed`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                </button>
+              );
+            })}
+          </div>
+          {allowClear && selectedUrl && (
+            <button
+              type="button"
+              onClick={() => onSelectedUrlChange(null)}
+              className="mt-2 text-xs text-muted-foreground hover:text-foreground"
+            >
+              Clear selection (create without a look)
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  if (isLockMode) {
+    return (
+      <div className="owner-look">
+        {hiddenFileInput}
+        {photoSrc ? (
+          <PhotoFrameEditor
+            key={photoSrc}
+            ref={frameRef}
+            src={photoSrc}
+            disabled={busy}
+            viewportPx={OWNER_FACE_PX}
+            circular
+          />
+        ) : (
+          <div
+            className={`owner-face ${isLockedFace ? 'is-locked' : 'is-empty'}${dragOver ? ' is-over' : ''}`}
+            role="button"
+            tabIndex={busy ? -1 : 0}
+            aria-label={isLockedFace ? 'Replace artist photo' : 'Upload artist photo'}
+            onClick={openFilePicker}
+            onKeyDown={event => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openFilePicker();
+              }
+            }}
+            onDragEnter={event => {
+              event.preventDefault();
+              if (!busy) setDragOver(true);
+            }}
+            onDragOver={event => {
+              event.preventDefault();
+              if (!busy) setDragOver(true);
+            }}
+            onDragLeave={event => {
+              event.preventDefault();
+              setDragOver(false);
+            }}
+            onDrop={event => {
+              event.preventDefault();
+              setDragOver(false);
+              if (!busy) acceptDroppedFile(event.dataTransfer.files);
+            }}
+          >
+            {faceUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={faceUrl} alt="" className="owner-face-img" />
+            ) : (
+              <div className="owner-face-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M12 12a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5Z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M5.5 19.25a6.5 6.5 0 0 1 13 0"
+                  />
+                </svg>
+                <span>Drop a photo or browse</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isLockedFace ? (
+          <p className="owner-look-caption">Locked · songs keep this face</p>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={photoSrc ? handleUsePhoto : openFilePicker}
+          disabled={busy || Boolean(photoSrc && !user)}
+          className="btn-primary owner-look-upload"
+        >
+          {photoSrc
+            ? uploading
+              ? 'Uploading…'
+              : 'Use this photo'
+            : 'Upload photo'}
+        </button>
+
+        {photoSrc ? (
+          <button
+            type="button"
+            onClick={() => handlePhotoChange(null)}
+            disabled={busy}
+            className="owner-look-remove"
+          >
+            Remove photo
+          </button>
+        ) : null}
+
+        {error && (
+          <p className="owner-look-error" role="alert">
+            {error === SIGN_IN_AGAIN_MESSAGE ? (
+              <>
+                Your session expired.{' '}
+                <Link href="/signin" className="underline font-medium hover:opacity-80">
+                  Sign in again
+                </Link>{' '}
+                to continue.
+              </>
+            ) : (
+              error
+            )}
+          </p>
+        )}
+
+        {showGeneratePath && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowGenerate(open => !open)}
+              aria-expanded={showGenerate}
+              aria-controls={generatePanelId}
+              className="owner-look-generate"
+            >
+              Or <u>generate a look</u>
+            </button>
+            {generatePanel}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

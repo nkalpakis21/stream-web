@@ -4,11 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { ArtistHeader } from '@/components/artists/ArtistHeader';
-import { ArtistLookPicker } from '@/components/artists/ArtistLookPicker';
+import { ArtistOwnerPanel } from '@/components/artists/ArtistOwnerPanel';
 import { ArtistCoinModule } from '@/components/artists/ArtistCoinModule';
 import { ArtistCoinBuy } from '@/components/artists/ArtistCoinBuy';
 import { useToast, ToastContainer } from '@/components/ui/toast';
-import { LaunchExistingArtistCoin } from '@/components/artists/LaunchExistingArtistCoin';
 import { updateArtistAvatar } from '@/lib/services/artists';
 import { hasLaunchedCoin } from '@/lib/brand/coin';
 import { CoverImage } from '@/components/media/CoverImage';
@@ -23,10 +22,11 @@ interface ArtistHeroProps {
 }
 
 export function ArtistHero({ artist, coin = null, children }: ArtistHeroProps) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const isOwner = Boolean(user && user.uid === artist.ownerId);
   const [avatarURL, setAvatarURL] = useState<string | null>(artist.avatarURL);
+  const [lore, setLore] = useState(artist.lore);
   const [pumpFun, setPumpFun] = useState<PumpFunCoin | null | undefined>(
     artist.pumpFun
   );
@@ -39,6 +39,10 @@ export function ArtistHero({ artist, coin = null, children }: ArtistHeroProps) {
   useEffect(() => {
     setAvatarURL(artist.avatarURL);
   }, [artist.avatarURL]);
+
+  useEffect(() => {
+    setLore(artist.lore);
+  }, [artist.lore]);
 
   useEffect(() => {
     setPumpFun(artist.pumpFun);
@@ -66,71 +70,66 @@ export function ArtistHero({ artist, coin = null, children }: ArtistHeroProps) {
       });
   };
 
+  const coinAside = coin ? (
+    <div className="w-full lg:w-[320px] lg:flex-shrink-0">
+      <ArtistCoinModule quote={coin} buyUrl={buyUrl} />
+      <ArtistCoinBuy url={buyUrl} />
+    </div>
+  ) : null;
+
   return (
     <>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-      <div className="mb-12 flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
-        <div className="flex min-w-0 flex-1 gap-5">
-          <div className="h-[120px] w-[120px] flex-shrink-0 overflow-hidden rounded-full bg-muted">
-            <div className="relative h-full w-full">
-              <CoverImage
-                key={avatarURL || 'placeholder'}
-                src={avatarURL}
-                title={artist.name}
-                sizes="120px"
-                rounded="rounded-full"
-                unoptimized={false}
-              />
-            </div>
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="mb-2">
-              <AiMark />
-            </div>
-            <ArtistHeader artist={{ ...artist, pumpFun }} />
-          </div>
-        </div>
-
-        {coin ? (
-          <div className="w-full lg:w-[320px] lg:flex-shrink-0">
-            <ArtistCoinModule quote={coin} buyUrl={buyUrl} />
-            <ArtistCoinBuy url={buyUrl} />
-          </div>
-        ) : null}
-      </div>
-
-      {children}
-
-      {isOwner && (
-        <div className="mb-12 max-w-2xl rounded-xl border border-border bg-muted/20 p-6">
-          <ArtistLookPicker
-            mode="lock"
-            artistName={artist.name}
-            lore={artist.lore}
-            genres={artist.styleDNA.genres.join(', ')}
-            moods={artist.styleDNA.moods.join(', ')}
-            influences={artist.styleDNA.influences.join(', ')}
+      {loading ? (
+        <div className="mb-12 h-48 animate-pulse rounded-[12px]" style={{ background: 'var(--surface)' }} />
+      ) : isOwner ? (
+        <>
+          <ArtistOwnerPanel
+            artist={{ ...artist, pumpFun, lore }}
+            lore={lore}
+            avatarURL={avatarURL}
             selectedUrl={selectedUrl}
             onSelectedUrlChange={handleSelectedUrlChange}
-            disabled={locking}
+            onLoreSaved={next => {
+              setLore(next);
+              router.refresh();
+            }}
+            locking={locking}
+            showLaunch={showLaunch}
+            onLaunched={(next: PumpFunCoin) => {
+              setPumpFun(next);
+              router.refresh();
+            }}
           />
-          {showLaunch && (
-            <div className="mt-6 border-t border-border pt-6">
-              <LaunchExistingArtistCoin
-                artistId={artist.id}
-                artistName={artist.name}
-                lore={artist.lore}
-                lookUrl={avatarURL}
-                disabled={locking}
-                onLaunched={(coin: PumpFunCoin) => {
-                  setPumpFun(coin);
-                  router.refresh();
-                }}
-              />
+          {coin ? <div className="mb-12">{coinAside}</div> : null}
+        </>
+      ) : (
+        <div className="mb-12 flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
+          <div className="flex min-w-0 flex-1 gap-5">
+            <div className="h-[120px] w-[120px] flex-shrink-0 overflow-hidden rounded-full bg-muted">
+              <div className="relative h-full w-full">
+                <CoverImage
+                  key={avatarURL || 'placeholder'}
+                  src={avatarURL}
+                  title={artist.name}
+                  sizes="120px"
+                  rounded="rounded-full"
+                  unoptimized={false}
+                />
+              </div>
             </div>
-          )}
+            <div className="min-w-0 flex-1">
+              <div className="mb-2">
+                <AiMark />
+              </div>
+              <ArtistHeader artist={{ ...artist, pumpFun }} />
+            </div>
+          </div>
+          {coinAside}
         </div>
       )}
+
+      {children}
     </>
   );
 }

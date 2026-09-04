@@ -21,6 +21,8 @@ interface LaunchCoinToggleProps {
   ticker: string;
   onTickerChange: (ticker: string) => void;
   lookUrl: string | null;
+  /** `flat` is the owner-panel row. Create-artist keeps the boxed default. */
+  variant?: 'boxed' | 'flat';
 }
 
 /**
@@ -38,6 +40,7 @@ export function LaunchCoinToggle({
   ticker,
   onTickerChange,
   lookUrl,
+  variant = 'boxed',
 }: LaunchCoinToggleProps) {
   const live = useWalletLiveStatus();
   const { publicKey, connected: adapterConnected } = useWallet();
@@ -55,6 +58,118 @@ export function LaunchCoinToggle({
       }
     }
   };
+
+  const fields = (
+        <div className={variant === 'flat' ? 'owner-flat-extra space-y-4' : 'pl-7 space-y-4'}>
+          <p className="text-xs text-muted-foreground">
+            Stay here to launch. No first buy. Fans get a Buy link out.
+          </p>
+
+          <div>
+            <label htmlFor="coinName" className="block text-sm font-medium mb-2 text-foreground">
+              Coin name
+            </label>
+            <input
+              id="coinName"
+              type="text"
+              maxLength={MAX_COIN_NAME_LENGTH}
+              value={coinName}
+              disabled={disabled}
+              onChange={e => onCoinNameChange(e.target.value.slice(0, MAX_COIN_NAME_LENGTH))}
+              placeholder={artistName.trim() || 'Same as artist name'}
+              className="w-full px-4 py-3 border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="coinTicker" className="block text-sm font-medium mb-2 text-foreground">
+              Ticker
+            </label>
+            <input
+              id="coinTicker"
+              type="text"
+              maxLength={MAX_TICKER_LENGTH}
+              value={ticker}
+              disabled={disabled}
+              onChange={e => onTickerChange(normalizeTicker(e.target.value))}
+              placeholder="e.g. NEON"
+              className="w-full px-4 py-3 border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all uppercase tracking-wide"
+            />
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              2–10 letters or numbers.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {lookUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={lookUrl}
+                alt="Locked look used as coin image"
+                className="w-12 h-12 rounded-full object-cover ring-2 ring-border"
+              />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-muted ring-2 ring-border" />
+            )}
+            <p className="text-xs text-muted-foreground">
+              {lookUrl
+                ? 'Locked look is the coin image.'
+                : 'Lock a look above so it can be the coin image.'}
+            </p>
+          </div>
+
+          {connected && address ? (
+            <p className="text-xs text-muted-foreground">
+              {WALLET_COPY.launchReady}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <WalletConnectControl disabled={disabled} />
+              <p className="text-xs text-muted-foreground">
+                {WALLET_COPY.launchHint}
+              </p>
+            </div>
+          )}
+        </div>
+  );
+
+  if (variant === 'flat') {
+    return (
+      <div>
+        <div className="owner-flat-row">
+          <div className="owner-flat-icon is-plus" aria-hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeWidth={2} d="M12 5v14M5 12h14" />
+            </svg>
+          </div>
+          <div className="owner-flat-copy">
+            <p className="owner-flat-title">
+              Launch a coin
+              <span className="owner-optional">Optional</span>
+            </p>
+            <p className="owner-flat-sub">
+              Off by default. Artists work with no token — turn on only if you want one.
+            </p>
+          </div>
+          <div className="owner-flat-action">
+            <button
+              type="button"
+              id="launchCoin"
+              role="switch"
+              aria-checked={checked}
+              disabled={disabled}
+              onClick={() => handleToggle(!checked)}
+              className="owner-switch"
+            >
+              <span className="owner-switch-knob" />
+              <span className="sr-only">Launch a coin</span>
+            </button>
+          </div>
+        </div>
+        {checked ? fields : null}
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">

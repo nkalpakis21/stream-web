@@ -3,6 +3,9 @@
  * Never invent a bio.
  */
 
+/** Owner-panel bio field. Matches the signed-off STR-51 character count. */
+export const MAX_ARTIST_BIO_LENGTH = 280;
+
 const PLACEHOLDERS = new Set([
   'who they are, where they come from…',
   'who they are, where they come from...',

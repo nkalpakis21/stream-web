@@ -187,114 +187,118 @@ export function ArtistXPanel({
     ? null
     : x.lastError;
 
+  const sub =
+    available === false
+      ? unavailableMessage ||
+        'X is not configured (set X_CLIENT_ID and X_CLIENT_SECRET). Connect is disabled.'
+      : connected
+        ? x.status === 'paused'
+          ? lastError
+            ? 'Posting is paused because of an X auth or spam failure.'
+            : 'Posting is paused. Resume or disconnect anytime.'
+          : 'Verify you’re you and pull your handle onto the artist page.'
+        : 'Verify you’re you and pull your handle onto the artist page.';
+
   return (
-    <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3 max-w-2xl">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-foreground">X</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Optional public X as this artist. Streamstar posts once when a public song goes live.
-          </p>
+    <div>
+      <div className="owner-flat-row">
+        <div className="owner-flat-icon is-square" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.726-8.835L1.254 2.25H8.08l4.253 5.622L18.244 2.25Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z" />
+          </svg>
         </div>
-        {connected && x.username && (
-          <a
-            href={`https://x.com/${x.username}`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs text-accent hover:underline"
-          >
-            @{x.username}
-          </a>
-        )}
-      </div>
-
-      {available === false && (
-        <p className="text-xs text-muted-foreground">
-          {unavailableMessage ||
-            'X is not configured (set X_CLIENT_ID and X_CLIENT_SECRET). Connect is disabled.'}
-        </p>
-      )}
-
-      {banner && (
-        <p className="text-xs text-green-600" role="status">
-          {banner}
-        </p>
-      )}
-      {(bannerError || lastError) && (
-        <p className="text-xs text-red-500" role="alert">
-          {bannerError || lastError}
-        </p>
-      )}
-
-      {x.status === 'paused' && (
-        <p className="text-xs text-amber-600">
-          Posting is paused
-          {lastError ? ' because of an X auth or spam failure.' : '.'} Resume or disconnect anytime.
-        </p>
-      )}
-
-      <div className="flex flex-wrap gap-2">
-        {!connected && (
-          <button
-            type="button"
-            onClick={startConnect}
-            disabled={busy || loading || available === false}
-            className="px-3 py-1.5 text-sm rounded-xl bg-accent text-accent-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {busy ? 'Connecting…' : 'Connect X'}
-          </button>
-        )}
-        {x.status === 'connected' && (
-          <button
-            type="button"
-            onClick={() => setPaused(true)}
-            disabled={busy}
-            className="px-3 py-1.5 text-sm rounded-xl border border-border hover:bg-muted/50 disabled:opacity-50"
-          >
-            Pause posting
-          </button>
-        )}
-        {x.status === 'paused' && (
-          <button
-            type="button"
-            onClick={() => setPaused(false)}
-            disabled={busy}
-            className="px-3 py-1.5 text-sm rounded-xl border border-border hover:bg-muted/50 disabled:opacity-50"
-          >
-            Resume posting
-          </button>
-        )}
-        {connected && (
-          <>
+        <div className="owner-flat-copy">
+          <p className="owner-flat-title">
+            Connect X
+            {connected && x.username ? (
+              <a
+                href={`https://x.com/${x.username}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                @{x.username}
+              </a>
+            ) : null}
+          </p>
+          <p className="owner-flat-sub">{sub}</p>
+          {banner && (
+            <p className="owner-flat-sub" style={{ color: '#6ee7b7' }} role="status">
+              {banner}
+            </p>
+          )}
+          {(bannerError || lastError) && (
+            <p className="owner-flat-sub" style={{ color: '#ff4d6a' }} role="alert">
+              {bannerError || lastError}
+            </p>
+          )}
+        </div>
+        <div className="owner-flat-action">
+          {!connected && (
             <button
               type="button"
               onClick={startConnect}
-              disabled={busy || available === false}
-              className="px-3 py-1.5 text-sm rounded-xl border border-border hover:bg-muted/50 disabled:opacity-50"
+              disabled={busy || loading || available === false}
+              className="btn-primary"
             >
-              Reconnect
+              {busy ? 'Connecting…' : 'Connect X'}
             </button>
+          )}
+          {x.status === 'connected' && (
             <button
               type="button"
-              onClick={disconnect}
+              onClick={() => setPaused(true)}
               disabled={busy}
-              className="px-3 py-1.5 text-sm rounded-xl border border-border hover:bg-muted/50 disabled:opacity-50"
+              className="btn-ghost"
             >
-              Disconnect
+              Pause posting
             </button>
-          </>
-        )}
+          )}
+          {x.status === 'paused' && (
+            <button
+              type="button"
+              onClick={() => setPaused(false)}
+              disabled={busy}
+              className="btn-ghost"
+            >
+              Resume posting
+            </button>
+          )}
+          {connected && (
+            <>
+              <button
+                type="button"
+                onClick={startConnect}
+                disabled={busy || available === false}
+                className="btn-ghost"
+              >
+                Reconnect
+              </button>
+              <button
+                type="button"
+                onClick={disconnect}
+                disabled={busy}
+                className="btn-ghost"
+              >
+                Disconnect
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {connected && (
-        <div className="pt-2 border-t border-border/60">
-          <p className="text-xs font-medium text-muted-foreground mb-2">Activity</p>
+        <div className="owner-flat-extra">
+          <p className="owner-flat-sub" style={{ fontWeight: 600, marginBottom: 8 }}>
+            Activity
+          </p>
           {x.posts.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No posts yet. One post per public song when it goes live.</p>
+            <p className="owner-flat-sub">
+              No posts yet. One post per public song when it goes live.
+            </p>
           ) : (
             <ul className="space-y-2">
               {x.posts.map(post => (
-                <li key={post.tweetId} className="text-xs text-foreground/80">
+                <li key={post.tweetId} className="owner-flat-sub" style={{ color: 'var(--ink)' }}>
                   <a
                     href={post.url}
                     target="_blank"
