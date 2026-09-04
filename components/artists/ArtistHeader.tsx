@@ -1,12 +1,10 @@
 'use client';
 
-import { Suspense } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { EditArtistName } from './EditArtistName';
 import { MessageArtistButton } from './MessageArtistButton';
 import { FollowButton } from './FollowButton';
 import { FollowersList } from './FollowersList';
-import { ArtistXPanel } from './ArtistXPanel';
 import { isHonestBio } from '@/lib/brand/bio';
 import type { AIArtistDocument } from '@/types/firestore';
 
@@ -41,9 +39,6 @@ export function ArtistHeader({ artist, isOwner: propIsOwner }: ArtistHeaderProps
           {bio}
         </p>
       ) : null}
-      <Suspense fallback={null}>
-        <ArtistXPanel artistId={artist.id} ownerId={artist.ownerId} />
-      </Suspense>
     </div>
   );
 }
