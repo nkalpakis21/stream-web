@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CoverImage } from '@/components/media/CoverImage';
 import {
   acquireCoverDecodeSlot,
@@ -26,33 +26,40 @@ function useForceCoverStill(): boolean {
   return forceStill;
 }
 
+function coverIsMostlyVisible(
+  entry: Pick<IntersectionObserverEntry, 'isIntersecting' | 'intersectionRatio'>
+): boolean {
+  return entry.isIntersecting && entry.intersectionRatio >= VISIBILITY_THRESHOLD;
+}
+
 function useMostlyVisible(enabled: boolean): {
-  ref: RefObject<HTMLDivElement>;
+  ref: (node: HTMLDivElement | null) => void;
   visible: boolean;
 } {
-  const ref = useRef<HTMLDivElement>(null);
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || !node) {
       setVisible(false);
       return;
     }
 
-    const node = ref.current;
-    if (!node) return;
-
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        setVisible(entry.isIntersecting);
+      entries => {
+        const entry = entries[entries.length - 1];
+        if (!entry) return;
+        setVisible(coverIsMostlyVisible(entry));
       },
-      { threshold: VISIBILITY_THRESHOLD }
+      // 0 is required: a 0.5-only threshold never fires on full exit, so
+      // isIntersecting stays true and the decode slot is never released.
+      { threshold: [0, VISIBILITY_THRESHOLD] }
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [enabled]);
+  }, [enabled, node]);
 
-  return { ref, visible };
+  return { ref: setNode, visible };
 }
 
 function useCoverDecodeSlot(want: boolean): boolean {
