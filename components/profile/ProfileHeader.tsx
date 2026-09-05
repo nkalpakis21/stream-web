@@ -120,7 +120,7 @@ export function ProfileHeader({ user, stats }: ProfileHeaderProps) {
                   <button
                     onClick={handleSaveDisplayName}
                     disabled={saving || !editValue.trim()}
-                    className="p-2 bg-accent text-accent-foreground rounded-xl hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-2 bg-accent-cta text-accent-ink rounded-xl hover:bg-accent-cta/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Save display name"
                   >
                     {saving ? (

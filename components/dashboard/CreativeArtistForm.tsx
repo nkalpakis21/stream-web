@@ -335,7 +335,7 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-6 py-3 bg-primary text-primary-foreground rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+              className="flex-1 px-6 py-3 bg-accent-cta text-accent-ink rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">

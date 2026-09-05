@@ -14,9 +14,11 @@ html.listen {
   --line: #2A2A38;
   --ink: #F5F4F8;
   --mute: #8B8896;
-  --accent: #C8F542;
+  /* STR-60 — ice chrome; lime is money + CTAs only. */
+  --accent: #E8E6F2;
   --accent-ink: #0A0A10;
   --heat: #C8F542;
+  --accent-cta: var(--heat);
   --down: #FF4D6A;
   --radius: 12px;
   /* STR-58 — song covers only. 28px cap; 22% keeps ~40px thumbs as soft squares. Chrome stays --radius 12px. */
@@ -38,6 +40,7 @@ html.listen {
   --listen-accent: var(--accent);
   --listen-accent-ink: var(--accent-ink);
   --listen-heat: var(--heat);
+  --listen-accent-cta: var(--accent-cta);
   --listen-down: var(--down);
 }
 
@@ -126,7 +129,7 @@ html.listen [data-entity='artist'] {
   min-height: 44px;
   height: 48px;
   padding: 0 20px;
-  background: var(--accent);
+  background: var(--accent-cta);
   color: var(--accent-ink);
   border: none;
 }
@@ -328,19 +331,19 @@ html.listen .lyrics-listen {
     --card-foreground: 24 9.8% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 24 9.8% 10%;
-    --primary: 75 90% 61%;
+    --primary: 250 32% 93%;
     --primary-foreground: 240 23% 5%;
     --secondary: 60 4.8% 95.9%;
     --secondary-foreground: 24 9.8% 10%;
     --muted: 60 4.8% 95.9%;
     --muted-foreground: 25 5.3% 44.7%;
-    --accent: 75 90% 61%;
+    --accent: 250 32% 93%;
     --accent-foreground: 240 23% 5%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 20 5.9% 90%;
     --input: 20 5.9% 90%;
-    --ring: 75 90% 61%;
+    --ring: 250 32% 93%;
     --radius: 12px;
     --radius-cover: min(28px, 22%);
     --chart-1: 12 76% 61%;
@@ -357,19 +360,19 @@ html.listen .lyrics-listen {
     --card-foreground: 0 0% 98%;
     --popover: 20 14.3% 4.1%;
     --popover-foreground: 0 0% 98%;
-    --primary: 75 90% 61%;
+    --primary: 250 32% 93%;
     --primary-foreground: 240 23% 5%;
     --secondary: 12 6.5% 15.1%;
     --secondary-foreground: 0 0% 98%;
     --muted: 12 6.5% 15.1%;
     --muted-foreground: 24 5.4% 63.9%;
-    --accent: 75 90% 61%;
+    --accent: 250 32% 93%;
     --accent-foreground: 240 23% 5%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     --border: 12 6.5% 15.1%;
     --input: 12 6.5% 15.1%;
-    --ring: 75 90% 61%;
+    --ring: 250 32% 93%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -443,10 +446,10 @@ html.listen .lyrics-listen {
 
   /* Wallet adapter leftovers (picker is custom; keep modal un-purple if opened) */
   .wallet-adapter-button {
-    @apply !bg-accent !text-accent-foreground hover:opacity-90 !rounded-xl;
+    @apply !bg-accent-cta !text-accent-ink hover:opacity-90 !rounded-xl;
   }
   .wallet-adapter-button-trigger {
-    @apply !bg-accent !text-accent-foreground !rounded-xl;
+    @apply !bg-accent-cta !text-accent-ink !rounded-xl;
   }
   .wallet-adapter-modal {
     max-width: 100vw !important;
@@ -518,8 +521,8 @@ textarea:focus-visible,
 select:focus,
 select:focus-visible {
   outline: none !important;
-  border-color: var(--accent, #c8f542) !important;
-  box-shadow: 0 0 0 1px var(--accent, #c8f542);
+  border-color: var(--accent, #e8e6f2) !important;
+  box-shadow: 0 0 0 1px var(--accent, #e8e6f2);
 }
 
 input:-webkit-autofill,

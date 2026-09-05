@@ -165,7 +165,7 @@ function SignInPageContent() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full px-6 py-3 bg-accent text-accent-foreground rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-lg hover:shadow-xl mt-6"
+                className="w-full px-6 py-3 bg-accent-cta text-accent-ink rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-lg hover:shadow-xl mt-6"
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>

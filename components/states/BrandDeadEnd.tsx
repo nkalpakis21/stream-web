@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { LogoIcon } from '@/components/branding/LogoIcon';
 
 export const listenPrimaryClass =
-  'inline-flex rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground';
+  'inline-flex rounded-xl bg-accent-cta px-5 py-2.5 text-sm font-medium text-accent-ink';
 export const listenSecondaryClass =
   'inline-flex rounded-xl border border-border px-5 py-2.5 text-sm font-medium text-foreground';
 

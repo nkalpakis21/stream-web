@@ -334,7 +334,7 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
           <div className="mt-4 pt-4 border-t border-border">
             <button
               onClick={handleStartChat}
-              className="w-full px-4 py-2 bg-accent text-accent-foreground rounded-xl hover:bg-accent/90 transition-colors flex items-center justify-center gap-2"
+              className="w-full px-4 py-2 bg-accent-cta text-accent-ink rounded-xl hover:bg-accent-cta/90 transition-colors flex items-center justify-center gap-2"
             >
               <Users className="w-4 h-4" />
               <span>

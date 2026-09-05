@@ -69,7 +69,7 @@ export function SiteHeader() {
               style={{
                 minHeight: 44,
                 borderRadius: 12,
-                background: 'var(--accent)',
+                background: 'var(--accent-cta)',
                 color: 'var(--accent-ink)',
                 fontSize: 14,
                 lineHeight: '20px',
