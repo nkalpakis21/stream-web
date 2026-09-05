@@ -5,6 +5,7 @@ import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
 import { HomeListenShell } from '@/components/homepage/HomeListenShell';
 import type { SongDocument } from '@/types/firestore';
+import { coverFieldsFromSong } from '@/lib/covers/resolve';
 
 const HEAT_LIMIT = 8;
 const LIVE_LIMIT = 12;
@@ -80,7 +81,7 @@ export default async function HomePage() {
                 title: featured.song.title,
                 artistName: artistNames.get(featured.song.id) || 'Artist',
                 artistId: featured.song.artistId,
-                coverUrl: featured.song.albumCoverThumbnail || featured.song.albumCoverPath,
+                cover: coverFieldsFromSong(featured.song),
                 audioUrl: featured.audioUrl,
                 hasCoin: coinByArtist.get(featured.song.artistId) ?? false,
                 coin: quoteForArtist(featured.song.artistId),
@@ -92,7 +93,7 @@ export default async function HomePage() {
           title: song.title,
           artistName: artistNames.get(song.id) || 'Artist',
           artistId: song.artistId,
-          coverUrl: song.albumCoverThumbnail || song.albumCoverPath,
+          cover: coverFieldsFromSong(song),
           playCount: song.playCount ?? 0,
           hasCoin: coinByArtist.get(song.artistId) ?? false,
           coin: quoteForArtist(song.artistId),
@@ -102,7 +103,7 @@ export default async function HomePage() {
           title: song.title,
           artistName: artistNames.get(song.id) || 'Artist',
           artistId: song.artistId,
-          coverUrl: song.albumCoverThumbnail || song.albumCoverPath,
+          cover: coverFieldsFromSong(song),
           playCount: song.playCount ?? 0,
           hasCoin: coinByArtist.get(song.artistId) ?? false,
           coin: null,

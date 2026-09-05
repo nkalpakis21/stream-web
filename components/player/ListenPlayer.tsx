@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PlayerCoinChip } from './PlayerCoinChip';
-import { CoverImage } from '@/components/media/CoverImage';
+import { CoverMedia } from '@/components/media/CoverMedia';
+import { coverFieldsFromSong, type CoverFields } from '@/lib/covers/resolve';
 import './listen-player.css';
 
-interface PlayingTrack {
+interface PlayingTrack extends CoverFields {
   songTitle: string;
   artistName: string;
   artistId?: string;
@@ -149,10 +150,16 @@ export function ListenPlayer({
       </button>
 
       <div className="listen-player-inner">
-        <div className="listen-player-art" aria-hidden={!nowPlaying?.albumCoverUrl}>
-          <CoverImage
-            src={nowPlaying?.albumCoverUrl}
+        <div className="listen-player-art" aria-hidden={!nowPlaying}>
+          <CoverMedia
+            cover={coverFieldsFromSong({
+              ...nowPlaying,
+              albumCoverPath: nowPlaying?.albumCoverPath ?? nowPlaying?.albumCoverUrl,
+              albumCoverThumbnail:
+                nowPlaying?.albumCoverThumbnail ?? nowPlaying?.albumCoverUrl,
+            })}
             title={nowPlaying?.songTitle || 'Track'}
+            playback="always"
             sizes="56px"
             rounded="rounded-md"
           />

@@ -5,6 +5,7 @@ import type { SongDocument } from '@/types/firestore';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { PlayableArt } from '@/components/songs/PlayableArt';
 import { DiscoverCoinRow } from '@/components/discover/DiscoverCoinRow';
+import { coverFieldsFromSong } from '@/lib/covers/resolve';
 
 interface DiscoverSongCardProps {
   song: SongDocument;
@@ -19,8 +20,6 @@ export function DiscoverSongCard({
   coin = null,
   hasCoin = false,
 }: DiscoverSongCardProps) {
-  const coverImageUrl = song.albumCoverThumbnail || song.albumCoverPath;
-
   return (
     <article className="block rounded-[12px] bg-card">
       <PlayableArt
@@ -28,7 +27,8 @@ export function DiscoverSongCard({
         title={song.title}
         artistName={artistName || 'Artist'}
         artistId={song.artistId}
-        coverUrl={coverImageUrl}
+        cover={coverFieldsFromSong(song)}
+        playback="visibility"
         hasCoin={hasCoin}
         durationSeconds={song.duration}
         href={`/songs/${song.id}`}

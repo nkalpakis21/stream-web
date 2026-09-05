@@ -3,7 +3,12 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
-import { CoverImage } from '@/components/media/CoverImage';
+import { CoverMedia, type CoverPlayback } from '@/components/media/CoverMedia';
+import {
+  coverFieldsFromSong,
+  playerCoverPayload,
+  type CoverFields,
+} from '@/lib/covers/resolve';
 import { getSongVersions } from '@/lib/services/songs';
 import { createDebouncedPlayTracker } from '@/lib/utils/playTracking';
 
@@ -19,7 +24,8 @@ interface PlayableArtProps {
   title: string;
   artistName: string;
   artistId?: string;
-  coverUrl: string | null;
+  cover: CoverFields;
+  playback?: CoverPlayback;
   audioUrl?: string | null;
   hasCoin?: boolean;
   durationSeconds?: number | null;
@@ -32,7 +38,8 @@ export function PlayableArt({
   title,
   artistName,
   artistId,
-  coverUrl,
+  cover,
+  playback = 'visibility',
   audioUrl: audioUrlProp,
   hasCoin = false,
   durationSeconds = null,
@@ -43,6 +50,7 @@ export function PlayableArt({
   const [resolvedAudio, setResolvedAudio] = useState<string | null>(audioUrlProp ?? null);
   const [loading, setLoading] = useState(false);
   const trackPlay = useMemo(() => createDebouncedPlayTracker(500), []);
+  const coverFields = coverFieldsFromSong(cover);
 
   const isCurrent = Boolean(
     (nowPlaying?.songId && nowPlaying.songId === songId) ||
@@ -76,7 +84,7 @@ export function PlayableArt({
       songTitle: title,
       artistName,
       artistId,
-      albumCoverUrl: coverUrl,
+      ...playerCoverPayload(coverFields),
       audioUrl: url,
     });
     trackPlay(songId);
@@ -98,10 +106,20 @@ export function PlayableArt({
       <div className="relative aspect-square overflow-hidden rounded-[12px]">
         {href ? (
           <Link href={href} className="absolute inset-0" aria-label={`${title} by ${artistName}`}>
-            <CoverImage src={coverUrl} title={title} sizes="(max-width: 768px) 50vw, 25vw" />
+            <CoverMedia
+              cover={coverFields}
+              title={title}
+              playback={playback}
+              sizes="(max-width: 768px) 50vw, 25vw"
+            />
           </Link>
         ) : (
-          <CoverImage src={coverUrl} title={title} sizes="(max-width: 768px) 50vw, 25vw" />
+          <CoverMedia
+            cover={coverFields}
+            title={title}
+            playback={playback}
+            sizes="(max-width: 768px) 50vw, 25vw"
+          />
         )}
 
         <button
