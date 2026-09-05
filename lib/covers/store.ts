@@ -1,5 +1,6 @@
 /**
- * Admin writes for song cover fields. Dual-writes albumCover* as poster aliases.
+ * Admin writes for Streamstar cover fields (`coverPosterUrl` / `coverVideoUrl`).
+ * Does not dual-write albumCover* — those stay a read fallback for older songs.
  */
 
 import { COLLECTIONS } from '@/lib/firebase/collections';
@@ -19,7 +20,6 @@ export async function updateSongCoverFields(
     coverMotionStatus?: CoverMotionStatus | null;
     coverMotionError?: string | null;
     coverProvider?: CoverProviderCrumbs | null;
-    dualWriteAlbumCover?: string;
   }
 ): Promise<void> {
   const payload: Record<string, unknown> = {
@@ -41,10 +41,6 @@ export async function updateSongCoverFields(
   }
   if (fields.coverProvider !== undefined) {
     payload.coverProvider = fields.coverProvider;
-  }
-  if (fields.dualWriteAlbumCover) {
-    payload.albumCoverPath = fields.dualWriteAlbumCover;
-    payload.albumCoverThumbnail = fields.dualWriteAlbumCover;
   }
 
   await getAdminDb().collection(COLLECTIONS.songs).doc(songId).set(payload, {

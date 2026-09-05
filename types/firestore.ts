@@ -165,7 +165,7 @@ export type CollaborationType = 'fork' | 'remix' | 'response' | 'extension';
 
 /**
  * Fal cover pipeline (STR-52). MusicGPT stills are ignored when
- * COVER_PIPELINE=fal. Dual-write albumCover* as poster aliases during migrate.
+ * COVER_PIPELINE=fal. albumCover* is a read fallback for older songs.
  */
 export type CoverMotionStatus = 'pending' | 'poster_ready' | 'ready' | 'failed';
 
@@ -190,15 +190,13 @@ export interface SongDocument {
   parentSongId: string | null; // If forked/remixed, reference original
   collaborationType: CollaborationType | null; // Type of collaboration if applicable
   /**
-   * Album cover image URL (full size).
-   * Shared across all conversions for a single song generation.
-   * Dual-written as an alias of coverPosterUrl while COVER_PIPELINE=fal migrates.
+   * Legacy MusicGPT album cover (full size).
+   * Read fallback when coverPosterUrl is missing. Not written by the Fal pipeline.
    */
   albumCoverPath: string | null;
   /**
-   * Album cover thumbnail URL.
-   * Shared across all conversions for a single song generation.
-   * Dual-written as an alias of coverPosterUrl while COVER_PIPELINE=fal migrates.
+   * Legacy MusicGPT album cover thumbnail.
+   * Read fallback when coverPosterUrl is missing. Not written by the Fal pipeline.
    */
   albumCoverThumbnail: string | null;
   /**

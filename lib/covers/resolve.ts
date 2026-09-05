@@ -18,7 +18,7 @@ export function firstCoverUrl(
   return null;
 }
 
-/** Flux poster first, then dual-written albumCover* aliases. */
+/** Flux poster first; albumCover* is a read fallback for songs without one. */
 export function resolveCoverPoster(cover: CoverFields): string | null {
   return firstCoverUrl(
     cover.coverPosterUrl,

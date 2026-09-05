@@ -24,9 +24,16 @@ export function isFalCoverPipeline(): boolean {
   return process.env.COVER_PIPELINE?.trim().toLowerCase() === 'fal';
 }
 
-/** MusicGPT album/cover webhook writes are ignored when the Fal pipeline is on. */
-export function shouldWriteMusicGptAlbumCover(): boolean {
-  return !isFalCoverPipeline();
+/**
+ * MusicGPT album/cover song writes. Off when COVER_PIPELINE=fal (Streamstar
+ * poster is SoT) or when a Flux poster already landed.
+ */
+export function shouldWriteMusicGptAlbumCover(song?: {
+  coverPosterUrl?: string | null;
+} | null): boolean {
+  if (isFalCoverPipeline()) return false;
+  if (song?.coverPosterUrl?.trim()) return false;
+  return true;
 }
 
 export function getFalFluxCoverModel(imageToImage: boolean): string {

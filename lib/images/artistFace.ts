@@ -67,11 +67,14 @@ export function preferStored(urls: string[]): string[] {
 }
 
 export function songCoverCandidates(song?: {
+  coverPosterUrl?: string | null;
   albumCoverPath?: string | null;
   albumCoverThumbnail?: string | null;
 } | null): string[] {
   if (!song) return [];
-  return preferStored(uniqueUrls([song.albumCoverPath, song.albumCoverThumbnail]));
+  return preferStored(
+    uniqueUrls([song.coverPosterUrl, song.albumCoverThumbnail, song.albumCoverPath])
+  );
 }
 
 /**

@@ -168,7 +168,6 @@ export async function generateSongCover(songId: string): Promise<CoverJobResult>
         coverMotionStatus: 'poster_ready',
         coverMotionError: null,
         coverProvider,
-        dualWriteAlbumCover: posterUrl,
       });
       posterLanded = true;
     }
