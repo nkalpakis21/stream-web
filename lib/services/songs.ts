@@ -106,6 +106,12 @@ export async function createSong(
     collaborationType: data.collaborationType || null,
     albumCoverPath: null,
     albumCoverThumbnail: null,
+    coverPosterUrl: null,
+    coverVideoUrl: null,
+    coverMotionStatus: null,
+    coverMotionError: null,
+    coverUpdatedAt: null,
+    coverProvider: null,
     playCount: 0,
   };
 
