@@ -104,7 +104,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                 <div className="mt-1 flex min-w-0 items-center gap-2">
                   <Link
                     href={`/artists/${featured.artistId}`}
-                    className="min-w-0 truncate text-muted-foreground hover:text-foreground"
+                    className="min-w-0 truncate text-accent hover:text-ink"
                     data-entity="artist"
                   >
                     {featured.artistName}
