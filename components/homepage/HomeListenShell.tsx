@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { PlayableArt } from '@/components/songs/PlayableArt';
+import { CoinBadge } from '@/components/songs/CoinBadge';
 import { EmptyAction } from '@/components/states/EmptyAction';
 import { FeaturedCoinMeta, HeatTape } from '@/components/homepage/HeatTape';
 import { CoverMedia } from '@/components/media/CoverMedia';
@@ -92,7 +93,6 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                   cover={featured.cover}
                   playback="always"
                   audioUrl={featured.audioUrl}
-                  hasCoin={featured.hasCoin}
                 />
                 <NowPlayingBadge songId={featured.songId} />
               </div>
@@ -101,13 +101,16 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                 <h1 className="listen-h1 mt-1 text-foreground" data-entity="track">
                   {featured.title}
                 </h1>
-                <Link
-                  href={`/artists/${featured.artistId}`}
-                  className="mt-1 block text-muted-foreground hover:text-foreground"
-                  data-entity="artist"
-                >
-                  {featured.artistName}
-                </Link>
+                <div className="mt-1 flex min-w-0 items-center gap-2">
+                  <Link
+                    href={`/artists/${featured.artistId}`}
+                    className="min-w-0 truncate text-muted-foreground hover:text-foreground"
+                    data-entity="artist"
+                  >
+                    {featured.artistName}
+                  </Link>
+                  {featured.hasCoin ? <CoinBadge /> : null}
+                </div>
                 <FeaturedCoinMeta artistId={featured.artistId} quote={featured.coin} />
                 <div className="mt-5 flex flex-wrap items-center gap-3">
                   <FeaturedPlay featured={featured} />
@@ -184,14 +187,14 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                     playback="visibility"
                     sizes="200px"
                   />
-                  {track.hasCoin && (
-                    <span className="absolute right-2 top-2 rounded-xl bg-black/70 px-2 py-0.5 text-[10px] font-medium text-primary">
-                      Coin
-                    </span>
-                  )}
                 </div>
                 <p className="mt-2 truncate text-sm font-medium" data-entity="track">{track.title}</p>
-                <p className="truncate text-xs text-muted-foreground" data-entity="artist">{track.artistName}</p>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <p className="min-w-0 truncate text-xs text-muted-foreground" data-entity="artist">
+                    {track.artistName}
+                  </p>
+                  {track.hasCoin ? <CoinBadge /> : null}
+                </div>
               </Link>
             ))}
           </div>

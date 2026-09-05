@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { SongDocument } from '@/types/firestore';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { PlayableArt } from '@/components/songs/PlayableArt';
+import { CoinBadge } from '@/components/songs/CoinBadge';
 import { ArtistCoinRow } from '@/components/songs/ArtistCoinRow';
 import { coverFieldsFromSong } from '@/lib/covers/resolve';
 
@@ -24,7 +25,6 @@ export function SongCard({
   coin = null,
 }: SongCardProps) {
   const isCompact = size === 'compact';
-  const showMetrics = Boolean(coin);
 
   return (
     <article className="block rounded-[12px] bg-card">
@@ -35,7 +35,6 @@ export function SongCard({
         artistId={song.artistId}
         cover={coverFieldsFromSong(song)}
         playback="visibility"
-        hasCoin={showMetrics ? false : hasCoin}
         durationSeconds={song.duration}
         href={`/songs/${song.id}`}
       />
@@ -49,14 +48,19 @@ export function SongCard({
             {song.title}
           </h3>
         </Link>
-        {artistName ? (
-          <p
-            className="mt-0.5 line-clamp-1"
-            style={{ fontSize: 12, lineHeight: '16px', color: 'var(--mute)' }}
-            data-entity="artist"
-          >
-            {artistName}
-          </p>
+        {artistName || hasCoin ? (
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+            {artistName ? (
+              <p
+                className="min-w-0 truncate"
+                style={{ fontSize: 12, lineHeight: '16px', color: 'var(--mute)' }}
+                data-entity="artist"
+              >
+                {artistName}
+              </p>
+            ) : null}
+            {hasCoin ? <CoinBadge /> : null}
+          </div>
         ) : null}
         {coin ? <ArtistCoinRow artistId={song.artistId} quote={coin} /> : null}
       </div>
