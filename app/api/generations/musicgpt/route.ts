@@ -4,6 +4,7 @@ import {
   createMusicGPTSong,
 } from '@/lib/ai/providers/musicgpt';
 import type { AIGenerationRequest } from '@/lib/ai/types';
+import { musicGptWebhookUrl } from '@/lib/webhooks/baseUrl';
 
 /**
  * Server-side API route for initiating MusicGPT generation.
@@ -26,9 +27,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Hardcode webhook URL to production (apex — www redirects here)
-    const webhookBaseUrl = 'https://streamstar.xyz';
-    const webhookUrl = `${webhookBaseUrl}/api/webhooks/musicgpt`;
+    // MusicGPT does not follow apex → www 307s. WEBHOOK_BASE_URL if set
+    // (apex is rewritten to www); otherwise https://www.streamstar.xyz.
+    const webhookUrl = musicGptWebhookUrl();
 
     console.log('[MusicGPT API Route] Webhook URL being set:', webhookUrl);
 
