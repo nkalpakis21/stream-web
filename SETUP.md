@@ -50,11 +50,27 @@ npm install
    FAL_FLUX_COVER_I2I_MODEL=fal-ai/flux/dev/image-to-image
    FAL_LUMA_COVER_MODEL=fal-ai/luma-dream-machine/ray-2/image-to-video
    ```
-   Optional secret for `POST /api/covers/generate` (`x-cover-job-secret`). Falls back to `REVALIDATE_SECRET` when unset:
+   Optional secret for `POST /api/covers/generate` and `GET|POST /api/covers/backfill` (`x-cover-job-secret` or `Authorization: Bearer`). Falls back to `REVALIDATE_SECRET` when unset. Vercel cron may send `Authorization: Bearer $CRON_SECRET`:
    ```
    COVER_JOB_SECRET=your-cover-job-secret
    ```
    Requires `FAL_KEY` and Firebase Admin + Storage (same as look uploads). Paths: `songs/{songId}/cover/poster.jpg`, `songs/{songId}/cover/loop.mp4`.
+
+   Optional — cover backfill (STR-52 PR3). Admin/cron only; does not run on audio or listen paths. Unset leaves `GET|POST /api/covers/backfill` as a no-op. Do not enable in production until ops is ready. Newest `createdAt` first; `poster_ready` resumes Luma-only; `ready` is a no-op. Concurrency is clamped to 2–4.
+   ```
+   COVER_BACKFILL_ENABLED=true
+   COVER_BACKFILL_CONCURRENCY=2
+   COVER_BACKFILL_BATCH_SIZE=4
+   COVER_BACKFILL_SCAN_LIMIT=100
+   ```
+   Invoke (secret required; also needs `COVER_PIPELINE=fal`):
+   ```
+   curl -X POST https://<host>/api/covers/backfill \
+     -H "x-cover-job-secret: $COVER_JOB_SECRET" \
+     -H "content-type: application/json" \
+     -d '{}'
+   ```
+   Resume with the returned `nextCursor` (`?cursor=` or JSON `{ "cursor": "…" }`). `?dryRun=1` lists the next batch without calling Fal. Optional Vercel cron: `GET /api/covers/backfill` on a schedule — still gated by `COVER_BACKFILL_ENABLED`.
 
    Optional — artist X posting (OAuth 2.0 user-context). Server-side only; do not commit keys and do not prefix with `NEXT_PUBLIC_`:
    ```
