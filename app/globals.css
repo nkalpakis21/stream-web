@@ -19,8 +19,8 @@ html.listen {
   --heat: #C8F542;
   --down: #FF4D6A;
   --radius: 12px;
-  /* STR-58 — song covers only. Chrome stays --radius 12px. */
-  --radius-cover: 28px;
+  /* STR-58 — song covers only. 28px cap; 22% keeps ~40px thumbs as soft squares. Chrome stays --radius 12px. */
+  --radius-cover: min(28px, 22%);
   --header-h: 56px;
   --player-h: 80px;
   --player-m: 56px;
@@ -342,7 +342,7 @@ html.listen .lyrics-listen {
     --input: 20 5.9% 90%;
     --ring: 75 90% 61%;
     --radius: 12px;
-    --radius-cover: 28px;
+    --radius-cover: min(28px, 22%);
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;

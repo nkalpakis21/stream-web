@@ -50,7 +50,7 @@
   width: 40px;
   height: 40px;
   overflow: hidden;
-  border-radius: var(--radius-cover, 28px);
+  border-radius: var(--radius-cover, min(28px, 22%));
   background: var(--surface-2, #1c1c28);
 }
 
