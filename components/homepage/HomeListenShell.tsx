@@ -177,7 +177,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                 className="w-[44vw] min-h-11 flex-shrink-0 sm:w-auto"
                 style={index === live.length - 1 ? undefined : undefined}
               >
-                <div className="relative aspect-square overflow-hidden rounded-xl">
+                <div className="relative aspect-square overflow-hidden rounded-cover">
                   <CoverMedia
                     cover={track.cover}
                     title={track.title}

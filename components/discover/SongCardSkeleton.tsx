@@ -5,7 +5,7 @@
 export function SongCardSkeleton({ showCluster = false }: { showCluster?: boolean }) {
   return (
     <article className="block animate-pulse rounded-[12px] bg-card">
-      <div className="relative aspect-square overflow-hidden rounded-xl bg-muted">
+      <div className="relative aspect-square overflow-hidden rounded-cover bg-muted">
         <span className="absolute inset-0 z-10 m-auto flex h-12 w-12 rounded-full bg-black/55" />
       </div>
       <div className="p-3">

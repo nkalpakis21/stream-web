@@ -100,10 +100,10 @@ export function PlayableArt({
 
   return (
     <div
-      className={`rounded-[12px] ${className}`}
+      className={`rounded-cover ${className}`}
       style={playingCover ? { boxShadow: '0 0 0 2px var(--accent)' } : undefined}
     >
-      <div className="relative aspect-square overflow-hidden rounded-[12px]">
+      <div className="relative aspect-square overflow-hidden rounded-cover">
         {href ? (
           <Link href={href} className="absolute inset-0" aria-label={`${title} by ${artistName}`}>
             <CoverMedia

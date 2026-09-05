@@ -72,6 +72,7 @@ module.exports = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        cover: "var(--radius-cover, min(28px, 22%))",
       },
       fontFamily: {
         sans: ['var(--font-figtree)', 'system-ui', 'sans-serif'],

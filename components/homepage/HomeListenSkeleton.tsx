@@ -2,7 +2,7 @@ function HeatRowSkeleton() {
   return (
     <li className="flex items-center gap-3 rounded-xl px-1 py-2.5">
       <span className="h-3 w-5 rounded bg-muted" />
-      <div className="h-11 w-11 flex-shrink-0 overflow-hidden rounded-md bg-muted" />
+      <div className="h-11 w-11 flex-shrink-0 overflow-hidden rounded-cover bg-muted" />
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="h-4 w-3/4 rounded bg-muted" />
         <div className="h-3 w-1/2 rounded bg-muted" />
@@ -15,7 +15,7 @@ function HeatRowSkeleton() {
 function LiveTileSkeleton() {
   return (
     <div className="w-[44vw] flex-shrink-0 sm:w-auto">
-      <div className="relative aspect-square overflow-hidden rounded-xl bg-muted">
+      <div className="relative aspect-square overflow-hidden rounded-cover bg-muted">
         <span className="absolute inset-0 z-10 m-auto flex h-14 w-14 rounded-full bg-black/55" />
       </div>
       <div className="mt-2 h-4 w-3/4 rounded bg-muted" />
@@ -31,7 +31,7 @@ export function HomeListenSkeleton() {
         <section className="rounded-xl border border-white/10 bg-card/60 p-4 sm:p-6">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
             <div className="relative w-full max-w-[280px] sm:w-[240px] sm:max-w-none">
-              <div className="relative aspect-square overflow-hidden rounded-xl bg-muted">
+              <div className="relative aspect-square overflow-hidden rounded-cover bg-muted">
                 <span className="absolute inset-0 z-10 m-auto flex h-14 w-14 rounded-full bg-black/55" />
               </div>
             </div>
