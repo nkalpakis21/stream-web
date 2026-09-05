@@ -88,7 +88,7 @@ export function CommentActions({
         <div className="flex items-center gap-2">
           <button
             onClick={handleUpdate}
-            className="px-3 py-1.5 text-xs bg-accent text-accent-foreground rounded-xl hover:bg-accent/90 transition-colors flex items-center gap-1"
+            className="px-3 py-1.5 text-xs bg-accent-cta text-accent-ink rounded-xl hover:bg-accent-cta/90 transition-colors flex items-center gap-1"
           >
             <Check className="w-3 h-3" />
             Save

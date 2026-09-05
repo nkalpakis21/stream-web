@@ -136,7 +136,7 @@ export function DisplayNameForm({ onUpdate }: DisplayNameFormProps) {
               <button
                 onClick={handleSave}
                 disabled={saving || !displayName.trim()}
-                className="px-3 py-1.5 text-sm bg-accent text-accent-foreground rounded-xl hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                className="px-3 py-1.5 text-sm bg-accent-cta text-accent-ink rounded-xl hover:bg-accent-cta/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
                 {saving ? (
                   <>

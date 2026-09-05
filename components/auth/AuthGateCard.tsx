@@ -21,7 +21,7 @@ export function AuthGateCard({ headline, why, returnTo }: AuthGateCardProps) {
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
         <Link
           href={authHref('/signin', dest)}
-          className="inline-flex w-full sm:w-auto items-center justify-center px-6 py-3 bg-accent text-accent-foreground rounded-xl font-medium hover:opacity-90 transition-all shadow-lg"
+          className="inline-flex w-full sm:w-auto items-center justify-center px-6 py-3 bg-accent-cta text-accent-ink rounded-xl font-medium hover:opacity-90 transition-all shadow-lg"
         >
           Sign in
         </Link>

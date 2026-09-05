@@ -92,7 +92,7 @@ export function OverviewTab({
           <div className="max-w-md mx-auto">
             <Link
               href="/dashboard?tab=artists&new=1"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-opacity font-medium"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-accent-cta text-accent-ink rounded-xl hover:opacity-90 transition-opacity font-medium"
             >
               Create your first artist
             </Link>
