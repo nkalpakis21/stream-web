@@ -309,7 +309,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
             <button
               type="submit"
               disabled={loading || formData.prompt.length > 300 || formData.prompt.trim().length === 0 || formData.lyrics.length > 2000}
-              className="flex-1 px-6 py-3 bg-gradient-to-r from-accent to-accent/90 text-accent-foreground rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-lg hover:shadow-xl"
+              className="flex-1 px-6 py-3 bg-gradient-to-r from-accent-cta to-accent-cta/90 text-accent-ink rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-lg hover:shadow-xl"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">

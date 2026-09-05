@@ -1,6 +1,6 @@
 import { getPublicSongs, getTopSongs, getArtistNamesForSongs, getSongVersions } from '@/lib/services/songs';
 import { getArtistsData } from '@/lib/services/artists';
-import { hasLaunchedCoin } from '@/lib/brand/coin';
+import { coinBadgeFromArtist, hasLaunchedCoin, type CoinBadgeMeta } from '@/lib/brand/coin';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
 import { HomeListenShell } from '@/components/homepage/HomeListenShell';
@@ -47,13 +47,12 @@ export default async function HomePage() {
     getArtistsData(unique.map(s => s.artistId)),
   ]);
 
-  const coinByArtist = new Map<string, boolean>();
+  const badgeByArtist = new Map<string, CoinBadgeMeta | null>();
   const mintByArtist = new Map<string, string>();
   artists.forEach((artist, id) => {
-    const launched = hasLaunchedCoin(artist.pumpFun);
-    coinByArtist.set(id, launched);
+    badgeByArtist.set(id, coinBadgeFromArtist(artist));
     const mint = artist.pumpFun?.mint?.trim();
-    if (launched && mint) {
+    if (hasLaunchedCoin(artist.pumpFun) && mint) {
       mintByArtist.set(id, mint);
     }
   });
@@ -83,7 +82,8 @@ export default async function HomePage() {
                 artistId: featured.song.artistId,
                 cover: coverFieldsFromSong(featured.song),
                 audioUrl: featured.audioUrl,
-                hasCoin: coinByArtist.get(featured.song.artistId) ?? false,
+                ticker: badgeByArtist.get(featured.song.artistId)?.ticker ?? null,
+                coinIcon: badgeByArtist.get(featured.song.artistId)?.iconSrc ?? null,
                 coin: quoteForArtist(featured.song.artistId),
               }
             : null
@@ -95,7 +95,8 @@ export default async function HomePage() {
           artistId: song.artistId,
           cover: coverFieldsFromSong(song),
           playCount: song.playCount ?? 0,
-          hasCoin: coinByArtist.get(song.artistId) ?? false,
+          ticker: badgeByArtist.get(song.artistId)?.ticker ?? null,
+          coinIcon: badgeByArtist.get(song.artistId)?.iconSrc ?? null,
           coin: quoteForArtist(song.artistId),
         }))}
         live={live.map(song => ({
@@ -105,7 +106,8 @@ export default async function HomePage() {
           artistId: song.artistId,
           cover: coverFieldsFromSong(song),
           playCount: song.playCount ?? 0,
-          hasCoin: coinByArtist.get(song.artistId) ?? false,
+          ticker: badgeByArtist.get(song.artistId)?.ticker ?? null,
+          coinIcon: badgeByArtist.get(song.artistId)?.iconSrc ?? null,
           coin: null,
         }))}
       />

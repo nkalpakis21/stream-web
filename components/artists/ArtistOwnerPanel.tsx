@@ -6,6 +6,8 @@ import { ArtistBioEditor } from '@/components/artists/ArtistBioEditor';
 import { ArtistXPanel } from '@/components/artists/ArtistXPanel';
 import { LaunchExistingArtistCoin } from '@/components/artists/LaunchExistingArtistCoin';
 import { FollowersList } from '@/components/artists/FollowersList';
+import { CoinBadge } from '@/components/songs/CoinBadge';
+import { coinBadgeFromArtist } from '@/lib/brand/coin';
 import { isHonestBio } from '@/lib/brand/bio';
 import type { AIArtistDocument, PumpFunCoin } from '@/types/firestore';
 import '@/components/artists/owner-panel.css';
@@ -33,6 +35,7 @@ export function ArtistOwnerPanel({
   showLaunch,
   onLaunched,
 }: ArtistOwnerPanelProps) {
+  const coinBadge = coinBadgeFromArtist({ ...artist, avatarURL });
   const hasBio = isHonestBio(lore, artist.name);
   const bioPreview = hasBio
     ? lore.trim()
@@ -66,6 +69,11 @@ export function ArtistOwnerPanel({
           <h1 className="listen-h1 owner-identity-name" data-entity="artist">
             {artist.name}
           </h1>
+          {coinBadge ? (
+            <div className="mb-2">
+              <CoinBadge ticker={coinBadge.ticker} iconSrc={coinBadge.iconSrc} />
+            </div>
+          ) : null}
           <div className="owner-identity-followers">
             <FollowersList artistId={artist.id} />
           </div>
