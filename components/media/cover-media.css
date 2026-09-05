@@ -1,9 +1,11 @@
 /* STR-52 CoverMedia. Square fill; poster underneath, muted loop on top. */
+/* STR-58 — clip poster + loop on the same 28px cover radius. */
 
 .cover-media {
   position: absolute;
   inset: 0;
   overflow: hidden;
+  border-radius: var(--radius-cover, 28px);
 }
 
 .cover-media-video {

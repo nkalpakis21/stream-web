@@ -97,7 +97,7 @@
   width: 40px;
   height: 40px;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: var(--radius-cover, 28px);
   background: var(--surface-2, #1c1c28);
 }
 

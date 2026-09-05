@@ -136,7 +136,6 @@ function HeatRow({ track, rank, queue }: { track: HeatTrack; rank: number; queue
             title={track.title}
             playback="visibility"
             sizes="40px"
-            rounded="rounded-[6px]"
           />
         </span>
         <div className="heat-meta">

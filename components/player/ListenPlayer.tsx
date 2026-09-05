@@ -161,7 +161,6 @@ export function ListenPlayer({
             title={nowPlaying?.songTitle || 'Track'}
             playback="always"
             sizes="56px"
-            rounded="rounded-md"
           />
         </div>
 

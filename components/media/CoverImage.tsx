@@ -6,7 +6,7 @@ import { coverArtAlt } from '@/lib/brand/site';
 
 export function CoverPlaceholder({
   className = '',
-  rounded = 'rounded-[12px]',
+  rounded = 'rounded-cover',
 }: {
   className?: string;
   rounded?: string;
@@ -38,7 +38,7 @@ export function CoverImage({
   title,
   sizes,
   className = 'object-cover',
-  rounded = 'rounded-[12px]',
+  rounded = 'rounded-cover',
   unoptimized = true,
   priority = false,
 }: CoverImageProps) {
@@ -52,7 +52,7 @@ export function CoverImage({
           src={src as string}
           alt={coverArtAlt(title)}
           fill
-          className={className}
+          className={`${className} ${rounded}`.trim()}
           sizes={sizes}
           unoptimized={unoptimized}
           priority={priority}
