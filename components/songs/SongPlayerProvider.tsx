@@ -6,8 +6,9 @@ import { SpotifyPlayer } from './SpotifyPlayer';
 import { ListenPlayer } from '@/components/player/ListenPlayer';
 import { isStudioPath } from '@/lib/listen/surface';
 import { getSongVersions } from '@/lib/services/songs';
+import type { CoverFields } from '@/lib/covers/resolve';
 
-export interface PlayerTrack {
+export interface PlayerTrack extends CoverFields {
   songId?: string;
   songTitle: string;
   artistName: string;

@@ -9,6 +9,7 @@ import { getSongVersions } from '@/lib/services/songs';
 import { VersionCards } from '@/components/songs/VersionCards';
 import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
 import { publicUrl, coverArtAlt } from '@/lib/brand/site';
+import { coverFieldsFromSong, resolveCoverPoster } from '@/lib/covers/resolve';
 import { ArtistCoinBuy } from '@/components/artists/ArtistCoinBuy';
 import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
 import { SongStage } from '@/components/songs/SongStage';
@@ -48,7 +49,7 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
     getArtist(song.artistId),
   ]);
 
-  const coverImageUrl = song.albumCoverThumbnail || song.albumCoverPath;
+  const coverImageUrl = resolveCoverPoster(song);
   
   // Ensure the image URL is absolute for Open Graph
   const ogImageUrl = coverImageUrl
@@ -129,7 +130,8 @@ export default async function SongPage({ params }: SongPageProps) {
     createdAt: version.createdAt.toMillis(), // Convert Timestamp to milliseconds
   }));
 
-  const coverImageUrl = song.albumCoverThumbnail || song.albumCoverPath;
+  const coverImageUrl = resolveCoverPoster(song);
+  const cover = coverFieldsFromSong(song);
   
   // Use primary version audio URL (already found above)
   const primaryAudioUrl = primaryVersion?.audioURL || null;
@@ -153,6 +155,7 @@ export default async function SongPage({ params }: SongPageProps) {
           artistId={artist?.id || null}
           artistName={artist?.name || 'Unknown Artist'}
           albumCoverUrl={coverImageUrl}
+          cover={cover}
           audioUrl={primaryAudioUrl}
           pending={hasPendingGeneration}
           durationSeconds={song.duration ?? null}

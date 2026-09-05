@@ -1,13 +1,14 @@
 'use client';
 
 import { useMemo, useState, type MouseEvent } from 'react';
-import { CoverImage } from '@/components/media/CoverImage';
+import { CoverMedia } from '@/components/media/CoverMedia';
 import Link from 'next/link';
 import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
 import { getSongVersions } from '@/lib/services/songs';
 import { createDebouncedPlayTracker } from '@/lib/utils/playTracking';
 import { formatCoinCluster, formatHeatCoinCluster, type ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { EmptyAction } from '@/components/states/EmptyAction';
+import { playerCoverPayload, type CoverFields } from '@/lib/covers/resolve';
 import './heat.css';
 
 export interface HeatTrack {
@@ -15,7 +16,7 @@ export interface HeatTrack {
   title: string;
   artistName: string;
   artistId: string;
-  coverUrl: string | null;
+  cover: CoverFields;
   coin: ArtistCoinQuote | null;
 }
 
@@ -59,7 +60,7 @@ function toQueueItem(track: HeatTrack) {
     songTitle: track.title,
     artistName: track.artistName,
     artistId: track.artistId,
-    albumCoverUrl: track.coverUrl,
+    ...playerCoverPayload(track.cover),
   };
 }
 
@@ -97,7 +98,7 @@ function HeatRow({ track, rank, queue }: { track: HeatTrack; rank: number; queue
         songTitle: track.title,
         artistName: track.artistName,
         artistId: track.artistId,
-        albumCoverUrl: track.coverUrl,
+        ...playerCoverPayload(track.cover),
         audioUrl: url,
       },
       queue.map(toQueueItem)
@@ -130,7 +131,13 @@ function HeatRow({ track, rank, queue }: { track: HeatTrack; rank: number; queue
       >
         <span className="rank">{rank}</span>
         <span className="heat-thumb">
-          <CoverImage src={track.coverUrl} title={track.title} sizes="40px" rounded="rounded-[6px]" />
+          <CoverMedia
+            cover={track.cover}
+            title={track.title}
+            playback="visibility"
+            sizes="40px"
+            rounded="rounded-[6px]"
+          />
         </span>
         <div className="heat-meta">
           <p className="heat-track" data-entity="track">

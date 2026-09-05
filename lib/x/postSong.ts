@@ -19,6 +19,7 @@ import {
 } from './artistStore';
 import { loadXAuth, saveXAuth } from './tokens';
 import { refreshAccessToken } from './oauth';
+import { resolveCoverPoster } from '@/lib/covers/resolve';
 
 const ACCESS_SKEW_MS = 60_000;
 
@@ -160,7 +161,7 @@ export async function maybePostSongLive(songId: string): Promise<SongLivePostRes
       return { ok: false, paused: true, reason: message };
     }
 
-    const coverUrl = song.albumCoverPath || song.albumCoverThumbnail;
+    const coverUrl = resolveCoverPoster(song);
     const cover = await fetchCoverBytes(coverUrl);
     let mediaId: string | null = null;
     if (cover) {

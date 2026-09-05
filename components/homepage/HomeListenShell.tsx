@@ -4,16 +4,17 @@ import Link from 'next/link';
 import { PlayableArt } from '@/components/songs/PlayableArt';
 import { EmptyAction } from '@/components/states/EmptyAction';
 import { FeaturedCoinMeta, HeatTape } from '@/components/homepage/HeatTape';
-import { CoverImage } from '@/components/media/CoverImage';
+import { CoverMedia } from '@/components/media/CoverMedia';
 import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
+import { playerCoverPayload, type CoverFields } from '@/lib/covers/resolve';
 
 export interface ListenTrack {
   id: string;
   title: string;
   artistName: string;
   artistId: string;
-  coverUrl: string | null;
+  cover: CoverFields;
   playCount: number;
   hasCoin: boolean;
   coin: ArtistCoinQuote | null;
@@ -24,7 +25,7 @@ interface FeaturedTrack {
   title: string;
   artistName: string;
   artistId: string;
-  coverUrl: string | null;
+  cover: CoverFields;
   audioUrl: string;
   hasCoin: boolean;
   coin: ArtistCoinQuote | null;
@@ -63,7 +64,7 @@ function FeaturedPlay({ featured }: { featured: FeaturedTrack }) {
       songTitle: featured.title,
       artistName: featured.artistName,
       artistId: featured.artistId,
-      albumCoverUrl: featured.coverUrl,
+      ...playerCoverPayload(featured.cover),
       audioUrl: featured.audioUrl,
     });
   };
@@ -88,7 +89,8 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                   title={featured.title}
                   artistName={featured.artistName}
                   artistId={featured.artistId}
-                  coverUrl={featured.coverUrl}
+                  cover={featured.cover}
+                  playback="always"
                   audioUrl={featured.audioUrl}
                   hasCoin={featured.hasCoin}
                 />
@@ -142,7 +144,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
               title: track.title,
               artistName: track.artistName,
               artistId: track.artistId,
-              coverUrl: track.coverUrl,
+              cover: track.cover,
               coin: track.coin,
             }))}
           />
@@ -176,7 +178,12 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                 style={index === live.length - 1 ? undefined : undefined}
               >
                 <div className="relative aspect-square overflow-hidden rounded-xl">
-                  <CoverImage src={track.coverUrl} title={track.title} sizes="200px" />
+                  <CoverMedia
+                    cover={track.cover}
+                    title={track.title}
+                    playback="visibility"
+                    sizes="200px"
+                  />
                   {track.hasCoin && (
                     <span className="absolute right-2 top-2 rounded-xl bg-black/70 px-2 py-0.5 text-[10px] font-medium text-primary">
                       Coin

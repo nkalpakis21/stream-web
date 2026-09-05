@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSong } from '@/lib/services/songs';
 import { getArtist } from '@/lib/services/artists';
+import { resolveCoverPoster } from '@/lib/covers/resolve';
 
 export async function GET(
   request: NextRequest,
@@ -26,7 +27,7 @@ export async function GET(
       process.env.NEXT_PUBLIC_APP_URL || 'https://streamstar.xyz';
     const songUrl = `${baseUrl}/songs/${songId}`;
 
-    const coverPath = song.albumCoverThumbnail || song.albumCoverPath;
+    const coverPath = resolveCoverPoster(song);
     const imageUrl = coverPath
       ? coverPath.startsWith('http')
         ? coverPath
