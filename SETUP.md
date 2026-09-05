@@ -40,7 +40,7 @@ npm install
    ```
    If `FAL_KEY` is unset, look generation is disabled. Managers can still upload and frame a photo as the artist look (no AI). Artist create also still works with a placeholder avatar.
 
-   Optional — Fal song covers (STR-52). Server-side only. When set to `fal`, new gens enqueue a Flux poster + Luma Ray ~5s loop after audio is ready. MusicGPT album/cover webhook writes are ignored so stills do not overwrite Streamstar covers. Existing album URLs are left in place until the Flux poster lands (then dual-written as `albumCover*` aliases). Audio is never blocked by the cover job.
+   Optional — Fal song covers (STR-52). Server-side only. When set to `fal`, new gens enqueue a Flux poster + Luma Ray ~5s loop after audio is ready. Streamstar `coverPosterUrl` / `coverVideoUrl` are the write path. MusicGPT album/cover webhook and conversion-detail writes are ignored so stills do not overwrite Streamstar covers. Existing `albumCover*` URLs stay as a read fallback for songs without a Flux poster. Audio is never blocked by the cover job.
    ```
    COVER_PIPELINE=fal
    ```

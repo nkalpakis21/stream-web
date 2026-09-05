@@ -17,6 +17,7 @@ import { createSongReadyNotification, createArtistNewSongNotification } from '@/
 import { getConversionDataByConversionID } from '@/lib/ai/providers/musicgpt';
 import { maybePostSongLive } from '@/lib/x/postSong';
 import { isFalCoverPipeline, shouldWriteMusicGptAlbumCover } from '@/lib/covers/config';
+import { musicGptAlbumCoverSongUpdates } from '@/lib/covers/musicgptAlbum';
 import { enqueueSongCoverGeneration } from '@/lib/covers/enqueue';
 
 export const runtime = 'nodejs';
@@ -186,15 +187,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
       
-      // Update song with album cover URLs
-      const songUpdates: Partial<SongDocument> = {};
-      if (body.image_path && !song.albumCoverPath) {
-        songUpdates.albumCoverPath = body.image_path;
-      }
-      if (body.thumbnail_path && !song.albumCoverThumbnail) {
-        songUpdates.albumCoverThumbnail = body.thumbnail_path;
-      }
-      
+      // Legacy stills only. Skipped when Fal is on or a Streamstar poster exists.
+      const songUpdates = musicGptAlbumCoverSongUpdates(song, {
+        albumCoverPath: body.image_path,
+        albumCoverThumbnail: body.thumbnail_path,
+      });
+
       if (Object.keys(songUpdates).length > 0) {
         await setDoc(
           doc(db, COLLECTIONS.songs, song.id),
@@ -563,32 +561,23 @@ export async function POST(request: Request) {
       if (conversion.createdAt) conversionMetadata.created_at = conversion.createdAt;
       if (conversion.updatedAt) conversionMetadata.updated_at = conversion.updatedAt;
       
-      // Extract album cover URLs and store on song document (shared across all conversions)
-      // Only update if not already set (idempotent) - all conversions share the same album cover
-      const albumCoverPath = conversion.album_cover_path as string | undefined;
-      const albumCoverThumbnail = conversion.album_cover_thumbnail as string | undefined;
-      
-      if (shouldWriteMusicGptAlbumCover() && (albumCoverPath || albumCoverThumbnail)) {
-        const songUpdates: Partial<SongDocument> = {};
-        if (albumCoverPath && !song.albumCoverPath) {
-          songUpdates.albumCoverPath = albumCoverPath;
-        }
-        if (albumCoverThumbnail && !song.albumCoverThumbnail) {
-          songUpdates.albumCoverThumbnail = albumCoverThumbnail;
-        }
-        
-        // Only update song if we have new album cover data
-        if (Object.keys(songUpdates).length > 0) {
-          await setDoc(
-            doc(db, COLLECTIONS.songs, song.id),
-            {
-              ...songUpdates,
-              updatedAt: Timestamp.now(),
-            },
-            { merge: true }
-          );
-          console.log(`[MusicGPT Webhook] Updated album cover for song ${song.id}`);
-        }
+      // Legacy stills only. Conversion-detail album writes are gated the same
+      // as the dedicated album_cover_generation webhook.
+      const songUpdates = musicGptAlbumCoverSongUpdates(song, {
+        albumCoverPath: conversion.album_cover_path as string | undefined,
+        albumCoverThumbnail: conversion.album_cover_thumbnail as string | undefined,
+      });
+
+      if (Object.keys(songUpdates).length > 0) {
+        await setDoc(
+          doc(db, COLLECTIONS.songs, song.id),
+          {
+            ...songUpdates,
+            updatedAt: Timestamp.now(),
+          },
+          { merge: true }
+        );
+        console.log(`[MusicGPT Webhook] Updated album cover for song ${song.id}`);
       }
     }
 
