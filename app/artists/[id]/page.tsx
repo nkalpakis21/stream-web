@@ -5,7 +5,7 @@ import { publicUrl, isDefaultTempoRange } from '@/lib/brand/site';
 import { getArtistSongs } from '@/lib/services/songs';
 import { SongCard } from '@/components/songs/SongCard';
 import { ArtistHero } from '@/components/artists/ArtistHero';
-import { hasLaunchedCoin } from '@/lib/brand/coin';
+import { coinBadgeFromArtist } from '@/lib/brand/coin';
 import { fetchArtistCoinModule } from '@/lib/solana/fetchArtistCoinModule';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import { EmptyAction } from '@/components/states/EmptyAction';
@@ -57,6 +57,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
     fetchArtistCoinModule(artist.pumpFun?.mint),
   ]);
 
+  const coinBadge = coinBadgeFromArtist(artist);
   const style = artist.styleDNA;
   const showTempo = !isDefaultTempoRange(style.tempoRange);
   const hasStyle =
@@ -134,7 +135,8 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                   key={song.id}
                   song={song}
                   artistName={artist.name}
-                  hasCoin={hasLaunchedCoin(artist.pumpFun)}
+                  ticker={coinBadge?.ticker}
+                  coinIcon={coinBadge?.iconSrc}
                 />
               ))}
             </div>
