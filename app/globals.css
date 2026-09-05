@@ -14,11 +14,11 @@ html.listen {
   --line: #2A2A38;
   --ink: #F5F4F8;
   --mute: #8B8896;
-  /* STR-60 — ice chrome; lime is money + CTAs only. */
+  /* STR-60 — ice chrome + ice CTA fills; lime is money metadata only. */
   --accent: #E8E6F2;
   --accent-ink: #0A0A10;
   --heat: #C8F542;
-  --accent-cta: var(--heat);
+  --accent-cta: var(--accent);
   --down: #FF4D6A;
   --radius: 12px;
   /* STR-58 — song covers only. 28px cap; 22% keeps ~40px thumbs as soft squares. Chrome stays --radius 12px. */
@@ -149,7 +149,7 @@ html.listen [data-entity='artist'] {
 .listen-btn-buy {
   height: 48px;
   padding: 0 20px;
-  background: var(--heat);
+  background: var(--accent-cta);
   color: var(--accent-ink);
   border: none;
 }

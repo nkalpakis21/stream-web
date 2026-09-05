@@ -124,7 +124,7 @@
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: var(--accent-cta, #c8f542);
+  background: var(--accent-cta, #e8e6f2);
   color: var(--accent-ink, #0a0a10);
   cursor: pointer;
 }
