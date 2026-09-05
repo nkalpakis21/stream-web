@@ -163,6 +163,19 @@ export interface AIArtistVersionDocument {
 
 export type CollaborationType = 'fork' | 'remix' | 'response' | 'extension';
 
+/**
+ * Fal cover pipeline (STR-52). MusicGPT stills are ignored when
+ * COVER_PIPELINE=fal. albumCover* is a read fallback for older songs.
+ */
+export type CoverMotionStatus = 'pending' | 'poster_ready' | 'ready' | 'failed';
+
+export interface CoverProviderCrumbs {
+  posterModel?: string | null;
+  loopModel?: string | null;
+  posterRequestId?: string | null;
+  loopRequestId?: string | null;
+}
+
 export interface SongDocument {
   id: string;
   ownerId: string; // User ID
@@ -177,15 +190,41 @@ export interface SongDocument {
   parentSongId: string | null; // If forked/remixed, reference original
   collaborationType: CollaborationType | null; // Type of collaboration if applicable
   /**
-   * Album cover image URL (full size).
-   * Shared across all conversions for a single song generation.
+   * Legacy MusicGPT album cover (full size).
+   * Read fallback when coverPosterUrl is missing. Not written by the Fal pipeline.
    */
   albumCoverPath: string | null;
   /**
-   * Album cover thumbnail URL.
-   * Shared across all conversions for a single song generation.
+   * Legacy MusicGPT album cover thumbnail.
+   * Read fallback when coverPosterUrl is missing. Not written by the Fal pipeline.
    */
   albumCoverThumbnail: string | null;
+  /**
+   * Fal Flux poster (rehosted). Optional on older songs.
+   */
+  coverPosterUrl?: string | null;
+  /**
+   * Fal Luma Ray seamless loop (rehosted mp4). Optional on older songs.
+   */
+  coverVideoUrl?: string | null;
+  /**
+   * Cover motion pipeline status. Absent on songs that never entered the Fal path.
+   * `failed` only when the Flux poster never landed. Luma failures stay `poster_ready`.
+   */
+  coverMotionStatus?: CoverMotionStatus | null;
+  /**
+   * Last cover-job error crumb. Cleared on a successful poster/loop write.
+   * After `poster_ready`, a Luma error is recorded here without flipping status.
+   */
+  coverMotionError?: string | null;
+  /**
+   * When cover fields were last written by the Fal job.
+   */
+  coverUpdatedAt?: Timestamp | null;
+  /**
+   * Provider/model crumbs for the last cover attempt.
+   */
+  coverProvider?: CoverProviderCrumbs | null;
   /**
    * Total number of times this song has been played.
    * Incremented atomically when users play the song.

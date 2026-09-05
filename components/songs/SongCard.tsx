@@ -5,6 +5,7 @@ import type { SongDocument } from '@/types/firestore';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { PlayableArt } from '@/components/songs/PlayableArt';
 import { ArtistCoinRow } from '@/components/songs/ArtistCoinRow';
+import { coverFieldsFromSong } from '@/lib/covers/resolve';
 
 interface SongCardProps {
   song: SongDocument;
@@ -22,7 +23,6 @@ export function SongCard({
   hasCoin = false,
   coin = null,
 }: SongCardProps) {
-  const coverImageUrl = song.albumCoverThumbnail || song.albumCoverPath;
   const isCompact = size === 'compact';
   const showMetrics = Boolean(coin);
 
@@ -33,7 +33,8 @@ export function SongCard({
         title={song.title}
         artistName={artistName || 'Artist'}
         artistId={song.artistId}
-        coverUrl={coverImageUrl}
+        cover={coverFieldsFromSong(song)}
+        playback="visibility"
         hasCoin={showMetrics ? false : hasCoin}
         durationSeconds={song.duration}
         href={`/songs/${song.id}`}

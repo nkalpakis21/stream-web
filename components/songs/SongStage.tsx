@@ -8,6 +8,7 @@ import { SongCoinCluster } from '@/components/songs/SongCoinCluster';
 import { AiMark } from '@/components/brand/AiMark';
 import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
+import { coverFieldsFromSong, playerCoverPayload, type CoverFields } from '@/lib/covers/resolve';
 
 interface VersionOption {
   id: string;
@@ -22,6 +23,7 @@ interface SongStageProps {
   artistId: string | null;
   artistName: string;
   albumCoverUrl: string | null;
+  cover?: CoverFields;
   audioUrl: string | null;
   versions: VersionOption[];
   durationSeconds?: number | null;
@@ -55,6 +57,7 @@ export function SongStage({
   artistId,
   artistName,
   albumCoverUrl,
+  cover,
   audioUrl,
   versions,
   durationSeconds = null,
@@ -78,6 +81,11 @@ export function SongStage({
     durationSeconds != null && Number.isFinite(durationSeconds) && durationSeconds > 0
       ? formatClock(durationSeconds)
       : versionClock(active || { id: '', audioURL: null, isPrimary: false }, null);
+  const coverFields = coverFieldsFromSong({
+    ...cover,
+    albumCoverPath: cover?.albumCoverPath ?? albumCoverUrl,
+    albumCoverThumbnail: cover?.albumCoverThumbnail ?? albumCoverUrl,
+  });
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start">
@@ -86,7 +94,8 @@ export function SongStage({
         title={songTitle}
         artistName={artistName}
         artistId={artistId || undefined}
-        coverUrl={albumCoverUrl}
+        cover={coverFields}
+        playback="always"
         audioUrl={currentAudio}
         durationSeconds={durationSeconds}
         className="w-full"
@@ -135,7 +144,7 @@ export function SongStage({
                         songTitle,
                         artistName,
                         artistId: artistId || undefined,
-                        albumCoverUrl: albumCoverUrl,
+                        ...playerCoverPayload(coverFields),
                         audioUrl: version.audioURL,
                       });
                     }
