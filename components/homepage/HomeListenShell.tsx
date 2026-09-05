@@ -17,7 +17,8 @@ export interface ListenTrack {
   artistId: string;
   cover: CoverFields;
   playCount: number;
-  hasCoin: boolean;
+  ticker: string | null;
+  coinIcon: string | null;
   coin: ArtistCoinQuote | null;
 }
 
@@ -28,7 +29,8 @@ interface FeaturedTrack {
   artistId: string;
   cover: CoverFields;
   audioUrl: string;
-  hasCoin: boolean;
+  ticker: string | null;
+  coinIcon: string | null;
   coin: ArtistCoinQuote | null;
 }
 
@@ -109,7 +111,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                   >
                     {featured.artistName}
                   </Link>
-                  {featured.hasCoin ? <CoinBadge /> : null}
+                  <CoinBadge ticker={featured.ticker} iconSrc={featured.coinIcon} />
                 </div>
                 <FeaturedCoinMeta artistId={featured.artistId} quote={featured.coin} />
                 <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -193,7 +195,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                   <p className="min-w-0 truncate text-xs text-muted-foreground" data-entity="artist">
                     {track.artistName}
                   </p>
-                  {track.hasCoin ? <CoinBadge /> : null}
+                  <CoinBadge ticker={track.ticker} iconSrc={track.coinIcon} />
                 </div>
               </Link>
             ))}

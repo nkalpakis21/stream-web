@@ -5,6 +5,8 @@ import { EditArtistName } from './EditArtistName';
 import { MessageArtistButton } from './MessageArtistButton';
 import { FollowButton } from './FollowButton';
 import { FollowersList } from './FollowersList';
+import { CoinBadge } from '@/components/songs/CoinBadge';
+import { coinBadgeFromArtist } from '@/lib/brand/coin';
 import { isHonestBio } from '@/lib/brand/bio';
 import type { AIArtistDocument } from '@/types/firestore';
 
@@ -17,10 +19,11 @@ export function ArtistHeader({ artist, isOwner: propIsOwner }: ArtistHeaderProps
   const { user } = useAuth();
   const isOwner = propIsOwner ?? (user?.uid === artist.ownerId);
   const bio = isHonestBio(artist.lore, artist.name) ? artist.lore.trim() : null;
+  const coinBadge = coinBadgeFromArtist(artist);
 
   return (
     <div className="min-w-0 flex-1">
-      <div className="flex items-start justify-between gap-4 mb-3">
+      <div className="mb-3 flex items-start justify-between gap-4">
         {isOwner ? (
           <EditArtistName artistId={artist.id} currentName={artist.name} />
         ) : (
@@ -29,6 +32,11 @@ export function ArtistHeader({ artist, isOwner: propIsOwner }: ArtistHeaderProps
           </h1>
         )}
       </div>
+      {coinBadge ? (
+        <div className="mb-3">
+          <CoinBadge ticker={coinBadge.ticker} iconSrc={coinBadge.iconSrc} />
+        </div>
+      ) : null}
       <FollowersList artistId={artist.id} />
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <FollowButton artistId={artist.id} ownerId={artist.ownerId} />

@@ -15,7 +15,7 @@ import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
 import { SongStage } from '@/components/songs/SongStage';
 import { getLyricsForSong } from '@/lib/services/lyrics';
 import { CommentsSection } from '@/components/comments/CommentsSection';
-import { hasLaunchedCoin } from '@/lib/brand/coin';
+import { coinBadgeFromArtist, hasLaunchedCoin } from '@/lib/brand/coin';
 import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 
@@ -144,6 +144,7 @@ export default async function SongPage({ params }: SongPageProps) {
   const quotes = mint ? await fetchCoinQuotes([mint]) : new Map<string, ArtistCoinQuote>();
   const coin = mint ? quotes.get(mint) ?? null : null;
   const buyUrl = launched ? (artist?.pumpFun?.url?.trim() || null) : null;
+  const coinBadge = coinBadgeFromArtist(artist);
   const shareUrl = publicUrl(`/songs/${song.id}`);
 
   return (
@@ -159,6 +160,8 @@ export default async function SongPage({ params }: SongPageProps) {
           audioUrl={primaryAudioUrl}
           pending={hasPendingGeneration}
           durationSeconds={song.duration ?? null}
+          ticker={coinBadge?.ticker}
+          coinIcon={coinBadge?.iconSrc}
           coin={coin}
           buyUrl={buyUrl}
           shareUrl={shareUrl}

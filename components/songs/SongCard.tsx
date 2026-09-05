@@ -13,7 +13,8 @@ interface SongCardProps {
   artistName?: string;
   variant?: 'default' | 'glass';
   size?: 'default' | 'compact';
-  hasCoin?: boolean;
+  ticker?: string | null;
+  coinIcon?: string | null;
   coin?: ArtistCoinQuote | null;
 }
 
@@ -21,10 +22,12 @@ export function SongCard({
   song,
   artistName,
   size = 'default',
-  hasCoin = false,
+  ticker = null,
+  coinIcon = null,
   coin = null,
 }: SongCardProps) {
   const isCompact = size === 'compact';
+  const showTicker = Boolean(ticker?.trim());
 
   return (
     <article className="block rounded-[12px] bg-card">
@@ -48,7 +51,7 @@ export function SongCard({
             {song.title}
           </h3>
         </Link>
-        {artistName || hasCoin ? (
+        {artistName || showTicker ? (
           <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
             {artistName ? (
               <p
@@ -59,7 +62,7 @@ export function SongCard({
                 {artistName}
               </p>
             ) : null}
-            {hasCoin ? <CoinBadge /> : null}
+            <CoinBadge ticker={ticker} iconSrc={coinIcon} />
           </div>
         ) : null}
         {coin ? <ArtistCoinRow artistId={song.artistId} quote={coin} /> : null}

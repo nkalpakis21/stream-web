@@ -52,7 +52,7 @@ function DiscoverPageInner() {
   const {
     songs,
     artistNames,
-    coinBySong,
+    coinBadgeBySong,
     quoteBySong,
     loading,
     loadingMore,
@@ -197,7 +197,8 @@ function DiscoverPageInner() {
                     song={song}
                     artistName={artistNames.get(song.id)}
                     coin={quoteBySong.get(song.id) ?? null}
-                    hasCoin={coinBySong.get(song.id) ?? false}
+                    ticker={coinBadgeBySong.get(song.id)?.ticker}
+                    coinIcon={coinBadgeBySong.get(song.id)?.iconSrc}
                   />
                 </div>
               ))}

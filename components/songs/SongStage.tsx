@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { PlayableArt } from '@/components/songs/PlayableArt';
 import { ShareButton } from '@/components/songs/ShareButton';
+import { CoinBadge } from '@/components/songs/CoinBadge';
 import { SongCoinCluster } from '@/components/songs/SongCoinCluster';
 import { AiMark } from '@/components/brand/AiMark';
 import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
@@ -27,6 +28,8 @@ interface SongStageProps {
   audioUrl: string | null;
   versions: VersionOption[];
   durationSeconds?: number | null;
+  ticker?: string | null;
+  coinIcon?: string | null;
   coin?: ArtistCoinQuote | null;
   buyUrl?: string | null;
   shareUrl: string;
@@ -61,6 +64,8 @@ export function SongStage({
   audioUrl,
   versions,
   durationSeconds = null,
+  ticker = null,
+  coinIcon = null,
   coin = null,
   buyUrl = null,
   shareUrl,
@@ -108,13 +113,16 @@ export function SongStage({
           ) : null}
           <AiMark />
         </div>
-        {artistId ? (
-          <Link href={`/artists/${artistId}`} className="mt-2 inline-block text-lg text-primary underline-offset-4 hover:underline" data-entity="artist">
-            {artistName}
-          </Link>
-        ) : (
-          <p className="mt-2 text-lg text-muted-foreground" data-entity="artist">{artistName}</p>
-        )}
+        <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
+          {artistId ? (
+            <Link href={`/artists/${artistId}`} className="inline-block text-lg text-primary underline-offset-4 hover:underline" data-entity="artist">
+              {artistName}
+            </Link>
+          ) : (
+            <p className="text-lg text-muted-foreground" data-entity="artist">{artistName}</p>
+          )}
+          <CoinBadge ticker={ticker} iconSrc={coinIcon} />
+        </div>
         <SongCoinCluster artistId={artistId} quote={coin} buyUrl={buyUrl} />
         {pending && !currentAudio && (
           <div

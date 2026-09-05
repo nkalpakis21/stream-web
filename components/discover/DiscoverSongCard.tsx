@@ -12,15 +12,18 @@ interface DiscoverSongCardProps {
   song: SongDocument;
   artistName?: string;
   coin?: ArtistCoinQuote | null;
-  hasCoin?: boolean;
+  ticker?: string | null;
+  coinIcon?: string | null;
 }
 
 export function DiscoverSongCard({
   song,
   artistName,
   coin = null,
-  hasCoin = false,
+  ticker = null,
+  coinIcon = null,
 }: DiscoverSongCardProps) {
+  const showTicker = Boolean(ticker?.trim());
   return (
     <article className="block rounded-[12px] bg-card">
       <PlayableArt
@@ -43,7 +46,7 @@ export function DiscoverSongCard({
             {song.title}
           </h3>
         </Link>
-        {artistName || hasCoin ? (
+        {artistName || showTicker ? (
           <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
             {artistName ? (
               <p
@@ -54,7 +57,7 @@ export function DiscoverSongCard({
                 {artistName}
               </p>
             ) : null}
-            {hasCoin ? <CoinBadge /> : null}
+            <CoinBadge ticker={ticker} iconSrc={coinIcon} />
           </div>
         ) : null}
         <DiscoverCoinRow artistId={song.artistId} quote={coin} />

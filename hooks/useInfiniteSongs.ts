@@ -5,7 +5,7 @@ import type { AIArtistDocument, SongDocument } from '@/types/firestore';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { getArtistNamesForSongs } from '@/lib/services/songs';
 import { getArtistsData } from '@/lib/services/artists';
-import { hasLaunchedCoin } from '@/lib/brand/coin';
+import { coinBadgeFromArtist, hasLaunchedCoin, type CoinBadgeMeta } from '@/lib/brand/coin';
 
 interface PaginatedResponse {
   songs: Array<Omit<SongDocument, 'createdAt' | 'updatedAt' | 'deletedAt'> & {
@@ -28,7 +28,7 @@ interface UseInfiniteSongsOptions {
 interface UseInfiniteSongsReturn {
   songs: SongDocument[];
   artistNames: Map<string, string>;
-  coinBySong: Map<string, boolean>;
+  coinBadgeBySong: Map<string, CoinBadgeMeta>;
   quoteBySong: Map<string, ArtistCoinQuote>;
   loading: boolean;
   loadingMore: boolean;
@@ -103,7 +103,7 @@ export function useInfiniteSongs(
   
   const [songs, setSongs] = useState<SongDocument[]>([]);
   const [artistNames, setArtistNames] = useState<Map<string, string>>(new Map());
-  const [coinBySong, setCoinBySong] = useState<Map<string, boolean>>(new Map());
+  const [coinBadgeBySong, setCoinBadgeBySong] = useState<Map<string, CoinBadgeMeta>>(new Map());
   const [quoteBySong, setQuoteBySong] = useState<Map<string, ArtistCoinQuote>>(new Map());
   const quotesByMintRef = useRef<Map<string, ArtistCoinQuote>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -203,10 +203,12 @@ export function useInfiniteSongs(
         names.forEach((name, id) => updated.set(id, name));
         return updated;
       });
-      setCoinBySong(prev => {
+      setCoinBadgeBySong(prev => {
         const updated = new Map(prev);
         deserializedSongs.forEach(song => {
-          updated.set(song.id, hasLaunchedCoin(artists.get(song.artistId)?.pumpFun));
+          const badge = coinBadgeFromArtist(artists.get(song.artistId));
+          if (badge) updated.set(song.id, badge);
+          else updated.delete(song.id);
         });
         return updated;
       });
@@ -219,11 +221,12 @@ export function useInfiniteSongs(
     }
 
     setArtistNames(names);
-    const coins = new Map<string, boolean>();
+    const badges = new Map<string, CoinBadgeMeta>();
     deserializedSongs.forEach(song => {
-      coins.set(song.id, hasLaunchedCoin(artists.get(song.artistId)?.pumpFun));
+      const badge = coinBadgeFromArtist(artists.get(song.artistId));
+      if (badge) badges.set(song.id, badge);
     });
-    setCoinBySong(coins);
+    setCoinBadgeBySong(badges);
     setQuoteBySong(quotes);
   }, [key]);
 
@@ -232,7 +235,7 @@ export function useInfiniteSongs(
     setError(null);
     setSongs([]);
     setArtistNames(new Map());
-    setCoinBySong(new Map());
+    setCoinBadgeBySong(new Map());
     setQuoteBySong(new Map());
     quotesByMintRef.current = new Map();
     setCursor(null);
@@ -301,7 +304,7 @@ export function useInfiniteSongs(
   const reset = useCallback(() => {
     setSongs([]);
     setArtistNames(new Map());
-    setCoinBySong(new Map());
+    setCoinBadgeBySong(new Map());
     setQuoteBySong(new Map());
     quotesByMintRef.current = new Map();
     setCursor(null);
@@ -323,7 +326,7 @@ export function useInfiniteSongs(
   return {
     songs,
     artistNames,
-    coinBySong,
+    coinBadgeBySong,
     quoteBySong,
     loading,
     loadingMore,
