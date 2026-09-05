@@ -14,7 +14,7 @@ html.listen {
   --line: #2A2A38;
   --ink: #F5F4F8;
   --mute: #8B8896;
-  --accent: #7C7BFF;
+  --accent: #C8F542;
   --accent-ink: #0A0A10;
   --heat: #C8F542;
   --down: #FF4D6A;
@@ -326,19 +326,19 @@ html.listen .lyrics-listen {
     --card-foreground: 24 9.8% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 24 9.8% 10%;
-    --primary: 239 84% 67%;
-    --primary-foreground: 0 0% 98%;
+    --primary: 75 90% 61%;
+    --primary-foreground: 240 23% 5%;
     --secondary: 60 4.8% 95.9%;
     --secondary-foreground: 24 9.8% 10%;
     --muted: 60 4.8% 95.9%;
     --muted-foreground: 25 5.3% 44.7%;
-    --accent: 239 84% 67%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 75 90% 61%;
+    --accent-foreground: 240 23% 5%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 20 5.9% 90%;
     --input: 20 5.9% 90%;
-    --ring: 239 84% 67%;
+    --ring: 75 90% 61%;
     --radius: 12px;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
@@ -354,19 +354,19 @@ html.listen .lyrics-listen {
     --card-foreground: 0 0% 98%;
     --popover: 20 14.3% 4.1%;
     --popover-foreground: 0 0% 98%;
-    --primary: 239 84% 67%;
-    --primary-foreground: 0 0% 98%;
+    --primary: 75 90% 61%;
+    --primary-foreground: 240 23% 5%;
     --secondary: 12 6.5% 15.1%;
     --secondary-foreground: 0 0% 98%;
     --muted: 12 6.5% 15.1%;
     --muted-foreground: 24 5.4% 63.9%;
-    --accent: 239 84% 67%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 75 90% 61%;
+    --accent-foreground: 240 23% 5%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     --border: 12 6.5% 15.1%;
     --input: 12 6.5% 15.1%;
-    --ring: 239 84% 67%;
+    --ring: 75 90% 61%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -515,8 +515,8 @@ textarea:focus-visible,
 select:focus,
 select:focus-visible {
   outline: none !important;
-  border-color: var(--accent, #7c7bff) !important;
-  box-shadow: 0 0 0 1px var(--accent, #7c7bff);
+  border-color: var(--accent, #c8f542) !important;
+  box-shadow: 0 0 0 1px var(--accent, #c8f542);
 }
 
 input:-webkit-autofill,
