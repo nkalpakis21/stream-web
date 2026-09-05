@@ -336,7 +336,7 @@ export function SpotifyPlayer({
             <Button
               onClick={onPlayPause}
               size="icon"
-              className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 hover:scale-105 transition-all shadow-lg"
+              className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-accent-cta text-accent-ink hover:bg-accent-cta/90 hover:scale-105 transition-all shadow-lg"
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (

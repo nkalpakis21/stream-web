@@ -62,7 +62,7 @@ function SignInGate({
           type="button"
           onClick={handleSignIn}
           disabled={signingIn}
-          className="inline-flex items-center justify-center gap-3 px-6 py-3 bg-accent text-accent-foreground rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-3 px-6 py-3 bg-accent-cta text-accent-ink rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
         >
           <GoogleMark />
           {signingIn ? 'Signing in...' : 'Sign in with Google'}

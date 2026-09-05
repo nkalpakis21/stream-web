@@ -131,7 +131,7 @@
   font-family: var(--font-figtree), system-ui, sans-serif;
   font-size: 12px;
   line-height: 16px;
-  color: var(--mute, #8b8896);
+  color: var(--accent, #e8e6f2);
   text-transform: none;
   text-decoration: none;
 }
@@ -190,7 +190,7 @@
 }
 
 .heat-play:hover {
-  color: var(--accent, #c8f542);
+  color: var(--accent, #e8e6f2);
 }
 
 .heat-featured-meta {

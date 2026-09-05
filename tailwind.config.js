@@ -60,6 +60,7 @@ module.exports = {
         heat: "var(--heat)",
         down: "var(--down)",
         "accent-ink": "var(--accent-ink)",
+        "accent-cta": "var(--listen-accent-cta, var(--accent))",
         chart: {
           "1": "hsl(var(--chart-1))",
           "2": "hsl(var(--chart-2))",

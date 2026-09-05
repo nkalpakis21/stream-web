@@ -118,7 +118,7 @@ export function CommentForm({
             <button
               type="submit"
               disabled={!content.trim() || submitting}
-              className="px-4 py-2 text-sm bg-accent text-accent-foreground rounded-xl hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm bg-accent-cta text-accent-ink rounded-xl hover:bg-accent-cta/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {submitting ? (
                 <>
