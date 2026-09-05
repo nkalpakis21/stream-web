@@ -211,10 +211,12 @@ export interface SongDocument {
   coverVideoUrl?: string | null;
   /**
    * Cover motion pipeline status. Absent on songs that never entered the Fal path.
+   * `failed` only when the Flux poster never landed. Luma failures stay `poster_ready`.
    */
   coverMotionStatus?: CoverMotionStatus | null;
   /**
    * Last cover-job error crumb. Cleared on a successful poster/loop write.
+   * After `poster_ready`, a Luma error is recorded here without flipping status.
    */
   coverMotionError?: string | null;
   /**

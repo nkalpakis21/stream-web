@@ -1,6 +1,7 @@
 /**
  * Fal cover generate job: Flux poster → rehost → Luma Ray loop → rehost.
- * Fail-soft: never throw out to song/audio callers; song is marked failed.
+ * Fail-soft: never throw out to song/audio callers.
+ * `failed` only if the poster never landed. Luma errors stay `poster_ready`.
  */
 
 import { isFalConfigured, generateCoverLoop, generateCoverPoster } from '@/lib/ai/fal';
@@ -61,17 +62,28 @@ function generationPromptText(generation: GenerationDocument | null): string | n
   return null;
 }
 
-async function markFailed(song: SongDocument, error: unknown): Promise<void> {
+/**
+ * Persist a cover-job error without wiping a landed poster.
+ * Luma/storage-after-poster stays `poster_ready` so stills remain usable.
+ * `failed` is only for Flux/storage failure before a poster URL exists.
+ */
+async function persistCoverJobError(
+  song: SongDocument,
+  error: unknown,
+  posterLanded: boolean
+): Promise<NonNullable<SongDocument['coverMotionStatus']>> {
   const message = error instanceof Error ? error.message : String(error ?? 'Cover job failed');
-  console.error('[cover] job failed', { songId: song.id, error: message });
+  const status = posterLanded ? 'poster_ready' : 'failed';
+  console.error('[cover] job failed', { songId: song.id, status, error: message });
   try {
     await updateSongCoverFields(song.id, {
-      coverMotionStatus: 'failed',
+      coverMotionStatus: status,
       coverMotionError: clipCoverError(message),
     });
   } catch (writeError) {
     console.error('[cover] failed to persist error crumb', song.id, writeError);
   }
+  return status;
 }
 
 /**
@@ -97,19 +109,19 @@ export async function generateSongCover(songId: string): Promise<CoverJobResult>
     return { ok: true, skipped: true, reason: 'Cover already ready', songId, status: 'ready' };
   }
 
+  let posterUrl = song.coverPosterUrl?.trim() || '';
+  let posterLanded = Boolean(posterUrl);
+
   if (!isFalConfigured()) {
-    await markFailed(song, new Error('FAL_KEY is not set'));
-    return { ok: false, songId, status: 'failed', reason: 'FAL_KEY is not set' };
+    const status = await persistCoverJobError(
+      song,
+      new Error('FAL_KEY is not set'),
+      posterLanded
+    );
+    return { ok: false, songId, status, reason: 'FAL_KEY is not set' };
   }
 
   try {
-    if (song.coverMotionStatus !== 'poster_ready') {
-      await updateSongCoverFields(song.id, {
-        coverMotionStatus: 'pending',
-        coverMotionError: null,
-      });
-    }
-
     const artist = await getArtistAdmin(song.artistId);
     const generation = await getLatestGeneration(song.id);
     const promptInput = {
@@ -122,10 +134,20 @@ export async function generateSongCover(songId: string): Promise<CoverJobResult>
       hasLockedLook: Boolean(usableLookUrl(artist?.avatarURL)),
     };
 
-    let posterUrl = song.coverPosterUrl?.trim() || '';
     let coverProvider = song.coverProvider || null;
 
-    if (song.coverMotionStatus !== 'poster_ready' || !posterUrl) {
+    if (posterLanded) {
+      // Video-only retry: never re-run Flux once a poster URL exists.
+      if (song.coverMotionStatus !== 'poster_ready' && song.coverMotionStatus !== 'ready') {
+        await updateSongCoverFields(song.id, {
+          coverMotionStatus: 'poster_ready',
+        });
+      }
+    } else {
+      await updateSongCoverFields(song.id, {
+        coverMotionStatus: 'pending',
+        coverMotionError: null,
+      });
       const poster = await generateCoverPoster({
         prompt: buildCoverPosterPrompt(promptInput),
         referenceImageUrl: usableLookUrl(artist?.avatarURL),
@@ -148,6 +170,7 @@ export async function generateSongCover(songId: string): Promise<CoverJobResult>
         coverProvider,
         dualWriteAlbumCover: posterUrl,
       });
+      posterLanded = true;
     }
 
     const loop = await generateCoverLoop({
@@ -174,11 +197,11 @@ export async function generateSongCover(songId: string): Promise<CoverJobResult>
 
     return { ok: true, songId, status: 'ready' };
   } catch (error) {
-    await markFailed(song, error);
+    const status = await persistCoverJobError(song, error, posterLanded);
     return {
       ok: false,
       songId,
-      status: 'failed',
+      status,
       reason: error instanceof Error ? error.message : 'Cover job failed',
     };
   }
