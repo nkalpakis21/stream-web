@@ -40,6 +40,22 @@ npm install
    ```
    If `FAL_KEY` is unset, look generation is disabled. Managers can still upload and frame a photo as the artist look (no AI). Artist create also still works with a placeholder avatar.
 
+   Optional — Fal song covers (STR-52). Server-side only. When set to `fal`, new gens enqueue a Flux poster + Luma Ray ~5s loop after audio is ready. MusicGPT album/cover webhook writes are ignored so stills do not overwrite Streamstar covers. Existing album URLs are left in place until the Flux poster lands (then dual-written as `albumCover*` aliases). Audio is never blocked by the cover job.
+   ```
+   COVER_PIPELINE=fal
+   ```
+   Optional cover model overrides (defaults shown):
+   ```
+   FAL_FLUX_COVER_MODEL=fal-ai/flux/dev
+   FAL_FLUX_COVER_I2I_MODEL=fal-ai/flux/dev/image-to-image
+   FAL_LUMA_COVER_MODEL=fal-ai/luma-dream-machine/ray-2/image-to-video
+   ```
+   Optional secret for `POST /api/covers/generate` (`x-cover-job-secret`). Falls back to `REVALIDATE_SECRET` when unset:
+   ```
+   COVER_JOB_SECRET=your-cover-job-secret
+   ```
+   Requires `FAL_KEY` and Firebase Admin + Storage (same as look uploads). Paths: `songs/{songId}/cover/poster.jpg`, `songs/{songId}/cover/loop.mp4`.
+
    Optional — artist X posting (OAuth 2.0 user-context). Server-side only; do not commit keys and do not prefix with `NEXT_PUBLIC_`:
    ```
    X_CLIENT_ID=your-x-oauth-client-id

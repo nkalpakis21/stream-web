@@ -16,6 +16,11 @@ import type { SongDocument, SongVersionDocument, GenerationDocument } from '@/ty
 import { createSongReadyNotification, createArtistNewSongNotification } from '@/lib/services/notifications';
 import { getConversionDataByConversionID } from '@/lib/ai/providers/musicgpt';
 import { maybePostSongLive } from '@/lib/x/postSong';
+import { isFalCoverPipeline, shouldWriteMusicGptAlbumCover } from '@/lib/covers/config';
+import { enqueueSongCoverGeneration } from '@/lib/covers/enqueue';
+
+export const runtime = 'nodejs';
+export const maxDuration = 300;
 
 /**
  * MusicGPT webhook payload structure as documented.
@@ -151,6 +156,13 @@ export async function POST(request: Request) {
 
     // Handle album cover generation webhooks
     if (body.subtype === 'album_cover_generation') {
+      if (!shouldWriteMusicGptAlbumCover()) {
+        console.log(
+          `[MusicGPT Webhook] Ignoring MusicGPT album cover write (COVER_PIPELINE=fal) task=${body.task_id}`
+        );
+        return NextResponse.json({ ok: true, ignored: 'album_cover' });
+      }
+
       console.log(`[MusicGPT Webhook] Received album cover generation webhook for task ${body.task_id}`);
       
       // Find generation by task_id
@@ -474,6 +486,31 @@ export async function POST(request: Request) {
 
     await setDoc(versionRef, version);
 
+    const hasExistingAudio = existingVersions.some(version => Boolean(version.audioURL));
+    if (!hasExistingAudio && isFalCoverPipeline()) {
+      try {
+        if (
+          song.coverMotionStatus !== 'ready' &&
+          song.coverMotionStatus !== 'pending' &&
+          song.coverMotionStatus !== 'poster_ready'
+        ) {
+          await setDoc(
+            doc(db, COLLECTIONS.songs, song.id),
+            {
+              coverMotionStatus: 'pending',
+              coverMotionError: null,
+              coverUpdatedAt: now,
+              updatedAt: now,
+            },
+            { merge: true }
+          );
+        }
+        enqueueSongCoverGeneration(song.id);
+      } catch (error) {
+        console.error('[MusicGPT Webhook] Cover enqueue failed (audio path continues):', error);
+      }
+    }
+
     // If this is the first version, mark it as primary
     if (existingVersions.length === 0) {
       await setPrimarySongVersion(song.id, versionId);
@@ -531,7 +568,7 @@ export async function POST(request: Request) {
       const albumCoverPath = conversion.album_cover_path as string | undefined;
       const albumCoverThumbnail = conversion.album_cover_thumbnail as string | undefined;
       
-      if (albumCoverPath || albumCoverThumbnail) {
+      if (shouldWriteMusicGptAlbumCover() && (albumCoverPath || albumCoverThumbnail)) {
         const songUpdates: Partial<SongDocument> = {};
         if (albumCoverPath && !song.albumCoverPath) {
           songUpdates.albumCoverPath = albumCoverPath;

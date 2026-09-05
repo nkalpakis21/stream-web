@@ -163,6 +163,19 @@ export interface AIArtistVersionDocument {
 
 export type CollaborationType = 'fork' | 'remix' | 'response' | 'extension';
 
+/**
+ * Fal cover pipeline (STR-52). MusicGPT stills are ignored when
+ * COVER_PIPELINE=fal. Dual-write albumCover* as poster aliases during migrate.
+ */
+export type CoverMotionStatus = 'pending' | 'poster_ready' | 'ready' | 'failed';
+
+export interface CoverProviderCrumbs {
+  posterModel?: string | null;
+  loopModel?: string | null;
+  posterRequestId?: string | null;
+  loopRequestId?: string | null;
+}
+
 export interface SongDocument {
   id: string;
   ownerId: string; // User ID
@@ -179,13 +192,39 @@ export interface SongDocument {
   /**
    * Album cover image URL (full size).
    * Shared across all conversions for a single song generation.
+   * Dual-written as an alias of coverPosterUrl while COVER_PIPELINE=fal migrates.
    */
   albumCoverPath: string | null;
   /**
    * Album cover thumbnail URL.
    * Shared across all conversions for a single song generation.
+   * Dual-written as an alias of coverPosterUrl while COVER_PIPELINE=fal migrates.
    */
   albumCoverThumbnail: string | null;
+  /**
+   * Fal Flux poster (rehosted). Optional on older songs.
+   */
+  coverPosterUrl?: string | null;
+  /**
+   * Fal Luma Ray seamless loop (rehosted mp4). Optional on older songs.
+   */
+  coverVideoUrl?: string | null;
+  /**
+   * Cover motion pipeline status. Absent on songs that never entered the Fal path.
+   */
+  coverMotionStatus?: CoverMotionStatus | null;
+  /**
+   * Last cover-job error crumb. Cleared on a successful poster/loop write.
+   */
+  coverMotionError?: string | null;
+  /**
+   * When cover fields were last written by the Fal job.
+   */
+  coverUpdatedAt?: Timestamp | null;
+  /**
+   * Provider/model crumbs for the last cover attempt.
+   */
+  coverProvider?: CoverProviderCrumbs | null;
   /**
    * Total number of times this song has been played.
    * Incremented atomically when users play the song.
