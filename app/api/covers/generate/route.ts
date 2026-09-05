@@ -1,29 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCoverJobSecret, isFalCoverPipeline } from '@/lib/covers/config';
+import { isCoverJobAuthorized, isFalCoverPipeline } from '@/lib/covers/config';
 import { generateSongCover } from '@/lib/covers/generate';
 
 /**
  * POST /api/covers/generate
  * Internal Fal cover job. Does not block MusicGPT audio.
  *
- * Auth: x-cover-job-secret (COVER_JOB_SECRET, else REVALIDATE_SECRET).
+ * Auth: x-cover-job-secret or Authorization Bearer
+ *   (COVER_JOB_SECRET, else REVALIDATE_SECRET; Bearer CRON_SECRET also ok).
  * Env: COVER_PIPELINE=fal, FAL_KEY.
  */
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-function isAuthorized(request: NextRequest): boolean {
-  const expected = getCoverJobSecret();
-  if (!expected) {
-    return false;
-  }
-  const header = request.headers.get('x-cover-job-secret');
-  return Boolean(header && header === expected);
-}
-
 export async function POST(request: NextRequest) {
-  if (!isAuthorized(request)) {
+  if (!isCoverJobAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
