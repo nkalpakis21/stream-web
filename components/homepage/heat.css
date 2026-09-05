@@ -97,7 +97,7 @@
   width: 40px;
   height: 40px;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: var(--radius-cover, min(28px, 22%));
   background: var(--surface-2, #1c1c28);
 }
 
@@ -190,7 +190,7 @@
 }
 
 .heat-play:hover {
-  color: var(--accent, #7c7bff);
+  color: var(--accent, #c8f542);
 }
 
 .heat-featured-meta {

@@ -27,7 +27,6 @@ interface PlayableArtProps {
   cover: CoverFields;
   playback?: CoverPlayback;
   audioUrl?: string | null;
-  hasCoin?: boolean;
   durationSeconds?: number | null;
   href?: string;
   className?: string;
@@ -41,7 +40,6 @@ export function PlayableArt({
   cover,
   playback = 'visibility',
   audioUrl: audioUrlProp,
-  hasCoin = false,
   durationSeconds = null,
   href,
   className = '',
@@ -100,10 +98,10 @@ export function PlayableArt({
 
   return (
     <div
-      className={`rounded-[12px] ${className}`}
+      className={`rounded-cover ${className}`}
       style={playingCover ? { boxShadow: '0 0 0 2px var(--accent)' } : undefined}
     >
-      <div className="relative aspect-square overflow-hidden rounded-[12px]">
+      <div className="relative aspect-square overflow-hidden rounded-cover">
         {href ? (
           <Link href={href} className="absolute inset-0" aria-label={`${title} by ${artistName}`}>
             <CoverMedia
@@ -144,10 +142,6 @@ export function PlayableArt({
         {clock ? (
           <span className="absolute bottom-2 right-2 z-10 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">
             {clock}
-          </span>
-        ) : hasCoin ? (
-          <span className="absolute bottom-2 right-2 z-10 rounded-xl bg-black/70 px-2 py-0.5 text-[10px] font-medium text-primary">
-            Coin
           </span>
         ) : null}
       </div>

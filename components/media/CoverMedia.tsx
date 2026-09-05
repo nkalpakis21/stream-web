@@ -102,7 +102,7 @@ export function CoverMedia({
   title,
   sizes,
   playback = 'visibility',
-  rounded = 'rounded-[12px]',
+  rounded = 'rounded-cover',
   className = '',
   priority = false,
 }: CoverMediaProps) {
@@ -148,7 +148,7 @@ export function CoverMedia({
   return (
     <div
       ref={ref}
-      className={`cover-media ${className}`.trim()}
+      className={`cover-media ${rounded} ${className}`.trim()}
       data-cover-playback={playback}
       data-cover-video={mountVideo ? 'on' : 'off'}
     >

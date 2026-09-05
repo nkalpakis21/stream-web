@@ -28,7 +28,7 @@ module.exports = {
         },
         primary: {
           DEFAULT: "var(--listen-accent, hsl(var(--primary)))",
-          foreground: "var(--listen-ink, hsl(var(--primary-foreground)))",
+          foreground: "var(--listen-accent-ink, hsl(var(--primary-foreground)))",
         },
         secondary: {
           DEFAULT: "var(--listen-surface-2, hsl(var(--secondary)))",
@@ -40,7 +40,7 @@ module.exports = {
         },
         accent: {
           DEFAULT: "var(--listen-accent, hsl(var(--accent)))",
-          foreground: "var(--listen-ink, hsl(var(--accent-foreground)))",
+          foreground: "var(--listen-accent-ink, hsl(var(--accent-foreground)))",
         },
         destructive: {
           DEFAULT: "var(--listen-down, hsl(var(--destructive)))",
@@ -72,6 +72,7 @@ module.exports = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        cover: "var(--radius-cover, min(28px, 22%))",
       },
       fontFamily: {
         sans: ['var(--font-figtree)', 'system-ui', 'sans-serif'],

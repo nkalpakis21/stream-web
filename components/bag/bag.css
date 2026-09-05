@@ -156,9 +156,9 @@
 }
 
 .bag-range.is-on {
-  background: var(--accent, #7c7bff);
+  background: var(--accent, #c8f542);
   color: var(--accent-ink, #0a0a10);
-  border-color: var(--accent, #7c7bff);
+  border-color: var(--accent, #c8f542);
 }
 
 .bag-chart {
@@ -258,7 +258,7 @@
 }
 
 .bag-search input:focus {
-  outline: 2px solid var(--accent, #7c7bff);
+  outline: 2px solid var(--accent, #c8f542);
   outline-offset: 2px;
 }
 

@@ -65,7 +65,7 @@ export function SongPlayCardClient({
 
   if (!audioUrl) {
     return (
-      <div className="relative w-full max-w-[280px] sm:max-w-[320px] md:max-w-[400px] aspect-square rounded-xl overflow-hidden shadow-large bg-muted cursor-not-allowed opacity-50">
+      <div className="relative w-full max-w-[280px] sm:max-w-[320px] md:max-w-[400px] aspect-square rounded-cover overflow-hidden shadow-large bg-muted cursor-not-allowed opacity-50">
         {albumCoverUrl ? (
           <Image
             src={albumCoverUrl}
@@ -102,7 +102,7 @@ export function SongPlayCardClient({
   return (
     <div
       onClick={handleCardClick}
-      className="relative w-full max-w-[280px] sm:max-w-[320px] md:max-w-[400px] aspect-square rounded-xl overflow-hidden shadow-large bg-muted cursor-pointer group hover:scale-[1.02] transition-transform duration-200"
+      className="relative w-full max-w-[280px] sm:max-w-[320px] md:max-w-[400px] aspect-square rounded-cover overflow-hidden shadow-large bg-muted cursor-pointer group hover:scale-[1.02] transition-transform duration-200"
     >
       {albumCoverUrl ? (
         <>
