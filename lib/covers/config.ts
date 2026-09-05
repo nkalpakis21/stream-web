@@ -2,6 +2,7 @@
  * Fal cover pipeline flags and model ids (STR-52 PR1).
  *
  * COVER_PIPELINE=fal — new gens use Flux poster + Luma Ray loop.
+ * Song posters are Flux text-to-image (song scene + artist identity as text).
  * Unset / any other value keeps MusicGPT still album covers.
  *
  * Optional model overrides (server-only):

@@ -126,8 +126,9 @@ function extractVideoUrl(result: FalVideoResult): string | undefined {
 }
 
 /**
- * One Flux poster still for a song cover. Uses the locked look as i2i
- * reference when a public image URL is provided.
+ * One Flux poster still for a song cover. Song covers are text-to-image
+ * from the song scene. Optional referenceImageUrl switches to i2i; the
+ * song job does not pass the artist look.
  */
 export async function generateCoverPoster(input: {
   prompt: string;

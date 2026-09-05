@@ -5,9 +5,9 @@
  */
 
 import { isFalConfigured, generateCoverLoop, generateCoverPoster } from '@/lib/ai/fal';
-import { isFragileCdn } from '@/lib/images/artistFace';
 import { getAdminDb, isFirebaseAdminConfigured } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
+import { parseLyricsFromMetadata } from '@/lib/utils/lyrics';
 import { getArtistAdmin, getSongAdmin } from '@/lib/x/artistStore';
 import type { GenerationDocument, SongDocument } from '@/types/firestore';
 import { isFalCoverPipeline } from './config';
@@ -26,13 +26,6 @@ export interface CoverJobResult {
   reason?: string;
   songId: string;
   status?: SongDocument['coverMotionStatus'];
-}
-
-function usableLookUrl(url?: string | null): string | undefined {
-  const trimmed = url?.trim();
-  if (!trimmed || !/^https?:\/\//i.test(trimmed)) return undefined;
-  if (isFragileCdn(trimmed)) return undefined;
-  return trimmed;
 }
 
 async function getLatestGeneration(songId: string): Promise<GenerationDocument | null> {
@@ -59,6 +52,37 @@ function generationPromptText(generation: GenerationDocument | null): string | n
   if (structured && typeof structured.prompt === 'string' && structured.prompt.trim()) {
     return structured.prompt.trim();
   }
+  return null;
+}
+
+function firstTrimmedString(...values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+/**
+ * Lyrics if they already landed on the generation. Cover jobs do not wait
+ * for a later lyrics webhook — missing lyrics just omit that prompt beat.
+ */
+function generationLyricsText(generation: GenerationDocument | null): string | null {
+  if (!generation) return null;
+
+  const fromFields = firstTrimmedString(
+    generation.prompt?.structured?.lyrics,
+    generation.parameters?.lyrics
+  );
+  if (fromFields) return fromFields;
+
+  const metadata = generation.output?.metadata;
+  if (metadata && typeof metadata === 'object') {
+    const parsed = parseLyricsFromMetadata(metadata);
+    if (parsed?.raw?.trim()) return parsed.raw.trim();
+  }
+
   return null;
 }
 
@@ -128,10 +152,11 @@ export async function generateSongCover(songId: string): Promise<CoverJobResult>
       artistName: artist?.name,
       title: song.title,
       songPrompt: generationPromptText(generation),
+      lyrics: generationLyricsText(generation),
       lore: artist?.lore,
       genres: artist?.styleDNA?.genres,
       moods: artist?.styleDNA?.moods,
-      hasLockedLook: Boolean(usableLookUrl(artist?.avatarURL)),
+      influences: artist?.styleDNA?.influences,
     };
 
     let coverProvider = song.coverProvider || null;
@@ -150,7 +175,6 @@ export async function generateSongCover(songId: string): Promise<CoverJobResult>
       });
       const poster = await generateCoverPoster({
         prompt: buildCoverPosterPrompt(promptInput),
-        referenceImageUrl: usableLookUrl(artist?.avatarURL),
       });
       const posterBytes = await downloadRemoteBytes(poster.url);
       posterUrl = await uploadSongCoverObject({
