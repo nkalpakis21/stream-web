@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { AuthGateCard } from '@/components/auth/AuthGateCard';
 import { currentReturnTo } from '@/lib/auth/returnTo';
+import { studioHrefFromCreateSearch } from '@/lib/create/paths';
 
 function CreateRedirectSpinner() {
   return (
@@ -22,16 +23,7 @@ function CreatePageContent() {
   useEffect(() => {
     if (authLoading || !user) return;
 
-    const step = searchParams.get('step');
-    const artistId = searchParams.get('artistId');
-
-    if (step === 'artist') {
-      router.replace('/dashboard?tab=artists');
-    } else if (step === 'song') {
-      router.replace(`/dashboard?tab=songs${artistId ? `&artistId=${artistId}` : ''}`);
-    } else {
-      router.replace('/dashboard');
-    }
+    router.replace(studioHrefFromCreateSearch(searchParams));
   }, [authLoading, user, router, searchParams]);
 
   if (authLoading) {
@@ -39,21 +31,22 @@ function CreatePageContent() {
   }
 
   if (!user) {
-    const returnTo = currentReturnTo('/create', searchParams.toString() ? `?${searchParams.toString()}` : '');
+    const returnTo = currentReturnTo(
+      '/create',
+      searchParams.toString() ? `?${searchParams.toString()}` : ''
+    );
     return (
       <div className="min-h-screen bg-background">
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-          <div className="mb-8">
-            <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-2">Create</h1>
-            <p className="text-lg text-muted-foreground">
-              Sign in to create artists and songs.
-            </p>
+        <main className="mx-auto flex min-h-[70vh] max-w-7xl items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
+          <div className="w-full max-w-md rounded-xl border border-white/10 bg-card/60 px-4 sm:px-6">
+            <AuthGateCard
+              headline="Sign in to create"
+              why="You're one step from your first AI artist. After sign-in we'll take you straight to Create artist."
+              returnTo={returnTo}
+              primaryLabel="Continue with email"
+              showCreateSteps
+            />
           </div>
-          <AuthGateCard
-            headline="Sign in to create"
-            why="Create artists and generate songs after you sign in."
-            returnTo={returnTo}
-          />
         </main>
       </div>
     );
