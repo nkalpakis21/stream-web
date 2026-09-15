@@ -36,8 +36,8 @@ export async function loadXAuth(artistId: string): Promise<StoredXAuth | null> {
   const snap = await db.collection(COLLECTIONS.artistXAuth).doc(artistId).get();
   if (!snap.exists) return null;
   const data = snap.data() as StoredXAuth | undefined;
-  if (!data?.accessToken) return null;
-  return data;
+  if (!data?.accessToken && !data?.refreshToken) return null;
+  return data as StoredXAuth;
 }
 
 export async function deleteXAuth(artistId: string): Promise<void> {
