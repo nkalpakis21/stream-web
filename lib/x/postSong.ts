@@ -90,9 +90,15 @@ export type SongLivePostResult =
 export async function maybePostSongLive(songId: string): Promise<SongLivePostResult> {
   try {
     if (!isXConfigured()) {
+      console.log('[X] maybePostSongLive skipped', songId, 'X is not configured');
       return { ok: false, skipped: true, reason: 'X is not configured' };
     }
     if (!isFirebaseAdminConfigured()) {
+      console.log(
+        '[X] maybePostSongLive skipped',
+        songId,
+        'Firebase Admin is not configured'
+      );
       return {
         ok: false,
         skipped: true,
@@ -102,24 +108,40 @@ export async function maybePostSongLive(songId: string): Promise<SongLivePostRes
 
     const song = await getSongAdmin(songId);
     if (!song || song.deletedAt) {
+      console.log('[X] maybePostSongLive skipped', songId, 'Song not found');
       return { ok: false, skipped: true, reason: 'Song not found' };
     }
     if (!song.isPublic) {
+      console.log('[X] maybePostSongLive skipped', songId, 'Song is not public');
       return { ok: false, skipped: true, reason: 'Song is not public' };
     }
     if (!(await songHasAudio(song))) {
+      console.log('[X] maybePostSongLive skipped', songId, 'Song has no audio yet');
       return { ok: false, skipped: true, reason: 'Song has no audio yet' };
     }
 
     const artist = await getArtistAdmin(song.artistId);
     if (!artist || artist.deletedAt) {
+      console.log('[X] maybePostSongLive skipped', songId, 'Artist not found');
       return { ok: false, skipped: true, reason: 'Artist not found' };
     }
     const x = artist.x ?? emptyXConnection();
     if (x.status === 'disconnected') {
+      console.log(
+        '[X] maybePostSongLive skipped',
+        songId,
+        'X is not connected for artist',
+        artist.id
+      );
       return { ok: false, skipped: true, reason: 'X is not connected' };
     }
     if (x.status === 'paused') {
+      console.log(
+        '[X] maybePostSongLive skipped',
+        songId,
+        'X posting is paused',
+        x.lastError
+      );
       return { ok: false, skipped: true, reason: 'X posting is paused' };
     }
 
@@ -136,6 +158,7 @@ export async function maybePostSongLive(songId: string): Promise<SongLivePostRes
       const code = (err as { code?: number | string })?.code;
       // Already claimed (ALREADY_EXISTS = 6)
       if (code === 6 || code === 'already-exists') {
+        console.log('[X] maybePostSongLive skipped', song.id, 'Already posted or claimed');
         return { ok: false, skipped: true, reason: 'Already posted or claimed' };
       }
       throw err;

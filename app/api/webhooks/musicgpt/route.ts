@@ -95,6 +95,24 @@ function verifySignature(rawBody: string, signature: string | null): boolean {
   // return expected === signature;
 }
 
+/**
+ * One X post per public song when audio first exists. Idempotent; never fakes a post.
+ * Must run on retry/short-circuit paths too: a prior attempt may have written audio
+ * then timed out or thrown before tweeting. maybePostSongLive no-ops if already posted.
+ */
+async function tryPostSongLive(songId: string, reason: string): Promise<void> {
+  try {
+    const xResult = await maybePostSongLive(songId);
+    if (!xResult.ok) {
+      console.log(`[MusicGPT Webhook] X song-live post (${reason}):`, xResult);
+    } else {
+      console.log(`[MusicGPT Webhook] X song-live post (${reason}): posted`, xResult.tweetId);
+    }
+  } catch (error) {
+    console.error(`[MusicGPT Webhook] X song-live post failed (${reason}):`, error);
+  }
+}
+
 export async function POST(request: Request) {
     
   console.log('[MusicGPT Webhook] Received request');
@@ -418,11 +436,16 @@ export async function POST(request: Request) {
       console.log(
         `[MusicGPT Webhook] Conversion ${body.conversion_id} already processed for generation ${generation.id}. Skipping.`
       );
+      // Audio may already exist from a prior attempt that died before the X post.
+      await tryPostSongLive(generation.songId, 'conversion-already-processed');
       return NextResponse.json({ ok: true });
     }
 
-    // Idempotency: if generation is already completed, do nothing.
+    // Generation already completed: still try the go-live post (idempotent).
+    // Common when the first webhook wrote audio, then timed out / threw on
+    // notifications or MusicGPT conversion-details before tweeting.
     if (generation.status === 'completed') {
+      await tryPostSongLive(generation.songId, 'generation-already-completed');
       return NextResponse.json({ ok: true });
     }
 
@@ -456,6 +479,7 @@ export async function POST(request: Request) {
         },
         { merge: true }
       );
+      await tryPostSongLive(song.id, 'version-already-exists');
       return NextResponse.json({ ok: true });
     }
 
@@ -469,6 +493,8 @@ export async function POST(request: Request) {
     const versionRef = doc(collection(db, COLLECTIONS.songVersions));
     const versionId = versionRef.id;
 
+    const hasExistingAudio = existingVersions.some(v => Boolean(v.audioURL));
+
     const version: SongVersionDocument = {
       id: versionId,
       songId: song.id,
@@ -479,12 +505,17 @@ export async function POST(request: Request) {
       parentVersionId: song.currentVersionId,
       audioURL: body.conversion_path, // Use conversion_path from webhook
       providerOutputId: providerOutputId, // Use conversion_id
-      isPrimary: existingVersions.length === 0, // First version is primary
+      // createSong already inserts a silent v1 with no audio, so "first version"
+      // is wrong. First playable audio is the go-live version.
+      isPrimary: !hasExistingAudio,
     };
 
     await setDoc(versionRef, version);
 
-    const hasExistingAudio = existingVersions.some(version => Boolean(version.audioURL));
+    // Post as soon as playable audio exists — before MusicGPT conversion-details,
+    // notifications, or other work that can time out and skip the tweet on retry.
+    await tryPostSongLive(song.id, 'audio-written');
+
     if (!hasExistingAudio && isFalCoverPipeline()) {
       try {
         if (
@@ -509,9 +540,13 @@ export async function POST(request: Request) {
       }
     }
 
-    // If this is the first version, mark it as primary
-    if (existingVersions.length === 0) {
-      await setPrimarySongVersion(song.id, versionId);
+    // Promote the first playable version. createSong already created a silent v1.
+    if (!hasExistingAudio) {
+      try {
+        await setPrimarySongVersion(song.id, versionId);
+      } catch (error) {
+        console.error('[MusicGPT Webhook] Failed to set primary version:', error);
+      }
     }
 
     // Mark this conversion_id as processed
@@ -602,11 +637,17 @@ export async function POST(request: Request) {
     // Create a notification for the song owner only when generation is fully completed
     // (all conversions have been processed)
     if (shouldMarkCompleted) {
-      await createSongReadyNotification({
-        userId: song.ownerId,
-        songId: song.id,
-        generationId: generation.id,
-      });
+      try {
+        await createSongReadyNotification({
+          userId: song.ownerId,
+          songId: song.id,
+          generationId: generation.id,
+        });
+      } catch (error) {
+        // Unauthenticated webhook client SDK can fail notification writes.
+        // Do not 500: that made MusicGPT retry a path that skipped the X post.
+        console.error('[MusicGPT Webhook] Failed to create song-ready notification:', error);
+      }
 
       // Create notifications for all followers of this artist
       try {
@@ -620,17 +661,8 @@ export async function POST(request: Request) {
         console.error('[MusicGPT Webhook] Failed to create follower notifications:', error);
       }
 
-      // One X post per public song when it goes live. Idempotent; never fakes a post.
-      if (song.isPublic) {
-        try {
-          const xResult = await maybePostSongLive(song.id);
-          if (!xResult.ok) {
-            console.log('[MusicGPT Webhook] X song-live post:', xResult);
-          }
-        } catch (error) {
-          console.error('[MusicGPT Webhook] X song-live post failed:', error);
-        }
-      }
+      // Backstop: first-audio post already ran; this is idempotent.
+      await tryPostSongLive(song.id, 'generation-completed');
 
       // Revalidate homepage so new song appears
       try {
