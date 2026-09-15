@@ -5,8 +5,11 @@ import { PlayableArt } from '@/components/songs/PlayableArt';
 import { CoinBadge } from '@/components/songs/CoinBadge';
 import { EmptyAction } from '@/components/states/EmptyAction';
 import { FeaturedCoinMeta, HeatTape } from '@/components/homepage/HeatTape';
+import { LoggedInEmptyCreateBanner, LoggedOutCreateBand } from '@/components/homepage/HomeCreateBands';
 import { CoverMedia } from '@/components/media/CoverMedia';
 import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
+import { useAuth } from '@/components/providers/AuthProvider';
+import { useOwnedArtistCount } from '@/hooks/useOwnedArtistCount';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { playerCoverPayload, type CoverFields } from '@/lib/covers/resolve';
 
@@ -80,10 +83,19 @@ function FeaturedPlay({ featured }: { featured: FeaturedTrack }) {
 }
 
 export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) {
+  const { user, loading: authLoading } = useAuth();
+  const { hasArtists, loading: artistsLoading } = useOwnedArtistCount();
+  const showLoggedOutBand = !authLoading && !user;
+  const showEmptyManagerBanner = !authLoading && Boolean(user) && !artistsLoading && !hasArtists;
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
+      {showLoggedOutBand ? <LoggedOutCreateBand /> : null}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(400px,0.9fr)]">
-        <section className="rounded-xl border border-white/10 bg-card/60 p-4 sm:p-6">
+        <section
+          id="listen-featured"
+          className="scroll-mt-[calc(var(--header-h,56px)+12px)] rounded-xl border border-white/10 bg-card/60 p-4 sm:p-6"
+        >
           {featured ? (
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
               <div className="relative w-full max-w-[360px] sm:w-[320px] sm:max-w-none">
@@ -155,6 +167,8 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
           />
         </div>
       </div>
+
+      {showEmptyManagerBanner ? <LoggedInEmptyCreateBanner /> : null}
 
       <section className="mt-10">
         <div className="mb-4 flex items-end justify-between gap-4">

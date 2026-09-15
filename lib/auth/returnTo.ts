@@ -1,11 +1,14 @@
-import { isStudioPath } from '@/lib/listen/surface';
+import { isCreatePath, isStudioPath } from '@/lib/listen/surface';
 
 export const DEFAULT_AFTER_AUTH = '/discover';
 
 /**
  * Only allow in-app relative paths. Reject protocol-relative, absolute,
- * auth-page loops, and Studio so the first session lands in Discover
+ * auth-page loops, and Studio so a generic first session lands in Discover
  * (You + UserMenu still open Studio after the user is signed in).
+ *
+ * `/create` is the exception: create-intent must survive sign-in so AuthGate
+ * can land the manager on Studio with the artist form open.
  */
 export function getSafeReturnTo(value: string | null | undefined): string {
   if (!value) return DEFAULT_AFTER_AUTH;
@@ -16,7 +19,7 @@ export function getSafeReturnTo(value: string | null | undefined): string {
   if (pathOnly === '/signin' || pathOnly === '/signup') {
     return DEFAULT_AFTER_AUTH;
   }
-  if (isStudioPath(pathOnly)) {
+  if (isStudioPath(pathOnly) && !isCreatePath(pathOnly)) {
     return DEFAULT_AFTER_AUTH;
   }
 
