@@ -16,7 +16,10 @@ export function LoggedOutCreateBand() {
     <section className="mb-6 rounded-xl border border-white/10 bg-card/60 p-5 sm:p-6">
       <h2 className="listen-h1 text-foreground">Music you can trade.</h2>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-        Listen like Spotify. Managers create AI artists — everyone listens and trades.
+        Listen and trade on Streamstar.
+      </p>
+      <p className="mt-1 max-w-2xl text-sm text-muted-foreground sm:text-base">
+        Create an AI artist, then ship songs.
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Link
