@@ -2,8 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { CreateEntrySheet } from '@/components/create/CreateEntrySheet';
 import { authHref } from '@/lib/auth/returnTo';
+import { ANALYTICS_EVENTS, trackEvent } from '@/lib/analytics/track';
+import { CREATE_ARTIST_HREF, STUDIO_NEW_ARTIST_HREF } from '@/lib/create/paths';
+import { useOwnedArtistCount } from '@/hooks/useOwnedArtistCount';
 
 const tabs = [
   {
@@ -38,12 +43,31 @@ const tabs = [
   },
 ];
 
+function CreateIcon() {
+  return (
+    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    </svg>
+  );
+}
+
 export function MobileTabBar() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { hasArtists } = useOwnedArtistCount();
+  const [createOpen, setCreateOpen] = useState(false);
   const youHref = user ? '/dashboard' : authHref('/signin', pathname);
   const youLabel = user ? 'You' : 'Log in';
   const youActive = pathname.startsWith('/dashboard') || pathname.startsWith('/me') || pathname.startsWith('/signin') || pathname.startsWith('/signup');
+  const createActive = pathname.startsWith('/create');
+  const createHref = user ? STUDIO_NEW_ARTIST_HREF : CREATE_ARTIST_HREF;
+
+  const onCreateClick = () => {
+    trackEvent(ANALYTICS_EVENTS.CTA_CREATE_HEADER);
+    if (user && hasArtists) {
+      setCreateOpen(true);
+    }
+  };
 
   return (
     <nav
@@ -71,6 +95,29 @@ export function MobileTabBar() {
             </Link>
           );
         })}
+        {user && hasArtists ? (
+          <button
+            type="button"
+            onClick={onCreateClick}
+            className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium ${
+              createActive || createOpen ? 'text-primary' : 'text-muted-foreground'
+            }`}
+          >
+            <CreateIcon />
+            Create
+          </button>
+        ) : (
+          <Link
+            href={createHref}
+            onClick={onCreateClick}
+            className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium ${
+              createActive ? 'text-primary' : 'text-muted-foreground'
+            }`}
+          >
+            <CreateIcon />
+            Create
+          </Link>
+        )}
         <Link
           href={youHref}
           className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium ${
@@ -83,6 +130,7 @@ export function MobileTabBar() {
           {youLabel}
         </Link>
       </div>
+      <CreateEntrySheet open={createOpen} onOpenChange={setCreateOpen} />
     </nav>
   );
 }
