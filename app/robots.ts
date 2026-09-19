@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { SITE_ORIGIN } from '@/lib/brand/site';
+import { SITE_WWW_ORIGIN } from '@/lib/brand/site';
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: ['/signin', '/signup', '/dashboard', '/feed', '/chat', '/investing', '/me', '/create'],
     },
-    sitemap: `${SITE_ORIGIN}/sitemap.xml`,
-    host: SITE_ORIGIN,
+    sitemap: `${SITE_WWW_ORIGIN}/sitemap.xml`,
+    host: SITE_WWW_ORIGIN,
   };
 }

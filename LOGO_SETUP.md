@@ -36,17 +36,13 @@ The logo is integrated in the following locations:
 2. **Footer** (`components/layout/Footer.tsx`)
    - Brand section with logo and tagline
 
-3. **Social Sharing** (`app/layout.tsx`)
-   - Open Graph meta tags
-   - Twitter Card meta tags
-   - Used when links are shared
+3. **Social Sharing** (`app/layout.tsx`, `lib/brand/site.ts`)
+   - Open Graph and Twitter Card tags use the same absolute www image URL
+   - Site default: `https://www.streamstar.xyz/og-image.png` (shipped brand OG)
+   - Song pages prefer `coverPosterUrl`, then album cover, then the brand OG
 
 4. **Favicon** (`app/icon.tsx`)
    - Browser tab icon
-   - Generated dynamically (can be replaced with static file)
-
-5. **Open Graph Image** (`app/opengraph-image.tsx`)
-   - Social media preview image
    - Generated dynamically (can be replaced with static file)
 
 ## Logo Component Usage
@@ -75,12 +71,30 @@ import { LogoIcon } from '@/components/branding/LogoIcon';
 4. **Consistency**: Same logo used throughout the application
 5. **Quality**: High-resolution assets for all use cases
 
+## Verify link previews (Twitterbot)
+
+After deploy, confirm `og:image` and `twitter:image` are the same absolute HTTPS URL:
+
+```bash
+# Homepage — both images should be https://www.streamstar.xyz/og-image.png
+curl -sL -A 'Twitterbot/1.0' https://www.streamstar.xyz/ \
+  | tr '>' '>\n' \
+  | grep -E 'og:image|twitter:image|twitter:card|canonical'
+
+# Song — coverPosterUrl (or album cover), never a missing/broken image
+curl -sL -A 'Twitterbot/1.0' https://www.streamstar.xyz/songs/<songId> \
+  | tr '>' '>\n' \
+  | grep -E 'og:image|twitter:image|og:title|twitter:card|canonical'
+```
+
+Apex `https://streamstar.xyz/...` already 307s to www (Vercel). Do not add www↔apex redirects in-app. Share meta uses www so crawlers do not hop for the card image.
+
 ## Next Steps
 
 1. Export your logo as SVG and PNG formats
 2. Place files in the `public` directory
 3. Optimize images for web (use tools like ImageOptim or Squoosh)
-4. Test social sharing previews using:
+4. Test social sharing previews using the Twitterbot curl above, then:
    - [Twitter Card Validator](https://cards-dev.twitter.com/validator)
    - [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/)
    - [LinkedIn Post Inspector](https://www.linkedin.com/post-inspector/)

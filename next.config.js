@@ -32,6 +32,12 @@ const nextConfig = {
         destination: '/songs/:id',
         permanent: false,
       },
+      {
+        // Retired file-based OG route; keep old crawler URLs on the brand asset.
+        source: '/opengraph-image',
+        destination: '/og-image.png',
+        permanent: true,
+      },
     ];
   },
   images: {
