@@ -9,7 +9,14 @@ import { Footer } from '@/components/layout/Footer';
 import { SiteHeader } from '@/components/navigation/SiteHeader';
 import { MobileTabBar } from '@/components/navigation/MobileTabBar';
 import { ListenSurface } from '@/components/listen/ListenSurface';
-import { SITE_NAME, SITE_ORIGIN, THEME_COLOR, publicUrl } from '@/lib/brand/site';
+import {
+  SITE_NAME,
+  SITE_WWW_ORIGIN,
+  THEME_COLOR,
+  brandOgImageMeta,
+  brandOgImageUrl,
+  publicUrl,
+} from '@/lib/brand/site';
 
 const SolanaWalletProvider = dynamic(
   () =>
@@ -33,13 +40,16 @@ const playfairDisplay = Playfair_Display({
   weight: ['500', '600', '700'],
 });
 
+const siteDescription = 'Listen and create on Streamstar.';
+const brandOgImage = brandOgImageMeta();
+
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE_ORIGIN),
+  metadataBase: new URL(SITE_WWW_ORIGIN),
   title: {
     default: SITE_NAME,
     template: `%s · ${SITE_NAME}`,
   },
-  description: 'Listen and create on Streamstar.',
+  description: siteDescription,
   applicationName: SITE_NAME,
   alternates: { canonical: publicUrl('/') },
   icons: {
@@ -53,17 +63,17 @@ export const metadata: Metadata = {
   manifest: '/site.webmanifest',
   openGraph: {
     title: SITE_NAME,
-    description: 'Listen and create on Streamstar.',
+    description: siteDescription,
     url: publicUrl('/'),
     siteName: SITE_NAME,
     type: 'website',
-    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: SITE_NAME }],
+    images: [brandOgImage],
   },
   twitter: {
     card: 'summary_large_image',
     title: SITE_NAME,
-    description: 'Listen and create on Streamstar.',
-    images: ['/og-image.png'],
+    description: siteDescription,
+    images: [brandOgImageUrl()],
   },
 };
 
