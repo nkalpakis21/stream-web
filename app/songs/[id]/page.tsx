@@ -8,7 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { getSongVersions } from '@/lib/services/songs';
 import { VersionCards } from '@/components/songs/VersionCards';
 import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
-import { publicUrl, coverArtAlt } from '@/lib/brand/site';
+import { SITE_NAME, publicUrl, coverArtAlt, shareImageUrl, brandOgImageUrl } from '@/lib/brand/site';
 import { coverFieldsFromSong, resolveCoverPoster } from '@/lib/covers/resolve';
 import { ArtistCoinBuy } from '@/components/artists/ArtistCoinBuy';
 import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
@@ -49,41 +49,38 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
     getArtist(song.artistId),
   ]);
 
-  const coverImageUrl = resolveCoverPoster(song);
-  
-  // Ensure the image URL is absolute for Open Graph
-  const ogImageUrl = coverImageUrl
-    ? (coverImageUrl.startsWith('http')
-        ? coverImageUrl
-        : publicUrl(coverImageUrl))
-    : undefined;
+  const ogImageUrl = shareImageUrl(resolveCoverPoster(song));
+  const usingBrandOg = ogImageUrl === brandOgImageUrl();
 
   const title = song.title;
   const artistName = artist?.name || 'Unknown Artist';
   const description = `Listen to ${title} by ${artistName} on Streamstar`;
+  const pageUrl = publicUrl(`/songs/${params.id}`);
+  const cardDescription = `by ${artistName}`;
 
   return {
     title,
     description,
+    alternates: { canonical: pageUrl },
     openGraph: {
       title,
-      description: `by ${artistName}`,
+      description: cardDescription,
       type: 'music.song',
-      url: publicUrl(`/songs/${params.id}`),
-      images: ogImageUrl ? [
+      url: pageUrl,
+      images: [
         {
           url: ogImageUrl,
           width: 1200,
-          height: 1200,
-          alt: coverArtAlt(title),
+          height: usingBrandOg ? 630 : 1200,
+          alt: usingBrandOg ? SITE_NAME : coverArtAlt(title),
         },
-      ] : [],
+      ],
     },
     twitter: {
       card: 'summary_large_image',
       title,
-      description: `by ${artistName}`,
-      images: ogImageUrl ? [ogImageUrl] : [],
+      description: cardDescription,
+      images: [ogImageUrl],
     },
   };
 }

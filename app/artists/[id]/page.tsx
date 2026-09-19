@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getArtist } from '@/lib/services/artists';
-import { publicUrl, isDefaultTempoRange } from '@/lib/brand/site';
+import { SITE_NAME, publicUrl, isDefaultTempoRange, shareImageUrl, brandOgImageUrl } from '@/lib/brand/site';
 import { getArtistSongs } from '@/lib/services/songs';
 import { SongCard } from '@/components/songs/SongCard';
 import { ArtistHero } from '@/components/artists/ArtistHero';
@@ -23,24 +23,34 @@ export async function generateMetadata({ params }: ArtistPageProps): Promise<Met
   if (!artist || artist.deletedAt) {
     return { title: 'Artist' };
   }
-  const image = artist.avatarURL || undefined;
+  const ogImageUrl = shareImageUrl(artist.avatarURL);
+  const usingBrandOg = ogImageUrl === brandOgImageUrl();
   const title = artist.name;
   const description = `Listen to ${artist.name} on Streamstar`;
+  const pageUrl = publicUrl(`/artists/${artist.id}`);
   return {
     title,
     description,
+    alternates: { canonical: pageUrl },
     openGraph: {
       title,
       description,
       type: 'profile',
-      url: publicUrl(`/artists/${artist.id}`),
-      images: image ? [{ url: image, alt: `${artist.name} cover art` }] : [],
+      url: pageUrl,
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: usingBrandOg ? 630 : 1200,
+          alt: usingBrandOg ? SITE_NAME : `${artist.name} cover art`,
+        },
+      ],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      images: image ? [image] : [],
+      images: [ogImageUrl],
     },
   };
 }
