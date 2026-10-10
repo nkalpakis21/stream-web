@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
+import { countedPlayLogLine, songPatchMode } from '@/lib/server/playAttribution';
 import { reservePlayCount } from '@/lib/server/playRateLimit';
 import {
   adminGetSong,
@@ -20,8 +21,14 @@ function badRequest(error: string) {
 
 /**
  * Play-count-only `{ playCount: "increment" }` stays anonymous and rate-limited.
- * `title` and `isPublic` require the song owner. Any other field is rejected.
- * A number `playCount` is never accepted.
+ * Optional `source` and `background` are accepted. Any other extra field on
+ * that path is ignored. `title` and `isPublic` require the song owner, and
+ * unknown fields on that path are rejected. A number `playCount` is never
+ * accepted.
+ *
+ * Counted plays log `play_counted`. They do not write `playsBySource` or
+ * `playsBackground`: PR #95's song key allowlist would reject later client
+ * updates of a song that carried those fields.
  */
 export async function PATCH(
   request: NextRequest,
@@ -35,21 +42,25 @@ export async function PATCH(
     }
 
     const record = body as Record<string, unknown>;
-    const keys = Object.keys(record);
-    const allowed = new Set(['playCount', 'title', 'isPublic']);
-    const unknown = keys.find((key) => !allowed.has(key));
-    if (unknown) return badRequest(`Unsupported field: ${unknown}`);
+    const parsed = songPatchMode(record);
+    if (parsed.mode === 'invalid') return badRequest(parsed.error);
 
-    const hasPlay = Object.prototype.hasOwnProperty.call(record, 'playCount');
-    const hasTitle = Object.prototype.hasOwnProperty.call(record, 'title');
-    const hasPublic = Object.prototype.hasOwnProperty.call(record, 'isPublic');
-    if (!hasPlay && !hasTitle && !hasPublic) {
-      return badRequest('No valid fields to update');
+    if (parsed.mode === 'increment') {
+      const reservation = await reservePlayCount(request, songId);
+      if (reservation !== 'limited') {
+        await adminIncrementPlayCount(songId);
+        const line = countedPlayLogLine({
+          songId,
+          source: parsed.source,
+          background: parsed.background,
+          reservation,
+        });
+        if (line) console.log(line);
+      }
+      return NextResponse.json({ success: true });
     }
 
-    if (hasPlay && record.playCount !== 'increment') {
-      return badRequest('playCount only accepts "increment"');
-    }
+    const { hasPlay, hasTitle, hasPublic } = parsed;
     let title: string | undefined;
     if (hasTitle) {
       if (typeof record.title !== 'string') {
@@ -63,15 +74,6 @@ export async function PATCH(
     }
     if (hasPublic && typeof record.isPublic !== 'boolean') {
       return badRequest('isPublic must be a boolean');
-    }
-
-    const ownerMutation = hasTitle || hasPublic;
-    if (!ownerMutation) {
-      const reservation = await reservePlayCount(request, songId);
-      if (reservation !== 'limited') {
-        await adminIncrementPlayCount(songId);
-      }
-      return NextResponse.json({ success: true });
     }
 
     const userId = await requireUser(request);
