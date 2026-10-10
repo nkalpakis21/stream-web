@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { getFreshIdToken } from '@/lib/api/clientAuth';
 import { DeleteSongModal } from './DeleteSongModal';
 import { useRouter } from 'next/navigation';
 
@@ -51,10 +52,12 @@ export function SongActionsMenu({
 
   const handleDelete = async () => {
     try {
+      const token = user ? await getFreshIdToken(user) : null;
       const response = await fetch(`/api/songs/${songId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ userId: user?.uid }),
       });

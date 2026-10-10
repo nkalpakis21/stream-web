@@ -4,7 +4,8 @@ import {
   createMusicGPTSong,
 } from '@/lib/ai/providers/musicgpt';
 import type { AIGenerationRequest } from '@/lib/ai/types';
-import { musicGptWebhookUrl } from '@/lib/webhooks/baseUrl';
+import { musicGptWebhookUrl, musicGptWebhookUrlForLog } from '@/lib/webhooks/baseUrl';
+import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
 
 /**
  * Server-side API route for initiating MusicGPT generation.
@@ -30,8 +31,12 @@ export async function POST(request: Request) {
     // MusicGPT does not follow apex → www 307s. WEBHOOK_BASE_URL if set
     // (apex is rewritten to www); otherwise https://www.streamstar.xyz.
     const webhookUrl = musicGptWebhookUrl();
-
-    console.log('[MusicGPT API Route] Webhook URL being set:', webhookUrl);
+    if (!musicGptWebhookSecret()) {
+      console.error(
+        '[MusicGPT API Route] MUSICGPT_WEBHOOK_SECRET is not set; MusicGPT callbacks will be rejected'
+      );
+    }
+    console.log('[MusicGPT API Route] Webhook URL being set:', musicGptWebhookUrlForLog());
 
     const style = buildMusicGPTStyleFromArtistContext(artistContext);
     const numOutputs: 1 | 2 = num_outputs === 2 ? 2 : 1;

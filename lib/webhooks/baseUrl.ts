@@ -28,7 +28,25 @@ export function resolveWebhookBaseUrl(
   return trimmed;
 }
 
+/**
+ * Callback MusicGPT should POST to.
+ *
+ * MusicGPT does not sign webhook bodies. The shared secret travels in the
+ * `token` query param so we can reject anyone who learns the path.
+ * Never log the return value.
+ */
 export function musicGptWebhookUrl(
+  baseUrl: string = resolveWebhookBaseUrl(),
+  secret: string | undefined = process.env.MUSICGPT_WEBHOOK_SECRET
+): string {
+  const url = `${baseUrl}/api/webhooks/musicgpt`;
+  const token = secret?.trim();
+  if (!token) return url;
+  return `${url}?token=${encodeURIComponent(token)}`;
+}
+
+/** Path only, safe to log. */
+export function musicGptWebhookUrlForLog(
   baseUrl: string = resolveWebhookBaseUrl()
 ): string {
   return `${baseUrl}/api/webhooks/musicgpt`;

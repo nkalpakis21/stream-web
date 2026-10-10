@@ -7,32 +7,17 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
 import { verifyIdToken } from '@/lib/firebase/admin';
-import { updateUserSolanaWallet } from '@/lib/services/users';
+import { adminUpdateUserSolanaWallet } from '@/lib/server/usersAdmin';
+
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Authentication required. Provide Bearer token.' },
-        { status: 401 }
-      );
-    }
-
-    const idToken = authHeader.slice(7);
-    let decodedToken;
-    try {
-      decodedToken = await verifyIdToken(idToken);
-    } catch (err) {
-      console.error('[API /users/link-wallet] Token verification failed:', err);
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      );
-    }
-
-    const userId = decodedToken.uid;
+    const userId = await requireUser(request);
+    const authHeader = request.headers.get('authorization') || '';
+    const decodedToken = await verifyIdToken(authHeader.slice('Bearer '.length).trim());
     const body = await request.json();
     const publicKey = body.publicKey;
 
@@ -51,10 +36,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await updateUserSolanaWallet(userId, trimmed, decodedToken.email);
+    await adminUpdateUserSolanaWallet(userId, trimmed, decodedToken.email);
 
     return NextResponse.json({ success: true, solanaWalletAddress: trimmed });
   } catch (error) {
+    if (error instanceof HttpError) return errorResponse(error);
     console.error('[API /users/link-wallet] Error:', error);
     return NextResponse.json(
       { error: 'Failed to link wallet' },

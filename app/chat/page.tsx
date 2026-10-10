@@ -8,6 +8,7 @@ import { NewChatModal } from '@/components/chat/NewChatModal';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast, ToastContainer } from '@/components/ui/toast';
 import { AuthGateCard } from '@/components/auth/AuthGateCard';
+import { getFreshIdToken } from '@/lib/api/clientAuth';
 
 function ChatPageContent() {
   const { user, loading: authLoading } = useAuth();
@@ -60,11 +61,12 @@ function ChatPageContent() {
       const conversationType = uniqueParticipants.length === 2 && artistIds.length === 1 ? 'direct' : 'group';
       const artistId = artistIds.length === 1 ? artistIds[0] : undefined;
 
+      const token = await getFreshIdToken(user);
       const conversationResponse = await fetch('/api/conversations', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'x-user-id': user.uid, // Pass user ID for creator tracking
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           participants: uniqueParticipants,

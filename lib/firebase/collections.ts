@@ -28,6 +28,11 @@ export const COLLECTIONS = {
    * Server-only (rules deny all).
    */
   xSongPosts: 'xSongPosts',
+  /**
+   * Anonymous play-count rate limits. Doc ids are HMACs, never raw IPs.
+   * Server-only. Enable a Firestore TTL policy on field `expireAt`.
+   */
+  playRateLimits: 'playRateLimits',
 } as const;
 
 export type CollectionName = typeof COLLECTIONS[keyof typeof COLLECTIONS];

@@ -10,14 +10,13 @@ import {
   getDoc,
   getDocs,
   setDoc,
-  updateDoc,
   query,
   where,
   orderBy,
   Timestamp,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase/config';
+import { auth, db, storage } from '@/lib/firebase/config';
 import {
   COLLECTIONS,
   getGenerationPath,
@@ -265,27 +264,28 @@ async function updateGenerationStatus(
   error: string | null,
   contentHash?: string | null
 ): Promise<void> {
-  const generationRef = doc(db, getGenerationPath(generationId));
-  const updates: Partial<GenerationDocument> = {
-    status,
-    completedAt: status === 'completed' || status === 'failed' 
-      ? Timestamp.now() 
-      : null,
-  };
-
-  if (output !== null) {
-    updates.output = output;
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('Authentication required to update generation status');
   }
-
-  if (error !== null) {
-    updates.error = error;
+  const token = await user.getIdToken();
+  const response = await fetch(`/api/generations/${generationId}/status`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      status,
+      output,
+      error,
+      ...(contentHash !== undefined ? { contentHash } : {}),
+    }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to update generation status');
   }
-
-  if (contentHash !== undefined) {
-    updates.contentHash = contentHash;
-  }
-
-  await updateDoc(generationRef, updates);
 }
 
 /**
