@@ -280,6 +280,18 @@ test('owner can create an artist, including a launched coin, and cannot seize an
     },
   })));
 
+  await assertFails(setDoc(doc(alice, 'artists/verified'), artistData({
+    id: 'verified',
+    pumpFun: {
+      mint: 'MintAddress111',
+      url: 'https://pump.fun/coin',
+      symbol: 'NOVA',
+      launchedAt: now,
+      creatorWallet: 'Wallet1111111111111111111111111111111111',
+      verifiedAt: now,
+    },
+  })));
+
   await assertFails(setDoc(doc(alice, 'artists/meta'), artistData({
     id: 'meta',
     coinMetadataId: 'meta-id',
@@ -323,6 +335,7 @@ test('owner can update artist profile fields and cannot change ownerId, coin, or
       creatorWallet: 'Wallet1111111111111111111111111111111111',
     },
   }));
+  await assertFails(updateDoc(ref, { 'pumpFun.verifiedAt': now }));
   await assertFails(updateDoc(ref, {
     x: {
       status: 'connected',

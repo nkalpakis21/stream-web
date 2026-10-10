@@ -72,7 +72,7 @@ service cloud.firestore {
     // Follow-up: the next mobile build drops pumpFun from the client create
     // and lets the confirm route own it. Until then, TF 15 writes the coin
     // at create, so a user can attach an arbitrary mint to their own new artist.
-    // Absent, null, or exactly mint/url/symbol/launchedAt/creatorWallet.
+    // Absent, null, or exactly these keys. verifiedAt is server-owned and rejected.
     function pumpFunOnCreate() {
       return !('pumpFun' in request.resource.data)
         || request.resource.data.pumpFun == null
@@ -139,11 +139,26 @@ service cloud.firestore {
     // diff() throws a null-value error on maps that store nulls (pumpFun, x,
     // coverProvider). Compare the server-owned leaves instead.
     // Do not compare these maps with == or !=. Maps that store nulls throw.
+    // Updates cannot change pumpFun, including by adding verifiedAt.
+    // Key sets must match so a new leaf cannot appear. Do not compare the
+    // maps with ==. Maps that store nulls throw.
     function samePumpFun() {
       return (!('pumpFun' in resource.data) && !('pumpFun' in request.resource.data))
         || (
           'pumpFun' in resource.data
           && 'pumpFun' in request.resource.data
+          && !(resource.data.pumpFun is map)
+          && !(request.resource.data.pumpFun is map)
+          && resource.data.pumpFun == null
+          && request.resource.data.pumpFun == null
+        )
+        || (
+          'pumpFun' in resource.data
+          && 'pumpFun' in request.resource.data
+          && resource.data.pumpFun is map
+          && request.resource.data.pumpFun is map
+          && request.resource.data.pumpFun.keys().hasOnly(resource.data.pumpFun.keys())
+          && resource.data.pumpFun.keys().hasOnly(request.resource.data.pumpFun.keys())
           && request.resource.data.pumpFun.mint == resource.data.pumpFun.mint
           && request.resource.data.pumpFun.url == resource.data.pumpFun.url
           && request.resource.data.pumpFun.symbol == resource.data.pumpFun.symbol

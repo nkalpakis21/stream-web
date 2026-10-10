@@ -78,7 +78,7 @@ Rules reject client creates and updates that include `email` or `solanaWalletAdd
 | Collection | Locked on client create/update |
 | --- | --- |
 | `songs` | Updates cannot touch `ownerId`, covers, `playCount`, `playsBySource`, `playsBackground`, or legacy token fields. Create may write `playCount: 0` and null cover fields (TF 15). A non-zero count or a non-null cover is denied |
-| `artists` | Updates cannot touch `ownerId`, `pumpFun`, `x`, `coinMetadataId`, or `coinImagePath`. Create may write `pumpFun` (null or the five coin keys, including a real mint) and `x` only in the disconnected default. `coinMetadataId` and `coinImagePath` are never client-writable |
+| `artists` | Updates cannot touch `ownerId`, `pumpFun`, `x`, `coinMetadataId`, or `coinImagePath`. Create may write `pumpFun` only as null or exactly `mint`, `url`, `symbol`, `launchedAt`, `creatorWallet` (a real mint is allowed). `verifiedAt` is rejected. `x` is allowed only in the disconnected default. `coinMetadataId` and `coinImagePath` are never client-writable |
 | `songVersions` | Create requires `audioURL == null` and `providerOutputId == null`. Owner may still change `isPrimary` |
 | `generations` | Create requires a pending job, null audio, null or empty stems, and the parent song owned by the caller. `ownerId`, when present, must be the caller. `createdBy` is rejected. No client update or delete |
 | `artistVersions` | `createdBy` and `artistId` cannot change. Owner may update the rest |
@@ -126,7 +126,7 @@ It is **not** a full export of production indexes. Chat, comments, follows, noti
 
 - **Test-mode prod rules** stay in force until this file is deployed. This change does not deploy.
 - **Unmigrated user documents** still return `email` and `solanaWalletAddress` on a direct client `get`, because rules cannot hide fields. Web service reads strip them. Run `scripts/migrate-user-private.ts` (not run here) before treating a raw client get as safe. A client `deleteDoc` of `users/{uid}` does not delete `private/profile`. Web `DELETE /api/account` uses `recursiveDelete` and does.
-- **Artist create may store a launched `pumpFun`.** Follow-up: the next mobile build drops `pumpFun` and `x` from the client create and lets the confirm route own them. Until then a user can attach an arbitrary mint to their own new artist. Updates still cannot change `pumpFun` or `x`. `coinMetadataId` and `coinImagePath` stay server-only.
+- **Artist create may store a launched `pumpFun`.** The map may contain only `mint`, `url`, `symbol`, `launchedAt`, and `creatorWallet`. `verifiedAt` is rejected on create, and updates cannot change `pumpFun`. Follow-up: the next mobile build drops `pumpFun` and `x` from the client create and lets the confirm route own them. Until then a user can attach an arbitrary mint to their own new artist. `coinMetadataId` and `coinImagePath` stay server-only.
 - **TF 15 generation create still omits `ownerId`.** Web sends it. Follow-up: the next mobile build adds `ownerId`. The parent song owner stays required, and clients cannot update or delete the job.
 - **Song create may write `playCount: 0` and null cover fields.** Follow-up: reject those fields on create once mobile omits them. Updates already cannot change them.
 - **Private songs and artists on server-rendered pages** (`app/songs/[id]/page.tsx`, `app/artists/[id]/page.tsx`) call `getSong` / `getArtist` with the client SDK and no user. A private doc fails that read for everyone, including the owner. X connect/pause/disconnect routes have the same `getArtist` gap.
