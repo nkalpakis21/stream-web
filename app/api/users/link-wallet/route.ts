@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
+import { errorResponse, HttpError, requireUser } from '@/lib/server/auth';
 import { verifyIdToken } from '@/lib/firebase/admin';
 import { adminUpdateUserSolanaWallet } from '@/lib/server/usersAdmin';
 

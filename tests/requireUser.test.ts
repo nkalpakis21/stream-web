@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { NextRequest } from 'next/server';
-import { HttpError, requireUser } from '../lib/api/requireAuth';
+import { HttpError, requireUser } from '../lib/server/auth';
 
 function request(authorization?: string): NextRequest {
   const headers = new Headers();
