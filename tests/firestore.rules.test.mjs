@@ -650,6 +650,23 @@ test('owner can change isPrimary and cannot write audioURL', async () => {
   }));
 });
 
+test('clients cannot read or write config/mintSweep, and config/mobile stays public', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'config/mintSweep'), { artistId: 'artist1' });
+    await setDoc(doc(db, 'config/mobile'), { coinsEnabled: true });
+  });
+  for (const uid of [null, 'alice']) {
+    const client = dbFor(uid);
+    await assertFails(getDoc(doc(client, 'config/mintSweep')));
+    await assertFails(getDocs(collection(client, 'config')));
+    await assertFails(setDoc(doc(client, 'config/mintSweep'), { artistId: 'other' }));
+    await assertFails(updateDoc(doc(client, 'config/mintSweep'), { artistId: 'other' }));
+    await assertFails(deleteDoc(doc(client, 'config/mintSweep')));
+  }
+  await assertSucceeds(getDoc(doc(dbFor(null), 'config/mobile')));
+  await assertSucceeds(getDoc(doc(dbFor('alice'), 'config/mobile')));
+});
+
 test('config/mobile is world-readable and not client-writable', async () => {
   await seedCatalog();
   await assertSucceeds(getDoc(doc(dbFor(null), 'config/mobile')));

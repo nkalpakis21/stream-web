@@ -2,9 +2,9 @@
  * Sweep unverified artist coins. Does not use createdAt or MINT_SWEEP_START.
  * createdAt is a client clock and can be backdated.
  *
- * The cron query is:
- *   deletedAt == null
- *   orderBy document id
+ * The cron query is every artist, ordered by document id. `deletedAt == null`
+ * is not used: that comparison skips artists that have no `deletedAt` field.
+ * An artist is skipped in memory only when `deletedAt` is set.
  *
  * `pumpFun.mint`, `pumpFun.verifiedAt`, `mintSweepExemptAt`, and
  * `mintFirstSeenAt` are filtered in memory. Firestore cannot match a field
@@ -17,12 +17,15 @@
  * cleared only when that stamp is more than 30 minutes old. A binding for
  * another uid, or an on-chain creator that differs from
  * coinMints.creatorWallet, clears on the next run without waiting.
+ * A missing bonding curve is left alone until mintFirstSeenAt is more
+ * than 30 minutes old, then cleared as a mismatch.
  *
  * Each run checks at most MINT_VERIFY_BATCH_CAP artists. A document-id cursor
  * remembers how far the scan got. When the collection is exhausted the cursor
  * resets so the next run retries RPC failures from the start.
  */
 
+import { timingSafeEqual } from 'crypto';
 import { FieldPath, FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
@@ -77,6 +80,16 @@ type ArtistRecord = {
 
 type SweepDoc = { id: string; data: () => ArtistRecord | undefined };
 
+function bearerSecretsMatch(provided: string, secret: string): boolean {
+  const providedBuf = Buffer.from(provided);
+  const secretBuf = Buffer.from(secret);
+  if (providedBuf.length !== secretBuf.length) {
+    timingSafeEqual(secretBuf, secretBuf);
+    return false;
+  }
+  return timingSafeEqual(providedBuf, secretBuf);
+}
+
 export function isMintSweepAuthorized(request: {
   headers: { get(name: string): string | null };
 }): boolean {
@@ -85,7 +98,11 @@ export function isMintSweepAuthorized(request: {
   const header = request.headers.get('authorization') ?? '';
   const match = header.match(/^Bearer\s+(\S+)\s*$/i);
   const bearer = match?.[1] ?? '';
-  return bearer.length > 0 && bearer === secret;
+  if (!bearer) {
+    timingSafeEqual(Buffer.from(secret), Buffer.from(secret));
+    return false;
+  }
+  return bearerSecretsMatch(bearer, secret);
 }
 
 export function timestampMillis(value: unknown): number | null {
@@ -151,10 +168,7 @@ async function fetchSweepPage(
   scanCap: number,
   cursor: string | null
 ): Promise<{ docs: SweepDoc[] }> {
-  let query = db
-    .collection(COLLECTIONS.artists)
-    .where('deletedAt', '==', null)
-    .orderBy(FieldPath.documentId(), 'asc');
+  let query = db.collection(COLLECTIONS.artists).orderBy(FieldPath.documentId(), 'asc');
   if (cursor) query = query.startAfter(cursor);
   const snap = await query.limit(scanCap).get();
   return { docs: snap.docs as SweepDoc[] };
@@ -230,12 +244,13 @@ export async function runMintSweep(deps: MintSweepDeps = {}): Promise<MintSweepS
         summary.stamped += 1;
         summary.unchanged += 1;
       } else {
-        const clearUnbound = seenMs < nowMs - MINT_UNBOUND_CLEAR_MS;
+        const pastGrace = seenMs < nowMs - MINT_UNBOUND_CLEAR_MS;
         const outcome = await verifyArtistMint(doc.id, {
           db,
           lookupCreator: deps.lookupCreator,
           timeoutMs: deps.timeoutMs,
-          unbound: clearUnbound ? 'clear' : 'leave',
+          unbound: pastGrace ? 'clear' : 'leave',
+          missingCurve: pastGrace ? 'clear' : 'leave',
         });
         if (outcome.result === 'matched') summary.matched += 1;
         else if (outcome.result === 'cleared') summary.cleared += 1;

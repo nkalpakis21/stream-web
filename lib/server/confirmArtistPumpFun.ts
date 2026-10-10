@@ -16,12 +16,18 @@
  * coinMetadataUploads. Metadata never rejects this route. mint stays on pumpFun.
  * After a successful persist (including a same-mint no-op), the handler runs
  * verifyArtistMint. A coinMints binding whose uid is the owner, and whose
- * creatorWallet matches the bonding-curve creator, sets pumpFun.verifiedAt.
- * A different uid or a clear on-chain mismatch clears pumpFun. No coinMints
- * doc still returns the saved coin, without verifiedAt, and logs
- * coin_saved_unbound. The cron may clear that coin later.
+ * creatorWallet matches the bonding-curve creator, sets pumpFun.verifiedAt
+ * and overwrites pumpFun.creatorWallet with that binding wallet. A pass
+ * means the coin went through our create-tx for this uid. A different uid
+ * or a clear on-chain mismatch clears pumpFun and deletes coinMetadataId,
+ * coinImagePath, and mintFirstSeenAt. A missing bonding curve leaves the
+ * saved coin unverified. No coinMints doc still returns the saved coin,
+ * without verifiedAt, and logs coin_saved_unbound. The cron may clear that
+ * coin later. A mint already stored on a different artist is 409 and is
+ * not written.
  */
 
+import { type Firestore } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { PublicKey } from '@solana/web3.js';
 import { z } from 'zod';
@@ -33,6 +39,8 @@ import {
   type PersistArtistPumpFunInput,
   type PersistArtistPumpFunResult,
 } from '@/lib/services/artistPumpFun';
+import { getAdminDb } from '@/lib/firebase/admin';
+import { COLLECTIONS } from '@/lib/firebase/collections';
 import {
   verifyArtistMint,
   type VerifyArtistMintDeps,
@@ -87,7 +95,22 @@ export type PumpFunConfirmDeps = {
     deps?: VerifyArtistMintDeps
   ) => Promise<VerifyArtistMintResult>;
   verifyDeps?: VerifyArtistMintDeps;
+  db?: Firestore;
 };
+
+/** True when some other artist document already stores this mint. */
+export async function mintOwnedByAnotherArtist(
+  db: Firestore,
+  artistId: string,
+  mint: string
+): Promise<boolean> {
+  const snap = await db
+    .collection(COLLECTIONS.artists)
+    .where('pumpFun.mint', '==', mint)
+    .limit(5)
+    .get();
+  return snap.docs.some(doc => doc.id !== artistId);
+}
 
 export async function handlePumpFunConfirm(
   request: NextRequest,
@@ -121,6 +144,19 @@ export async function handlePumpFunConfirm(
       throw new HttpError(400, 'url must be the pump.fun coin page for this mint.');
     }
 
+    const db = deps?.db ?? deps?.verifyDeps?.db ?? getAdminDb();
+    let taken: boolean;
+    try {
+      taken = await mintOwnedByAnotherArtist(db, artistId, mint);
+    } catch (err) {
+      if (err instanceof HttpError) throw err;
+      console.error('[pump.fun] mint ownership query failed', { artistId });
+      throw new HttpError(503, 'Could not check whether this mint is already used.');
+    }
+    if (taken) {
+      throw new HttpError(409, 'This mint is already on another artist.');
+    }
+
     const metadataUri = parsed.data.metadataUri?.trim() || parsed.data.uri?.trim() || null;
 
     const result = await persist({
@@ -141,16 +177,21 @@ export async function handlePumpFunConfirm(
     } else if (check.result === 'cleared') {
       return NextResponse.json({
         pumpFun: serializePumpFun(emptyPumpFunCoin()),
-        coinMetadataId: result.coinMetadataId,
-        coinImagePath: result.coinImagePath,
+        coinMetadataId: null,
+        coinImagePath: null,
         noop: false,
         verified: false,
         cleared: check.reason,
       });
     }
 
+    const pumpFun =
+      check.result === 'matched'
+        ? { ...result.pumpFun, creatorWallet: check.creatorWallet }
+        : result.pumpFun;
+
     return NextResponse.json({
-      pumpFun: serializePumpFun(result.pumpFun),
+      pumpFun: serializePumpFun(pumpFun),
       coinMetadataId: result.coinMetadataId,
       coinImagePath: result.coinImagePath,
       noop: result.noop,

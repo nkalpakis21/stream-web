@@ -1,8 +1,10 @@
 /**
  * POST /api/artists/[id]/pump-fun
  *
- * Persist a confirmed artist coin, then verify the mint's bonding-curve
- * creator against the owner's linked wallet. See confirmArtistPumpFun.
+ * Persist a confirmed artist coin, then verify it against the coinMints
+ * binding. A pass means the coin went through our create-tx for this uid:
+ * the binding uid is the artist owner and the bonding-curve creator matches
+ * coinMints.creatorWallet. See confirmArtistPumpFun.
  */
 
 import { NextRequest } from 'next/server';

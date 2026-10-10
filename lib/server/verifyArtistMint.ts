@@ -16,10 +16,13 @@
  * is already that wallet, including after graduation (`complete` stays on
  * the same account).
  *
- * A missing bonding-curve account is a mismatch: the mint is not a pump.fun
- * coin this binding launched. A `coinMints` doc whose uid is not the artist
- * owner is the same clear. RPC errors and the 5s timeout leave the document
- * alone so the next run can retry.
+ * A missing bonding-curve account or a decode failure is treated like an RPC
+ * error: confirm leaves the coin unverified. The cron counts that as a
+ * mismatch only once mintFirstSeenAt is more than 30 minutes old. A
+ * graduated curve (`complete`) still verifies when the creator matches.
+ * A `coinMints` doc whose uid is not the artist owner is an immediate clear.
+ * RPC errors and the 5s timeout leave the document alone so the next run
+ * can retry.
  *
  * No `coinMints` doc is not a confirm-route failure. Confirm saves the coin
  * without verifiedAt and logs coin_saved_unbound. The cron clears that coin
@@ -45,15 +48,24 @@ export const MINT_UNBOUND_CLEAR_MS = 30 * 60 * 1000;
 
 export type CreatorLookup =
   | { status: 'ok'; creator: string | null }
-  | { status: 'unavailable' };
+  | { status: 'unavailable' }
+  /** Account missing, or the account bytes did not decode. */
+  | { status: 'missing' };
 
 export type VerifyArtistMintResult =
-  | { result: 'matched' }
+  | { result: 'matched'; creatorWallet: string }
   | { result: 'cleared'; reason: 'mismatch' | 'unbound' }
   | { result: 'unbound'; mint: string }
   | {
       result: 'unchanged';
-      reason: 'rpc' | 'no_mint' | 'already_verified' | 'missing' | 'deleted' | 'mint_changed';
+      reason:
+        | 'rpc'
+        | 'missing_curve'
+        | 'no_mint'
+        | 'already_verified'
+        | 'missing'
+        | 'deleted'
+        | 'mint_changed';
     };
 
 export type MintCheckRow = {
@@ -73,15 +85,21 @@ export type VerifyArtistMintDeps = {
   /**
    * What to do when `coinMints/{mint}` is missing.
    * Confirm uses `leave` (never clear). The cron uses `clear` only after
-   * the artist is more than 30 minutes old.
+   * mintFirstSeenAt is more than 30 minutes old.
    */
   unbound?: 'leave' | 'clear';
+  /**
+   * Missing bonding curve or a decode failure. Confirm leaves it.
+   * The cron clears it as a mismatch only after mintFirstSeenAt is more
+   * than 30 minutes old.
+   */
+  missingCurve?: 'leave' | 'clear';
 };
 
 type MintDecision =
-  | { action: 'verify' }
+  | { action: 'verify'; creatorWallet: string }
   | { action: 'clear'; reason: 'mismatch' | 'unbound' }
-  | { action: 'leave'; reason: 'rpc' | 'unbound' };
+  | { action: 'leave'; reason: 'rpc' | 'unbound' | 'missing_curve' };
 
 function walletString(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -123,10 +141,36 @@ export function judgeBoundMint(
   if (!binding) return { action: 'leave', reason: 'unbound' };
   if (binding.uid !== ownerId) return { action: 'clear', reason: 'mismatch' };
   if (!lookup || lookup.status === 'unavailable') return { action: 'leave', reason: 'rpc' };
+  if (lookup.status === 'missing') return { action: 'leave', reason: 'missing_curve' };
   if (lookup.creator && sameWallet(binding.creatorWallet, lookup.creator)) {
-    return { action: 'verify' };
+    return { action: 'verify', creatorWallet: binding.creatorWallet };
   }
   return { action: 'clear', reason: 'mismatch' };
+}
+
+type DecodedBondingCurve = {
+  creator?: { toBase58?: () => string } | null;
+  complete?: boolean;
+};
+
+/**
+ * A missing account or a decode failure is `missing`. A decoded curve,
+ * including one with `complete === true`, is `ok` and keeps its creator.
+ */
+export function interpretBondingCurve(
+  account: unknown,
+  decode: (account: unknown) => DecodedBondingCurve | null
+): CreatorLookup {
+  if (!account) return { status: 'missing' };
+  let decoded: DecodedBondingCurve | null;
+  try {
+    decoded = decode(account);
+  } catch {
+    return { status: 'missing' };
+  }
+  if (!decoded) return { status: 'missing' };
+  const creator = decoded.creator?.toBase58?.() || null;
+  return { status: 'ok', creator };
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -151,7 +195,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 /**
  * Read the bonding-curve creator for `mint`. Never throws.
- * `creator: null` means the account is absent or has no creator.
+ * `missing` means the account is absent or did not decode. `unavailable`
+ * is an RPC failure. `creator: null` on `ok` is a decoded curve with no creator.
  */
 export async function lookupBondingCurveCreator(mint: string): Promise<CreatorLookup> {
   let mintKey: PublicKey;
@@ -174,10 +219,7 @@ export async function lookupBondingCurveCreator(mint: string): Promise<CreatorLo
         }),
     });
     const info = await connection.getAccountInfo(pda, 'confirmed');
-    if (!info) return { status: 'ok', creator: null };
-    const decoded = PUMP_SDK.decodeBondingCurveNullable(info);
-    const creator = decoded?.creator?.toBase58?.();
-    return { status: 'ok', creator: creator || null };
+    return interpretBondingCurve(info, account => PUMP_SDK.decodeBondingCurveNullable(account as never));
   } catch (err) {
     const name = err instanceof Error ? err.name : 'error';
     console.error('[verifyArtistMint] bonding curve lookup failed', { mint, name });
@@ -218,6 +260,7 @@ async function commitMintDecision(
     if (decision.action === 'verify') {
       tx.update(ref, {
         'pumpFun.verifiedAt': FieldValue.serverTimestamp(),
+        'pumpFun.creatorWallet': decision.creatorWallet,
         updatedAt: FieldValue.serverTimestamp(),
       });
       return 'applied';
@@ -225,6 +268,9 @@ async function commitMintDecision(
 
     tx.update(ref, {
       pumpFun: emptyPumpFunCoin(),
+      coinMetadataId: FieldValue.delete(),
+      coinImagePath: FieldValue.delete(),
+      mintFirstSeenAt: FieldValue.delete(),
       updatedAt: FieldValue.serverTimestamp(),
     });
     return 'applied';
@@ -278,12 +324,26 @@ export async function verifyArtistMint(
   const decision = judgeBoundMint(ownerId, binding, lookup);
   if (decision.action === 'leave') {
     if (decision.reason === 'unbound') return { result: 'unbound', mint };
+    if (decision.reason === 'missing_curve' && deps.missingCurve === 'clear') {
+      const wrote = await commitMintDecision(db, artistId, mint, {
+        action: 'clear',
+        reason: 'mismatch',
+      });
+      if (wrote === 'skipped') return { result: 'unchanged', reason: 'mint_changed' };
+      console.info('coin_cleared_mismatch', { artistId, mint });
+      return { result: 'cleared', reason: 'mismatch' };
+    }
+    if (decision.reason === 'missing_curve') {
+      return { result: 'unchanged', reason: 'missing_curve' };
+    }
     return { result: 'unchanged', reason: 'rpc' };
   }
 
   const wrote = await commitMintDecision(db, artistId, mint, decision);
   if (wrote === 'skipped') return { result: 'unchanged', reason: 'mint_changed' };
-  if (decision.action === 'verify') return { result: 'matched' };
+  if (decision.action === 'verify') {
+    return { result: 'matched', creatorWallet: decision.creatorWallet };
+  }
 
   console.info('coin_cleared_mismatch', { artistId, mint });
   return { result: 'cleared', reason: 'mismatch' };
@@ -318,7 +378,7 @@ export async function inspectArtistMint(
     lookup = { status: 'unavailable' };
   }
 
-  if (lookup.status === 'unavailable') {
+  if (lookup.status === 'unavailable' || lookup.status === 'missing') {
     return { ...base, onchainCreator: null, result: 'rpc_error' };
   }
   const decision = judgeBoundMint(input.ownerId, binding, lookup);

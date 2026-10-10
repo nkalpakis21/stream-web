@@ -5,7 +5,7 @@
 
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
-import { PublicKey } from '@solana/web3.js';
+import { Connection, PublicKey } from '@solana/web3.js';
 import { z } from 'zod';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
@@ -23,7 +23,12 @@ import {
   isMetadataUriTooLong,
   isValidTicker,
   normalizeTicker,
+  getSolanaRpcUrl,
 } from '@/lib/solana/pumpFun';
+
+const MINT_ACCOUNT_RPC_TIMEOUT_MS = 5_000;
+
+export type MintAccountState = 'absent' | 'exists' | 'unavailable';
 
 const bodySchema = z.object({
   mint: z.string().trim().min(32).max(44),
@@ -101,9 +106,35 @@ export type PumpFunCreateTxDeps = {
   requireUser?: typeof requireUser;
   db?: Firestore;
   buildTx?: typeof buildUnsignedArtistPumpFunCreateTx;
+  /** Absent means the mint account is not on-chain yet. */
+  mintAccount?: (mint: PublicKey) => Promise<MintAccountState>;
 };
 
-/** Auth, bind the mint, then build. A failed bind returns no transaction. */
+/**
+ * The mint account must not exist yet. An RPC failure is unavailable,
+ * which create-tx treats as fail-closed.
+ */
+export async function lookupMintAccount(mint: PublicKey): Promise<MintAccountState> {
+  try {
+    const connection = new Connection(getSolanaRpcUrl(), {
+      commitment: 'confirmed',
+      disableRetryOnRateLimit: true,
+      fetch: (input, init) =>
+        fetch(input, {
+          ...init,
+          signal: AbortSignal.timeout(MINT_ACCOUNT_RPC_TIMEOUT_MS),
+        }),
+    });
+    const info = await connection.getAccountInfo(mint, 'confirmed');
+    return info ? 'exists' : 'absent';
+  } catch (err) {
+    const name = err instanceof Error ? err.name : 'error';
+    console.error('[coinMints] mint account lookup failed', { mint: mint.toBase58(), name });
+    return 'unavailable';
+  }
+}
+
+/** Auth, prove the mint is new, build and simulate, then bind. */
 export async function handlePumpFunCreateTx(
   request: NextRequest,
   deps?: PumpFunCreateTxDeps
@@ -138,11 +169,20 @@ export async function handlePumpFunCreateTx(
     const user = parsePublicKey(parsed.data.user, 'wallet');
     const mintAddress = mint.toBase58();
 
-    await bindCoinMint(db, {
-      mint: mintAddress,
-      uid,
-      creatorWallet: user.toBase58(),
-    });
+    let account: MintAccountState;
+    try {
+      account = await (deps?.mintAccount ?? lookupMintAccount)(mint);
+    } catch (err) {
+      const name = err instanceof Error ? err.name : 'error';
+      console.error('[coinMints] mint account lookup failed', { mint: mintAddress, name });
+      account = 'unavailable';
+    }
+    if (account === 'exists') {
+      throw new HttpError(409, 'This mint already exists.');
+    }
+    if (account !== 'absent') {
+      throw new HttpError(503, 'Could not check whether this mint exists.');
+    }
 
     const tx = await buildTx({
       mint,
@@ -150,6 +190,12 @@ export async function handlePumpFunCreateTx(
       name: parsed.data.name.trim(),
       symbol,
       uri: parsed.data.uri,
+    });
+
+    await bindCoinMint(db, {
+      mint: mintAddress,
+      uid,
+      creatorWallet: user.toBase58(),
     });
 
     return NextResponse.json({

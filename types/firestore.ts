@@ -62,8 +62,9 @@ export interface PumpFunCoin {
   launchedAt: Timestamp | null;
   creatorWallet: string | null;
   /**
-   * Server-owned. Admin sets this after the pump.fun bonding-curve creator
-   * matches the owner's linked wallet. Absent until then. Clients cannot write it.
+   * Server-owned. Admin sets this after the bonding-curve creator matches
+   * coinMints.creatorWallet for this owner's create-tx binding. Absent until
+   * then. Clients cannot write it.
    */
   verifiedAt?: Timestamp | null;
 }

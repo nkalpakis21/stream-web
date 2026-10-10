@@ -12,9 +12,11 @@ import { pumpFunCoinUrl } from '../lib/solana/pumpFun';
 import type { PumpFunCoin } from '../types/firestore';
 import {
   inspectArtistMint,
+  interpretBondingCurve,
   verifyArtistMint,
   type CreatorLookup,
 } from '../lib/server/verifyArtistMint';
+import { PumpFunCreateTxBuildError } from '../lib/solana/buildArtistPumpFunCreateTx';
 
 const OWNER = Keypair.generate().publicKey.toBase58();
 const OTHER = Keypair.generate().publicKey.toBase58();
@@ -27,10 +29,19 @@ const ELIGIBLE_AT = NOW - 11 * 60 * 1000;
 
 type Stored = Record<string, unknown>;
 
+function isDeleteSentinel(value: unknown): boolean {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    (value as { methodName?: string }).methodName === 'FieldValue.delete'
+  );
+}
+
 function applyUpdate(target: Stored, data: Stored) {
   for (const [key, value] of Object.entries(data)) {
     if (!key.includes('.')) {
-      target[key] = value;
+      if (isDeleteSentinel(value)) delete target[key];
+      else target[key] = value;
       continue;
     }
     const parts = key.split('.');
@@ -45,8 +56,20 @@ function applyUpdate(target: Stored, data: Stored) {
       cursor[part] = next;
       cursor = next;
     }
-    cursor[parts[parts.length - 1]] = value;
+    const leaf = parts[parts.length - 1];
+    if (isDeleteSentinel(value)) delete cursor[leaf];
+    else cursor[leaf] = value;
   }
+}
+
+function fieldAt(data: Stored, field: string): unknown {
+  if (!field.includes('.')) return data[field];
+  let cursor: unknown = data;
+  for (const part of field.split('.')) {
+    if (!cursor || typeof cursor !== 'object') return undefined;
+    cursor = (cursor as Stored)[part];
+  }
+  return cursor;
 }
 
 function timestampMillis(value: unknown): number | null {
@@ -145,7 +168,7 @@ function createDb(options?: { writesThrow?: boolean }) {
           }));
         for (const filter of filters) {
           rows = rows.filter(row => {
-            const actual = row.data[filter.field];
+            const actual = fieldAt(row.data, filter.field);
             if (filter.op === '==') {
               if (filter.value === null) return actual === null;
               return actual === filter.value;
@@ -348,7 +371,7 @@ describe('verifyArtistMint', () => {
       lookupCreator: async () => ({ status: 'ok', creator: OWNER }),
     });
 
-    assert.deepEqual(result, { result: 'matched' });
+    assert.deepEqual(result, { result: 'matched', creatorWallet: OWNER });
     assert.ok(pumpOf(docs, 'artist-1').verifiedAt);
     assert.equal(pumpOf(docs, 'artist-1').mint, MINT);
   });
@@ -429,6 +452,67 @@ describe('verifyArtistMint', () => {
     assert.equal(pump.mint, MINT);
     assert.equal(pump.verifiedAt, undefined);
     assert.deepEqual(logs.entries, []);
+  });
+
+  it('overwrites creatorWallet with the binding wallet when it verifies', async () => {
+    const { db, docs } = createDb();
+    seedArtist(docs, 'artist-1', ELIGIBLE_AT, MINT);
+    (docs.get('artists/artist-1') as Stored).pumpFun = {
+      ...(pumpOf(docs, 'artist-1')),
+      creatorWallet: OTHER,
+    };
+    bindMint(docs, MINT, 'user-1', OWNER);
+
+    const result = await verifyArtistMint('artist-1', {
+      db,
+      lookupCreator: async () => ({ status: 'ok', creator: OWNER }),
+    });
+
+    assert.deepEqual(result, { result: 'matched', creatorWallet: OWNER });
+    assert.equal(pumpOf(docs, 'artist-1').creatorWallet, OWNER);
+  });
+
+  it('deletes coin metadata and mintFirstSeenAt when it clears', async () => {
+    const { db, docs } = createDb();
+    seedArtist(docs, 'artist-1', ELIGIBLE_AT, MINT);
+    const artist = docs.get('artists/artist-1') as Stored;
+    artist.coinMetadataId = 'meta-1';
+    artist.coinImagePath = 'c/meta-1.png';
+    artist.mintFirstSeenAt = NOW;
+    bindMint(docs, MINT, 'someone-else', OTHER);
+
+    const result = await verifyArtistMint('artist-1', { db });
+
+    assert.deepEqual(result, { result: 'cleared', reason: 'mismatch' });
+    assert.equal(artist.coinMetadataId, undefined);
+    assert.equal(artist.coinImagePath, undefined);
+    assert.equal(artist.mintFirstSeenAt, undefined);
+    assert.deepEqual(pumpOf(docs, 'artist-1'), emptyPump());
+  });
+
+  it('verifies a graduated curve when the creator matches', async () => {
+    const lookup = interpretBondingCurve({ data: Buffer.from([1]) }, () => ({
+      creator: { toBase58: () => OWNER },
+      complete: true,
+    }));
+    assert.deepEqual(lookup, { status: 'ok', creator: OWNER });
+    assert.deepEqual(interpretBondingCurve(null, () => null), { status: 'missing' });
+    assert.deepEqual(
+      interpretBondingCurve({ data: Buffer.from([1]) }, () => {
+        throw new Error('decode failed');
+      }),
+      { status: 'missing' }
+    );
+
+    const { db, docs } = createDb();
+    seedArtist(docs, 'artist-1', ELIGIBLE_AT, MINT);
+    bindMint(docs, MINT, 'user-1', OWNER);
+    const result = await verifyArtistMint('artist-1', {
+      db,
+      lookupCreator: async () => lookup,
+    });
+    assert.deepEqual(result, { result: 'matched', creatorWallet: OWNER });
+    assert.ok(pumpOf(docs, 'artist-1').verifiedAt);
   });
 });
 
@@ -571,6 +655,76 @@ describe('mint sweep cron', () => {
     ]);
   });
 
+  it('leaves a missing curve unchanged until mintFirstSeenAt is 30 minutes old', async () => {
+    const { db, docs } = createDb();
+    seedArtist(docs, 'young', 1, MINT);
+    (docs.get('artists/young') as Stored).mintFirstSeenAt = NOW - 60 * 1000;
+    bindMint(docs, MINT, 'user-1', OWNER);
+    const logs = captureClears();
+
+    try {
+      const summary = await runMintSweep({
+        db,
+        nowMs: NOW,
+        lookupCreator: async () => ({ status: 'missing' }),
+      });
+      assert.equal(summary.cleared, 0);
+      assert.equal(summary.unchanged, 1);
+    } finally {
+      logs.restore();
+    }
+
+    assert.equal(pumpOf(docs, 'young').mint, MINT);
+    assert.equal(pumpOf(docs, 'young').verifiedAt, undefined);
+    assert.deepEqual(logs.entries, []);
+  });
+
+  it('clears a missing curve once mintFirstSeenAt is more than 30 minutes old', async () => {
+    const { db, docs } = createDb();
+    seedArtist(docs, 'stale-curve', 1, MINT);
+    (docs.get('artists/stale-curve') as Stored).mintFirstSeenAt = NOW - 31 * 60 * 1000;
+    bindMint(docs, MINT, 'user-1', OWNER);
+    const logs = captureClears();
+
+    try {
+      const summary = await runMintSweep({
+        db,
+        nowMs: NOW,
+        lookupCreator: async () => ({ status: 'missing' }),
+      });
+      assert.equal(summary.cleared, 1);
+    } finally {
+      logs.restore();
+    }
+
+    assert.deepEqual(pumpOf(docs, 'stale-curve'), emptyPump());
+    assert.deepEqual(logs.entries, [
+      { event: 'coin_cleared_mismatch', payload: { artistId: 'stale-curve', mint: MINT } },
+    ]);
+  });
+
+  it('includes an artist with no deletedAt field and skips one where it is set', async () => {
+    const { db, docs } = createDb();
+    seedArtist(docs, 'present', 1, MINT);
+    delete (docs.get('artists/present') as Stored).deletedAt;
+    seedArtist(docs, 'gone', 1, LEGACY_MINT);
+    const gone = docs.get('artists/gone') as Stored;
+    gone.deletedAt = NOW;
+    gone.mintFirstSeenAt = NOW - 31 * 60 * 1000;
+
+    const summary = await runMintSweep({
+      db,
+      nowMs: NOW,
+      lookupCreator: async () => ({ status: 'ok', creator: OWNER }),
+    });
+
+    assert.equal(summary.stamped, 1);
+    assert.equal(summary.cleared, 0);
+    assert.equal(pumpOf(docs, 'present').mint, MINT);
+    assert.ok((docs.get('artists/present') as Stored).mintFirstSeenAt);
+    assert.equal(pumpOf(docs, 'gone').mint, LEGACY_MINT);
+  });
+
   it('rejects cron requests that do not present CRON_SECRET', async () => {
     const previous = process.env.CRON_SECRET;
     try {
@@ -592,6 +746,22 @@ describe('mint sweep cron', () => {
           })
         ),
         true
+      );
+      assert.equal(
+        isMintSweepAuthorized(
+          new NextRequest('http://localhost/api/cron/verify-mints', {
+            headers: { authorization: 'Bearer cron-secreX' },
+          })
+        ),
+        false
+      );
+      assert.equal(
+        isMintSweepAuthorized(
+          new NextRequest('http://localhost/api/cron/verify-mints', {
+            headers: { authorization: 'Bearer cron-secret-extra' },
+          })
+        ),
+        false
       );
     } finally {
       if (previous === undefined) delete process.env.CRON_SECRET;
@@ -659,6 +829,119 @@ describe('pump.fun confirm route', () => {
       { event: 'coin_saved_unbound', payload: { artistId: 'artist-1', mint: MINT } },
     ]);
   });
+
+  it('leaves a missing curve unverified on confirm', async () => {
+    const { db, docs } = createDb();
+    seedArtist(docs, 'artist-1', ELIGIBLE_AT, null);
+    bindMint(docs, MINT, 'user-1', OWNER);
+
+    const response = await handlePumpFunConfirm(confirmRequest(), 'artist-1', {
+      requireUserId: async () => 'user-1',
+      persistArtistPumpFun: persistPump(db),
+      verifyDeps: {
+        db,
+        lookupCreator: async () => ({ status: 'missing' }),
+      },
+    });
+
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.verified, false);
+    assert.equal(body.cleared, undefined);
+    assert.equal(body.pumpFun.mint, MINT);
+    assert.equal(pumpOf(docs, 'artist-1').verifiedAt, undefined);
+    assert.equal(pumpOf(docs, 'artist-1').mint, MINT);
+  });
+
+  it('returns the binding creatorWallet when the coin verifies', async () => {
+    const { db, docs } = createDb();
+    seedArtist(docs, 'artist-1', ELIGIBLE_AT, null);
+    bindMint(docs, MINT, 'user-1', OTHER);
+
+    const response = await handlePumpFunConfirm(confirmRequest(), 'artist-1', {
+      requireUserId: async () => 'user-1',
+      persistArtistPumpFun: async input => {
+        const saved = await persistPump(db)(input);
+        const artist = docs.get('artists/artist-1') as Stored;
+        artist.coinMetadataId = 'meta-1';
+        artist.coinImagePath = 'c/meta-1.png';
+        return {
+          ...saved,
+          coinMetadataId: 'meta-1',
+          coinImagePath: 'c/meta-1.png',
+        };
+      },
+      verifyDeps: {
+        db,
+        lookupCreator: async () => ({ status: 'ok', creator: OTHER }),
+      },
+    });
+
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.verified, true);
+    assert.equal(body.pumpFun.creatorWallet, OTHER);
+    assert.equal(pumpOf(docs, 'artist-1').creatorWallet, OTHER);
+    assert.equal(body.coinMetadataId, 'meta-1');
+  });
+
+  it('does not return stale metadata when confirm clears the coin', async () => {
+    const { db, docs } = createDb();
+    seedArtist(docs, 'artist-1', ELIGIBLE_AT, null);
+    bindMint(docs, MINT, 'someone-else', OTHER);
+
+    const response = await handlePumpFunConfirm(confirmRequest(), 'artist-1', {
+      requireUserId: async () => 'user-1',
+      persistArtistPumpFun: async input => {
+        const saved = await persistPump(db)(input);
+        const artist = docs.get('artists/artist-1') as Stored;
+        artist.coinMetadataId = 'meta-1';
+        artist.coinImagePath = 'c/meta-1.png';
+        artist.mintFirstSeenAt = NOW;
+        return {
+          ...saved,
+          coinMetadataId: 'meta-1',
+          coinImagePath: 'c/meta-1.png',
+        };
+      },
+      verifyDeps: { db },
+    });
+
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.verified, false);
+    assert.equal(body.cleared, 'mismatch');
+    assert.equal(body.pumpFun.mint, null);
+    assert.equal(body.coinMetadataId, null);
+    assert.equal(body.coinImagePath, null);
+    const artist = docs.get('artists/artist-1') as Stored;
+    assert.equal(artist.coinMetadataId, undefined);
+    assert.equal(artist.coinImagePath, undefined);
+    assert.equal(artist.mintFirstSeenAt, undefined);
+  });
+
+  it('rejects a mint that is already on another artist and does not write', async () => {
+    const { db, docs } = createDb();
+    seedArtist(docs, 'artist-1', ELIGIBLE_AT, null);
+    seedArtist(docs, 'artist-2', ELIGIBLE_AT, MINT);
+    let persisted = 0;
+
+    const response = await handlePumpFunConfirm(confirmRequest(), 'artist-1', {
+      requireUserId: async () => 'user-1',
+      persistArtistPumpFun: async input => {
+        persisted += 1;
+        return persistPump(db)(input);
+      },
+      verifyDeps: { db },
+    });
+
+    assert.equal(response.status, 409);
+    const body = await response.json();
+    assert.equal(body.error, 'This mint is already on another artist.');
+    assert.equal(persisted, 0);
+    assert.equal(pumpOf(docs, 'artist-1').mint, null);
+    assert.equal(pumpOf(docs, 'artist-2').mint, MINT);
+  });
 });
 
 describe('create-tx mint binding', () => {
@@ -674,6 +957,7 @@ describe('create-tx mint binding', () => {
       requireUser: async () => 'user-1',
       db,
       buildTx,
+      mintAccount: async () => 'absent',
     });
     assert.equal(first.status, 200);
     const created = await first.json();
@@ -686,6 +970,7 @@ describe('create-tx mint binding', () => {
       requireUser: async () => 'user-1',
       db,
       buildTx,
+      mintAccount: async () => 'absent',
     });
     assert.equal(again.status, 200);
 
@@ -693,12 +978,72 @@ describe('create-tx mint binding', () => {
       requireUser: async () => 'user-2',
       db,
       buildTx,
+      mintAccount: async () => 'absent',
     });
     assert.equal(rebound.status, 409);
     const body = await rebound.json();
     assert.equal(body.transaction, undefined);
     assert.equal((docs.get(`coinMints/${MINT}`) as Stored).uid, 'user-1');
-    assert.deepEqual(built, ['tx', 'tx']);
+    assert.deepEqual(built, ['tx', 'tx', 'tx']);
+  });
+
+  it('rejects an existing mint and binds nothing', async () => {
+    const { db, docs } = createDb();
+    let built = 0;
+    const response = await handlePumpFunCreateTx(createTxRequest(), {
+      requireUser: async () => 'user-1',
+      db,
+      mintAccount: async () => 'exists',
+      buildTx: async () => {
+        built += 1;
+        return fakeBuiltTx();
+      },
+    });
+
+    assert.equal(response.status, 409);
+    const body = await response.json();
+    assert.equal(body.transaction, undefined);
+    assert.equal(built, 0);
+    assert.equal(docs.get(`coinMints/${MINT}`), undefined);
+  });
+
+  it('fails closed when the mint-account RPC errors', async () => {
+    const { db, docs } = createDb();
+    let built = 0;
+    const response = await handlePumpFunCreateTx(createTxRequest(), {
+      requireUser: async () => 'user-1',
+      db,
+      mintAccount: async () => {
+        throw new Error('rpc down');
+      },
+      buildTx: async () => {
+        built += 1;
+        return fakeBuiltTx();
+      },
+    });
+
+    assert.equal(response.status, 503);
+    const body = await response.json();
+    assert.equal(body.transaction, undefined);
+    assert.equal(built, 0);
+    assert.equal(docs.get(`coinMints/${MINT}`), undefined);
+  });
+
+  it('leaves no binding when simulation fails', async () => {
+    const { db, docs } = createDb();
+    const response = await handlePumpFunCreateTx(createTxRequest(), {
+      requireUser: async () => 'user-1',
+      db,
+      mintAccount: async () => 'absent',
+      buildTx: async () => {
+        throw new PumpFunCreateTxBuildError('Launch simulation failed', 400);
+      },
+    });
+
+    assert.equal(response.status, 400);
+    const body = await response.json();
+    assert.equal(body.transaction, undefined);
+    assert.equal(docs.get(`coinMints/${MINT}`), undefined);
   });
 
   it('sends no transaction when the bind write fails', async () => {
@@ -715,6 +1060,7 @@ describe('create-tx mint binding', () => {
     const response = await handlePumpFunCreateTx(createTxRequest(), {
       requireUser: async () => 'user-1',
       db,
+      mintAccount: async () => 'absent',
       buildTx: async () => {
         built.push('tx');
         return fakeBuiltTx();
@@ -725,7 +1071,7 @@ describe('create-tx mint binding', () => {
     const body = await response.json();
     assert.equal(body.error, 'Could not bind this mint.');
     assert.equal(body.transaction, undefined);
-    assert.deepEqual(built, []);
+    assert.deepEqual(built, ['tx']);
   });
 });
 
