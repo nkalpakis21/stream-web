@@ -4,6 +4,7 @@ import {
   musicGptWebhookTokenFromRequest,
   webhookTokensMatch,
 } from '@/lib/webhooks/musicgptAuth';
+import { redactForLog } from '@/lib/webhooks/redactUrl';
 import {
   processMusicGptWebhook,
   type MusicGPTWebhookPayload,
@@ -17,8 +18,9 @@ export const maxDuration = 300;
  * https://docs.musicgpt.com/api-documentation/index/webhook
  *
  * The callback URL registered in POST /api/generations/musicgpt includes
- * `?token=<MUSICGPT_WEBHOOK_SECRET>`. Reject anything that does not present
- * that secret.
+ * `?token=<MUSICGPT_WEBHOOK_SECRET>`. MusicGPT cannot attach a custom
+ * header, so that query value is what they send. A caller we control may
+ * instead send `x-musicgpt-webhook-token`. Do not log the request URL.
  */
 export async function POST(request: Request) {
   console.log('[MusicGPT Webhook] Received request');
@@ -52,7 +54,7 @@ export async function POST(request: Request) {
 
     return processMusicGptWebhook(body);
   } catch (error) {
-    console.error('[MusicGPT Webhook] Error', error);
+    console.error('[MusicGPT Webhook] Error', redactForLog(error, musicGptWebhookSecret()));
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

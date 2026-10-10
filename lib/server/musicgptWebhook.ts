@@ -17,6 +17,8 @@ import {
   adminCreateArtistNewSongNotification,
   adminCreateSongReadyNotification,
 } from '@/lib/server/notificationsAdmin';
+import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
+import { redactForLog } from '@/lib/webhooks/redactUrl';
 
 export interface MusicGPTWebhookPayload {
   success: boolean;
@@ -64,7 +66,10 @@ export async function processMusicGptWebhook(
   body: MusicGPTWebhookPayload
 ): Promise<NextResponse> {
   if (!body.task_id) {
-    console.error('[MusicGPT Webhook] Invalid payload structure:', body);
+    console.error(
+      '[MusicGPT Webhook] Invalid payload structure:',
+      redactForLog(body, musicGptWebhookSecret())
+    );
     return NextResponse.json(
       { error: 'Invalid payload: missing required field (task_id)' },
       { status: 400 }
@@ -190,7 +195,7 @@ export async function processMusicGptWebhook(
   if (!body.conversion_id) {
     console.error(
       '[MusicGPT Webhook] Invalid payload structure: conversion_id required for conversion completion webhook:',
-      body
+      redactForLog(body, musicGptWebhookSecret())
     );
     return NextResponse.json(
       { error: 'Invalid payload: conversion_id is required for conversion completion webhooks' },
@@ -201,7 +206,7 @@ export async function processMusicGptWebhook(
   if (!body.conversion_path) {
     console.error(
       '[MusicGPT Webhook] Invalid payload structure: conversion_path required for conversion completion webhook:',
-      body
+      redactForLog(body, musicGptWebhookSecret())
     );
     return NextResponse.json(
       { error: 'Invalid payload: conversion_path is required for conversion completion webhooks' },

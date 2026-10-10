@@ -24,6 +24,7 @@ import {
 import type { GenerationDocument } from '@/types/firestore';
 import { aiService } from '@/lib/ai/providers';
 import { hashGeneration } from '@/lib/utils/hash';
+import { redactForLog, redactUrl } from '@/lib/webhooks/redactUrl';
 
 /**
  * Create a generation request.
@@ -115,10 +116,10 @@ export async function createGeneration(
     } catch (error) {
       // Don't create generation document if API call fails
       // The song still exists, but user can retry generation
-      console.error('[createGeneration] MusicGPT request failed', error);
+      console.error('[createGeneration] MusicGPT request failed', redactForLog(error));
       throw new Error(
         `Failed to initiate MusicGPT generation: ${
-          error instanceof Error ? error.message : 'Unknown error'
+          error instanceof Error ? redactUrl(error.message) : 'Unknown error'
         }`
       );
     }

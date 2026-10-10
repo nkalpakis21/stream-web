@@ -6,6 +6,7 @@ import {
 import type { AIGenerationRequest } from '@/lib/ai/types';
 import { musicGptWebhookUrl, musicGptWebhookUrlForLog } from '@/lib/webhooks/baseUrl';
 import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
+import { redactForLog, redactSecrets } from '@/lib/webhooks/redactUrl';
 
 /**
  * Server-side API route for initiating MusicGPT generation.
@@ -66,15 +67,21 @@ export async function POST(request: Request) {
     return NextResponse.json({
       taskId,
       conversionIds,
-      raw: response,
+      raw: redactForLog(response, musicGptWebhookSecret()),
     });
   } catch (error) {
-    console.error('[MusicGPT API Route] Error:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'MusicGPT request failed';
+    const secret = musicGptWebhookSecret();
+    const errorMessage = redactSecrets(
+      error instanceof Error ? error.message : 'MusicGPT request failed',
+      secret
+    );
+    console.error('[MusicGPT API Route] Error:', redactForLog(error, secret));
     console.error('[MusicGPT API Route] Error details:', {
       message: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined,
+      stack:
+        error instanceof Error && error.stack
+          ? redactSecrets(error.stack, secret)
+          : undefined,
     });
     return NextResponse.json(
       {

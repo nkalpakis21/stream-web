@@ -5,6 +5,8 @@ import {
   songOwnerForMusicGptTask,
   type MusicGPTWebhookPayload,
 } from '@/lib/server/musicgptWebhook';
+import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
+import { redactForLog } from '@/lib/webhooks/redactUrl';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -37,7 +39,10 @@ export async function POST(request: NextRequest) {
     return processMusicGptWebhook(body);
   } catch (error) {
     if (error instanceof HttpError) return errorResponse(error);
-    console.error('[MusicGPT Webhook Simulate] Error', error);
+    console.error(
+      '[MusicGPT Webhook Simulate] Error',
+      redactForLog(error, musicGptWebhookSecret())
+    );
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

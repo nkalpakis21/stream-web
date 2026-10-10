@@ -5,6 +5,7 @@ import {
   musicGptWebhookTokenFromRequest,
   webhookTokensMatch,
 } from '../lib/webhooks/musicgptAuth';
+import { redactForLog, redactSecrets, redactUrl } from '../lib/webhooks/redactUrl';
 
 describe('MusicGPT webhook token', () => {
   it('rejects a missing or mismatched token', () => {
@@ -24,6 +25,31 @@ describe('MusicGPT webhook token', () => {
     assert.equal(parsed.origin + parsed.pathname, 'https://www.streamstar.xyz/api/webhooks/musicgpt');
     assert.equal(parsed.searchParams.get('token'), 's3cret/with space');
     assert.equal(musicGptWebhookUrl('https://www.streamstar.xyz', '   '), 'https://www.streamstar.xyz/api/webhooks/musicgpt');
+  });
+
+  it('redacts the token query value and the raw secret', () => {
+    const secret = 's3cret/with space';
+    const url = musicGptWebhookUrl('https://www.streamstar.xyz', secret);
+    assert.equal(
+      redactUrl(url),
+      'https://www.streamstar.xyz/api/webhooks/musicgpt?token=[redacted]'
+    );
+    const leaked = `payload ${url} raw ${secret}`;
+    const redacted = redactSecrets(leaked, secret);
+    assert.equal(
+      redacted,
+      'payload https://www.streamstar.xyz/api/webhooks/musicgpt?token=[redacted] raw [redacted]'
+    );
+    assert.equal(redacted.includes(secret), false);
+    assert.equal(redacted.includes(encodeURIComponent(secret)), false);
+
+    const logged = redactForLog(
+      { webhook_url: url, note: `echo ${secret}` },
+      secret
+    ) as { webhook_url: string; note: string };
+    assert.equal(logged.webhook_url.includes(secret), false);
+    assert.equal(logged.note.includes(secret), false);
+    assert.match(logged.webhook_url, /token=\[redacted\]/);
   });
 
   it('reads the token from the query string or the header', () => {

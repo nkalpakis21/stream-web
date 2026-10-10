@@ -3,10 +3,12 @@ import { timingSafeEqual } from 'crypto';
 /**
  * MusicGPT does not document a webhook signature, HMAC, or signing secret.
  * See https://docs.musicgpt.com/api-documentation/index/webhook
+ * and the MusicAI `webhook_url` field (a URL string; no callback headers).
  *
- * We authenticate callbacks with MUSICGPT_WEBHOOK_SECRET, which we append
- * to the registered webhook_url as `?token=`. The same secret is accepted
- * in the `x-musicgpt-webhook-token` header for callers we control.
+ * They cannot send a custom header on the callback POST. The secret they
+ * will actually present is `?token=` on the registered webhook_url.
+ * `x-musicgpt-webhook-token` is accepted first when a caller we control
+ * sends it; the query value stays the fallback MusicGPT uses.
  */
 export const MUSICGPT_WEBHOOK_TOKEN_HEADER = 'x-musicgpt-webhook-token';
 export const MUSICGPT_WEBHOOK_TOKEN_QUERY = 'token';
