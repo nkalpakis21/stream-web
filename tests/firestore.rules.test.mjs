@@ -1838,4 +1838,9 @@ test('web client create payloads pass, and a missing or foreign owner is denied'
 test('catch-all denies unknown collections', async () => {
   await assertFails(getDoc(doc(dbFor(null), 'secrets/one')));
   await assertFails(setDoc(doc(dbFor('alice'), 'secrets/one'), { leak: true }));
+  await assertFails(getDoc(doc(dbFor(null), 'musicgptTasks/task-1')));
+  await assertFails(getDocs(collection(dbFor('alice'), 'musicgptTasks')));
+  await assertFails(setDoc(doc(dbFor('alice'), 'musicgptTasks/task-1'), { uid: 'alice' }));
+  await assertFails(updateDoc(doc(dbFor('alice'), 'musicgptTasks/task-1'), { uid: 'alice' }));
+  await assertFails(deleteDoc(doc(dbFor('alice'), 'musicgptTasks/task-1')));
 });

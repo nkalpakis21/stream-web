@@ -94,6 +94,8 @@ export async function createGeneration(
           prompt: data.prompt.freeText,
           // Includes locked vocalIdentity; server maps it into music_style.
           artistContext: data.artistContext,
+          // Binds musicgptTasks/{taskId} to this song. Omitted by older mobile.
+          songId,
           ...(data.artistId ? { artistId: data.artistId } : {}),
           ...(data.lyrics && { lyrics: data.lyrics }),
         }),

@@ -98,11 +98,28 @@ export async function verifyIdToken(idToken: string): Promise<admin.auth.Decoded
   return app.auth().verifyIdToken(idToken);
 }
 
+let firestoreOverride: admin.firestore.Firestore | null = null;
+
 /**
- * Admin Firestore. Used for server-only data (X OAuth tokens) that must
- * never be readable through the client SDK / security rules.
+ * Test-only Admin Firestore. Throws in production so a request cannot swap
+ * the database. `getAdminDb` also ignores the override when NODE_ENV is
+ * production.
+ */
+export function setAdminDbForTests(db: unknown): void {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('setAdminDbForTests is disabled in production');
+  }
+  firestoreOverride = (db as admin.firestore.Firestore | null) ?? null;
+}
+
+/**
+ * Admin Firestore. Used for server-only data (X OAuth tokens, MusicGPT task
+ * bindings) that must never be readable through the client SDK / security rules.
  */
 export function getAdminDb(): admin.firestore.Firestore {
+  if (firestoreOverride && process.env.NODE_ENV !== 'production') {
+    return firestoreOverride;
+  }
   return getAdminApp().firestore();
 }
 
