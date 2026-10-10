@@ -8,10 +8,6 @@ import { FieldValue, Timestamp as AdminTimestamp } from 'firebase-admin/firestor
 import { getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import { hasLaunchedCoin } from '@/lib/brand/coin';
-import {
-  cleanCoinMetadataId,
-  cleanStorageObjectPath,
-} from '@/lib/server/deleteAccount';
 import type { AIArtistDocument, PumpFunCoin } from '@/types/firestore';
 import type { Timestamp } from 'firebase/firestore';
 
@@ -32,8 +28,6 @@ export type PersistArtistPumpFunInput = {
   symbol: string;
   launchedAtMs: number;
   creatorWallet: string;
-  coinMetadataId?: string | null;
-  coinImagePath?: string | null;
 };
 
 export type PersistArtistPumpFunResult = {
@@ -44,22 +38,6 @@ export type PersistArtistPumpFunResult = {
 function existingMint(pumpFun?: PumpFunCoin | null): string | null {
   const mint = pumpFun?.mint?.trim();
   return mint || null;
-}
-
-function coinFields(
-  coinMetadataId: string | null | undefined,
-  coinImagePath: string | null | undefined
-): { coinMetadataId?: string; coinImagePath?: string | null } {
-  const fields: { coinMetadataId?: string; coinImagePath?: string | null } = {};
-  const id = cleanCoinMetadataId(coinMetadataId);
-  if (id) fields.coinMetadataId = id;
-  if (coinImagePath === null) {
-    fields.coinImagePath = null;
-  } else {
-    const imagePath = cleanStorageObjectPath(coinImagePath);
-    if (imagePath) fields.coinImagePath = imagePath;
-  }
-  return fields;
 }
 
 /**
@@ -100,12 +78,8 @@ export async function persistArtistPumpFun(
     }
 
     const storedMint = existingMint(artist.pumpFun);
-    const fields = coinFields(input.coinMetadataId, input.coinImagePath);
     if (storedMint || hasLaunchedCoin(artist.pumpFun)) {
       if (storedMint === mint) {
-        if (Object.keys(fields).length > 0) {
-          tx.set(ref, { ...fields, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-        }
         return { pumpFun: artist.pumpFun as PumpFunCoin, noop: true };
       }
       throw new ArtistPumpFunPersistError(409, 'This artist already has a coin.');
@@ -123,7 +97,6 @@ export async function persistArtistPumpFun(
       ref,
       {
         pumpFun,
-        ...fields,
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }

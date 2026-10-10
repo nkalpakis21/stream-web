@@ -292,18 +292,32 @@ export function artistVersionLook(data: unknown): ArtistVersionLook | null {
   };
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('coin-resolve-timeout')), ms);
-    promise.then(
-      value => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      err => {
-        clearTimeout(timer);
-        reject(err);
-      }
+/**
+ * Abort the RPC at the deadline and stop waiting. A fetch that ignores the
+ * signal cannot hold the request until maxDuration.
+ */
+function runWithDeadline<T>(
+  run: (signal: AbortSignal) => Promise<T>,
+  ms: number
+): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const finish = (settle: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      controller.signal.removeEventListener('abort', onAbort);
+      settle();
+    };
+    const onAbort = () => {
+      finish(() => reject(new Error('coin-resolve-timeout')));
+    };
+    controller.signal.addEventListener('abort', onAbort, { once: true });
+    run(controller.signal).then(
+      value => finish(() => resolve(value)),
+      err => finish(() => reject(err))
     );
   });
 }
@@ -361,20 +375,14 @@ export async function resolveLaunchedCoinImages(input: {
   artists: readonly ArtistCoinSource[];
   versions: readonly ArtistVersionLook[];
   bucketName: string;
-  readMetadataUri: (mint: string) => Promise<string | null>;
-  readCoinImageUrl: (objectPath: string) => Promise<string | null>;
+  readMetadataUri: (mint: string, signal: AbortSignal) => Promise<string | null>;
+  readCoinImageUrl: (objectPath: string, signal: AbortSignal) => Promise<string | null>;
   timeoutMs?: number;
   logFallback?: (artistId: string) => void;
 }): Promise<CoinImagePlan> {
   const timeoutMs = input.timeoutMs ?? COIN_RESOLVE_TIMEOUT_MS;
   const keep = new Set<string>();
   const strip = new Set<string>();
-
-  const rememberImage = (imageUrl: string | null) => {
-    if (!imageUrl) return;
-    const path = firebaseStorageObjectPath(imageUrl, input.bucketName);
-    if (path && !path.startsWith('c/')) keep.add(path);
-  };
 
   const fallback = (artist: ArtistCoinSource) => {
     for (const path of fallbackLookPaths(artist, input.versions, input.bucketName)) {
@@ -385,35 +393,56 @@ export async function resolveLaunchedCoinImages(input: {
 
   await Promise.all(
     input.artists.map(async artist => {
-      const finish = async (): Promise<void> => {
-        if (artist.coinMetadataId || artist.coinImagePath) {
-          if (artist.coinMetadataId) strip.add(`c/${artist.coinMetadataId}.json`);
-          if (artist.coinImagePath) {
-            keep.add(artist.coinImagePath);
+      const localKeep: string[] = [];
+      const localStrip: string[] = [];
+      const rememberLocal = (imageUrl: string | null) => {
+        if (!imageUrl) return;
+        const path = firebaseStorageObjectPath(imageUrl, input.bucketName);
+        if (path && !path.startsWith('c/')) localKeep.push(path);
+      };
+      let finished = false;
+      try {
+        await runWithDeadline(async signal => {
+          if (artist.coinMetadataId || artist.coinImagePath) {
+            if (artist.coinMetadataId) localStrip.push(`c/${artist.coinMetadataId}.json`);
+            if (artist.coinImagePath) {
+              localKeep.push(artist.coinImagePath);
+              return;
+            }
+            if (signal.aborted) return;
+            if (artist.coinMetadataId) {
+              const imageUrl = await input.readCoinImageUrl(
+                `c/${artist.coinMetadataId}.json`,
+                signal
+              );
+              if (signal.aborted) return;
+              rememberLocal(imageUrl);
+            }
             return;
           }
-          if (artist.coinMetadataId) {
-            const imageUrl = await input.readCoinImageUrl(`c/${artist.coinMetadataId}.json`);
-            rememberImage(imageUrl);
+          if (!artist.mint) return;
+          const uri = await input.readMetadataUri(artist.mint, signal);
+          if (signal.aborted) return;
+          const jsonPaths = uri ? coinMetadataObjectPaths(uri) : [];
+          if (jsonPaths.length === 0) {
+            fallback(artist);
+            finished = true;
+            return;
           }
-          return;
-        }
-        if (!artist.mint) return;
-        const uri = await input.readMetadataUri(artist.mint);
-        const jsonPaths = uri ? coinMetadataObjectPaths(uri) : [];
-        if (jsonPaths.length === 0) {
-          fallback(artist);
-          return;
-        }
-        for (const jsonPath of jsonPaths) strip.add(jsonPath);
-        const imageUrl = await input.readCoinImageUrl(jsonPaths[0]);
-        rememberImage(imageUrl);
-      };
-
-      try {
-        await withTimeout(finish(), timeoutMs);
+          localStrip.push(...jsonPaths);
+          const imageUrl = await input.readCoinImageUrl(jsonPaths[0], signal);
+          if (signal.aborted) return;
+          rememberLocal(imageUrl);
+        }, timeoutMs);
+        finished = true;
       } catch {
-        if (artist.mint || artist.coinMetadataId || artist.coinImagePath) fallback(artist);
+        if (!finished && (artist.mint || artist.coinMetadataId || artist.coinImagePath)) {
+          fallback(artist);
+        }
+      }
+      if (finished) {
+        for (const path of localKeep) keep.add(path);
+        for (const path of localStrip) strip.add(path);
       }
     })
   );
@@ -900,8 +929,9 @@ export async function deleteAccount(
         artists: artistCoins,
         versions: versionLooks,
         bucketName: bucket.name,
-        readMetadataUri: mint => fetchMetaplexMetadataUri(mint, getSolanaRpcUrl()),
-        readCoinImageUrl: objectPath => readCoinImageUrl(bucket, objectPath),
+        readMetadataUri: (mint, signal) =>
+          fetchMetaplexMetadataUri(mint, getSolanaRpcUrl(), { signal }),
+        readCoinImageUrl: (objectPath, _signal) => readCoinImageUrl(bucket, objectPath),
         logFallback: artistId => {
           console.info(`coin_image_kept_fallback ${artistId}`);
         },

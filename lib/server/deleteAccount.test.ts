@@ -271,6 +271,30 @@ describe('launched coin images', () => {
     );
   });
 
+  it('aborts a slow RPC and keeps the look', async () => {
+    let aborted = false;
+    const started = Date.now();
+    const plan = await resolveLaunchedCoinImages({
+      artists: [launched],
+      versions: [{ artistId: 'artist-1', avatarURL: olderUrl, createdAtMs: 1_000 }],
+      bucketName: bucket,
+      timeoutMs: 40,
+      readMetadataUri: (_mint, signal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => {
+            aborted = signal.aborted;
+            reject(new Error('aborted'));
+          });
+        }),
+      readCoinImageUrl: async () => null,
+    });
+    assert.equal(aborted, true);
+    assert.ok(Date.now() - started < 1000);
+    assert.ok(plan.keep.includes(coinObject));
+    assert.ok(plan.keep.includes(olderObject));
+    assert.equal(plan.keep.includes(otherObject), false);
+  });
+
   it('uses stored coin ids before the network', async () => {
     let lookedUp = false;
     const plan = await resolveLaunchedCoinImages({
