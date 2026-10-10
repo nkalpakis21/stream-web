@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isFirebaseAdminInitError } from '@/lib/firebase/admin';
-import { AccountAuthError, requireRecentAccountUser } from '@/lib/server/auth';
+import { AccountAuthError, requireRecentAccountUser } from '@/lib/server/accountAuth';
 import { deleteAccount } from '@/lib/server/deleteAccount';
 
 export const dynamic = 'force-dynamic';

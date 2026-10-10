@@ -1,6 +1,6 @@
 /**
  * Recent-login check for DELETE /api/account only.
- * Kept local so it does not share a helper with other routes.
+ * Not lib/server/auth.ts: the route-hardening PR owns requireUser there.
  */
 
 import { NextRequest } from 'next/server';

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { isRecentSignIn, RECENT_LOGIN_WINDOW_SECONDS } from './auth';
+import { isRecentSignIn, RECENT_LOGIN_WINDOW_SECONDS } from './accountAuth';
 import {
   collectEmails,
   isAuthUserNotFound,
