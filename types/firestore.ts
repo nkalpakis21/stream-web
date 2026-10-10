@@ -135,6 +135,17 @@ export interface AIArtistDocument {
    */
   pumpFun?: PumpFunCoin | null;
   /**
+   * `{id}` of Storage object `c/{id}.json`. Artist document root, not inside
+   * pumpFun. Account deletion reads `artist.coinMetadataId` here. Written by
+   * the launch-confirm route after Storage `uploadedBy` matches this user.
+   */
+  coinMetadataId?: string | null;
+  /**
+   * Admin-bucket object path of the coin image, or null when that image is
+   * not in our bucket. Artist document root. Never a client-supplied path.
+   */
+  coinImagePath?: string | null;
+  /**
    * Optional public X account for this artist. Absent/undefined on older
    * documents is equivalent to disconnected. Tokens are never stored here.
    */

@@ -5,6 +5,10 @@
  * Owner-only. Call only after the wallet-signed create_v2 confirms.
  * No-ops when the same mint is already stored. Rejects a different mint
  * or an empty write so a live coin is never overwritten with blanks.
+ * Optional coinMetadataId is stored on the artist document root only after
+ * Storage uploadedBy matches this user. Older clients that omit it still
+ * persist the coin. A metadata URI is used when present. Otherwise the id
+ * remembered from this user's metadata upload is used. mint stays on pumpFun.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -31,6 +35,11 @@ const bodySchema = z.object({
   symbol: z.string().trim().min(2).max(10),
   launchedAt: z.number().int().positive().optional(),
   creatorWallet: z.string().trim().min(32).max(44),
+  /** `{id}` returned by POST /api/artists/pump-fun/metadata. Omitted by older clients. */
+  coinMetadataId: z.string().trim().max(200).nullish(),
+  /** Public `/c/{id}` URI. Used only when coinMetadataId is omitted. */
+  metadataUri: z.string().trim().max(500).nullish(),
+  uri: z.string().trim().max(500).nullish(),
 });
 
 function parsePublicKey(value: string, field: string): PublicKey {
@@ -81,7 +90,9 @@ export async function POST(
       throw new HttpError(400, 'url must be the pump.fun coin page for this mint.');
     }
 
-    const { pumpFun, noop } = await persistArtistPumpFun({
+    const metadataUri = parsed.data.metadataUri?.trim() || parsed.data.uri?.trim() || null;
+
+    const result = await persistArtistPumpFun({
       artistId: params.id,
       userId,
       mint,
@@ -89,11 +100,15 @@ export async function POST(
       symbol,
       launchedAtMs: parsed.data.launchedAt ?? Date.now(),
       creatorWallet,
+      coinMetadataId: parsed.data.coinMetadataId,
+      metadataUri,
     });
 
     return NextResponse.json({
-      pumpFun: serializePumpFun(pumpFun),
-      noop,
+      pumpFun: serializePumpFun(result.pumpFun),
+      coinMetadataId: result.coinMetadataId,
+      coinImagePath: result.coinImagePath,
+      noop: result.noop,
     });
   } catch (error) {
     if (error instanceof ArtistPumpFunPersistError) {

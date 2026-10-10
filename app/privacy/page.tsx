@@ -113,7 +113,7 @@ export default function PrivacyPolicyPage() {
               </p>
               <h3 className="text-xl font-medium mb-2 mt-6 text-foreground">Deleting your account</h3>
               <p className="text-muted-foreground leading-relaxed">
-                You can delete your account in the app under You, then Delete account. This permanently removes your account, profile, artists, and songs from Streamstar. Anything recorded on the Solana blockchain, such as coins you launched and their pump.fun records, is public and permanent. We can&apos;t delete it, and it stays available to people who hold those coins. Your wallet and its keys live in your wallet app and aren&apos;t affected. You can also email privacy@streamstar.xyz to ask for deletion.
+                You can delete your account in the app under You, then Delete account. This permanently removes your account, profile, artists, and songs from Streamstar. Coins you launched, including their name, symbol, and image, stay public. We can&apos;t delete them, and they stay available to people who hold those coins. Your wallet and its keys live in your wallet app and aren&apos;t affected. You can also email privacy@streamstar.xyz to ask for deletion.
               </p>
             </section>
 
