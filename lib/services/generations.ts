@@ -20,6 +20,7 @@ import { auth, db, storage } from '@/lib/firebase/config';
 import {
   COLLECTIONS,
   getGenerationPath,
+  getSongVersionPath,
 } from '@/lib/firebase/collections';
 import type { GenerationDocument } from '@/types/firestore';
 import { aiService } from '@/lib/ai/providers';
@@ -322,13 +323,24 @@ export async function getGeneration(
 export async function getSongVersionGenerations(
   songVersionId: string
 ): Promise<GenerationDocument[]> {
+  // List rules call canReadSong(songId). A songVersionId-only query is denied
+  // because that lookup is not the same value for every candidate. Read the
+  // version, then equality-filter songId (indexed with createdAt) and keep
+  // this version in memory.
+  const versionSnap = await getDoc(doc(db, getSongVersionPath(songVersionId)));
+  if (!versionSnap.exists()) return [];
+  const songId = versionSnap.data().songId;
+  if (typeof songId !== 'string' || songId.length === 0) return [];
+
   const q = query(
     collection(db, COLLECTIONS.generations),
-    where('songVersionId', '==', songVersionId),
+    where('songId', '==', songId),
     orderBy('createdAt', 'desc')
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => doc.data() as GenerationDocument);
+  return snapshot.docs
+    .map(docSnap => docSnap.data() as GenerationDocument)
+    .filter(generation => generation.songVersionId === songVersionId);
 }
 
 /**

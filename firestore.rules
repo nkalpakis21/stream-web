@@ -385,8 +385,11 @@ service cloud.firestore {
       // Public profile: display name and avatar. email and solanaWalletAddress
       // live on users/{uid}/private/profile and are not readable here.
       allow get: if true;
-      // Prefix search: where displayName >= q AND displayName <= q+\uf8ff.
-      allow list: if resource.data.displayName is string;
+      // Prefix search is displayName >= q AND displayName <= q+\uf8ff, plus an
+      // optional deletedAt equality. `displayName is string` cannot satisfy
+      // that range, so the list is open. Create and update still allowlist
+      // the public fields; email and wallet stay on private/profile.
+      allow list: if true;
 
       allow create: if isOwner(uid)
         && request.resource.data.keys().hasOnly([

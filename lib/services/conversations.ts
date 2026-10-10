@@ -122,16 +122,18 @@ async function findDirectConversation(
     // Fallback if index doesn't exist
     if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
       console.warn('[findDirectConversation] Index missing, using fallback');
-      // Fallback: get all direct conversations and filter in memory
+      // Rules require participants array-contains the caller. type is applied
+      // in memory. One array-contains uses the automatic field index.
+      // participants CONTAINS + updatedAt DESC is the inbox query, not this one.
       const q = query(
         collection(db, COLLECTIONS.conversations),
-        where('type', '==', 'direct')
+        where('participants', 'array-contains', userId1)
       );
       const snapshot = await getDocs(q);
       
       for (const docSnapshot of snapshot.docs) {
         const conv = docSnapshot.data() as ConversationDocument;
-        if (conv.participants.includes(userId1) && conv.participants.includes(userId2) && conv.participants.length === 2) {
+        if (conv.type === 'direct' && conv.participants.includes(userId1) && conv.participants.includes(userId2) && conv.participants.length === 2) {
           return conv;
         }
       }
@@ -169,16 +171,17 @@ async function findDirectConversationByArtist(
     // Fallback if index doesn't exist
     if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
       console.warn('[findDirectConversationByArtist] Index missing, using fallback');
-      // Fallback: get all direct conversations and filter in memory
+      // Same participant constraint as findDirectConversation. artistId and
+      // type are filtered in memory so the fallback needs no new composite.
       const q = query(
         collection(db, COLLECTIONS.conversations),
-        where('type', '==', 'direct')
+        where('participants', 'array-contains', userId)
       );
       const snapshot = await getDocs(q);
       
       for (const docSnapshot of snapshot.docs) {
         const conv = docSnapshot.data() as ConversationDocument;
-        if (conv.artistId === artistId && conv.participants.includes(userId) && conv.participants.length === 2) {
+        if (conv.type === 'direct' && conv.artistId === artistId && conv.participants.includes(userId) && conv.participants.length === 2) {
           return conv;
         }
       }
