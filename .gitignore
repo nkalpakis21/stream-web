@@ -40,5 +40,11 @@ serviceAccountKey.dev.json
 *.tsbuildinfo
 next-env.d.ts
 
+# firebase emulator logs
+firestore-debug.log
+firebase-debug.log
+ui-debug.log
+pubsub-debug.log
+
 
 

@@ -14,14 +14,26 @@ import { Timestamp } from 'firebase/firestore';
 
 export interface UserDocument {
   id: string; // Firestore document ID
-  email: string;
   displayName: string | null;
   photoURL: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   deletedAt: Timestamp | null; // Soft delete
-  /** Linked Solana wallet address (base58). Set when user connects and links wallet. */
+}
+
+/**
+ * Owner-only. Stored at users/{uid}/private/profile.
+ * email and solanaWalletAddress are not on the public user document.
+ */
+export interface UserPrivateProfile {
+  email?: string;
+  /** Linked Solana wallet address (base58). Set when the user connects and links a wallet. */
   solanaWalletAddress?: string | null;
+  /**
+   * Server timestamp written by Admin link-wallet. Strip uses it to keep this
+   * wallet when the public doc still has an older copy.
+   */
+  walletUpdatedAt?: Timestamp;
 }
 
 // ============================================================================
@@ -243,6 +255,13 @@ export interface SongDocument {
    */
   playCount?: number;
   /**
+   * Server-owned play counts by client. Keys are ios, android, and web.
+   * Clients cannot write this map.
+   */
+  playsBySource?: Partial<Record<'ios' | 'android' | 'web', number>>;
+  /** Server-owned count of plays with background: true. */
+  playsBackground?: number;
+  /**
    * Audio length in seconds when known. Omitted on older songs — never invent.
    */
   duration?: number;
@@ -296,6 +315,11 @@ export interface GenerationParameters {
 
 export interface GenerationDocument {
   id: string;
+  /**
+   * Signed-in user who requested the job. Web creates always set this.
+   * TF 15 omits it; rules then rely on the parent song's owner.
+   */
+  ownerId?: string;
   /**
    * Parent song this generation was requested for.
    * All versions created from this generation will share this songId.

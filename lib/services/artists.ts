@@ -17,7 +17,8 @@ import {
   Timestamp,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { auth, db } from '@/lib/firebase/config';
+import { getFreshIdToken, userFacingApiError } from '@/lib/api/clientAuth';
 import {
   COLLECTIONS,
   getArtistPath,
@@ -158,7 +159,35 @@ export async function getArtistVersions(
 }
 
 /**
- * Create a new version of an artist
+ * A new name is an Admin write. The client profile merge never sends `name`
+ * or `nameLowercase`, so a version cannot rename the artist.
+ */
+async function renameArtistThroughAdmin(artistId: string, name: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('Your session expired. Sign in again to continue.');
+  }
+  const token = await getFreshIdToken(user);
+  const response = await fetch(`/api/artists/${artistId}/name`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ name }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      userFacingApiError(response.status, data.error, 'Failed to update artist name')
+    );
+  }
+}
+
+/**
+ * Create a new version of an artist.
+ * The version name is always the artist document's name. A caller that passes
+ * a different `name` is renamed through Admin first.
  */
 export async function createArtistVersion(
   artistId: string,
@@ -171,8 +200,7 @@ export async function createArtistVersion(
     vocalIdentity?: string | null;
   }
 ): Promise<AIArtistVersionDocument> {
-  // Get current artist and version
-  const artist = await getArtist(artistId);
+  let artist = await getArtist(artistId);
   if (!artist) {
     throw new Error(`Artist ${artistId} not found`);
   }
@@ -180,12 +208,33 @@ export async function createArtistVersion(
     throw new Error('Only the owner can create new versions');
   }
 
+  const requestedName = typeof updates.name === 'string' ? updates.name.trim() : undefined;
+  const nameChanges = requestedName != null && requestedName !== artist.name;
+  if (nameChanges && requestedName) {
+    await renameArtistThroughAdmin(artistId, requestedName);
+    const renamed = await getArtist(artistId);
+    if (!renamed) {
+      throw new Error(`Artist ${artistId} not found`);
+    }
+    artist = renamed;
+  }
+
   const currentVersion = await getArtistVersion(artist.currentVersionId);
   if (!currentVersion) {
     throw new Error('Current version not found');
   }
 
-  // Create new version
+  const changesProfile =
+    updates.avatarURL !== undefined ||
+    updates.styleDNA !== undefined ||
+    updates.lore !== undefined ||
+    updates.vocalIdentity !== undefined;
+
+  // Admin rename already wrote the version and pointed currentVersionId at it.
+  if (nameChanges && !changesProfile) {
+    return currentVersion;
+  }
+
   const versionRef = doc(collection(db, COLLECTIONS.artistVersions));
   const versionId = versionRef.id;
 
@@ -193,7 +242,7 @@ export async function createArtistVersion(
     id: versionId,
     artistId,
     versionNumber: currentVersion.versionNumber + 1,
-    name: updates.name ?? currentVersion.name,
+    name: artist.name,
     avatarURL: updates.avatarURL ?? currentVersion.avatarURL,
     styleDNA: updates.styleDNA ?? currentVersion.styleDNA,
     lore: updates.lore ?? currentVersion.lore,
@@ -205,13 +254,10 @@ export async function createArtistVersion(
 
   await setDoc(versionRef, newVersion);
 
-  // Update artist to point to new version
   const artistRef = doc(db, getArtistPath(artistId));
   await setDoc(
     artistRef,
     {
-      name: newVersion.name,
-      nameLowercase: newVersion.name.toLowerCase().trim(),
       avatarURL: newVersion.avatarURL,
       styleDNA: newVersion.styleDNA,
       lore: newVersion.lore,
@@ -311,6 +357,8 @@ export async function checkArtistNameAvailable(
   try {
     const q = query(
       collection(db, COLLECTIONS.artists),
+      where('isPublic', '==', true),
+      where('deletedAt', '==', null),
       where('nameLowercase', '==', normalizedName),
       limit(10)
     );
@@ -331,9 +379,12 @@ export async function checkArtistNameAvailable(
     // Fallback if index doesn't exist - query without nameLowercase filter
     if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
       console.warn('[checkArtistNameAvailable] Index missing, using fallback');
-      // For fallback, we'd need to fetch all artists and filter in memory
-      // This is inefficient but works as a fallback
-      const q = query(collection(db, COLLECTIONS.artists), limit(1000));
+      // Public artists only. An unbounded list is denied by rules.
+      const q = query(
+        collection(db, COLLECTIONS.artists),
+        where('isPublic', '==', true),
+        limit(1000)
+      );
       const snapshot = await getDocs(q);
       const conflicts = snapshot.docs
         .map(doc => doc.data() as AIArtistDocument)
@@ -347,60 +398,6 @@ export async function checkArtistNameAvailable(
     }
     throw error;
   }
-}
-
-/**
- * Update artist name with uniqueness validation
- */
-export async function updateArtistName(
-  artistId: string,
-  userId: string,
-  newName: string
-): Promise<AIArtistDocument> {
-  // Validate name format
-  const trimmedName = newName.trim();
-  
-  if (trimmedName.length < 2) {
-    throw new Error('Artist name must be at least 2 characters');
-  }
-  
-  if (trimmedName.length > 50) {
-    throw new Error('Artist name must be 50 characters or less');
-  }
-
-  const allowedPattern = /^[a-zA-Z0-9\s\-_]+$/;
-  if (!allowedPattern.test(trimmedName)) {
-    throw new Error('Artist name can only contain letters, numbers, spaces, hyphens, and underscores');
-  }
-
-  // Get artist and validate ownership
-  const artist = await getArtist(artistId);
-  if (!artist) {
-    throw new Error('Artist not found');
-  }
-
-  if (artist.ownerId !== userId) {
-    throw new Error('Only the owner can update the artist name');
-  }
-
-  // Check if name is available (excluding current artist)
-  const isAvailable = await checkArtistNameAvailable(trimmedName, artistId);
-  if (!isAvailable) {
-    throw new Error('This artist name is already taken');
-  }
-
-  // Create new version with updated name
-  const updatedVersion = await createArtistVersion(artistId, userId, {
-    name: trimmedName,
-  });
-
-  // Return updated artist
-  const updatedArtist = await getArtist(artistId);
-  if (!updatedArtist) {
-    throw new Error('Failed to retrieve updated artist');
-  }
-
-  return updatedArtist;
 }
 
 /**
@@ -545,6 +542,7 @@ export async function getLaunchedArtistsByMints(
       const batch = unique.slice(i, i + 10);
       const q = query(
         collection(db, COLLECTIONS.artists),
+        where('isPublic', '==', true),
         where('pumpFun.mint', 'in', batch)
       );
       const snapshot = await getDocs(q);
@@ -614,9 +612,10 @@ export async function searchArtistsByName(
     // Firestore range queries work well for prefix matching
     const q = query(
       collection(db, COLLECTIONS.artists),
+      where('isPublic', '==', true),
+      where('deletedAt', '==', null),
       where('nameLowercase', '>=', trimmedQuery),
       where('nameLowercase', '<=', trimmedQuery + '\uf8ff'),
-      where('deletedAt', '==', null),
       orderBy('nameLowercase', 'asc'),
       limit(limitValue * 2) // Get more to account for filtering
     );
@@ -642,11 +641,11 @@ export async function searchArtistsByName(
     // Fallback if composite index doesn't exist
     if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
       console.warn('[searchArtistsByName] Index missing, using fallback');
-      
-      // Fallback: query without orderBy and filter in memory
+
+      // Public artists only. A deletedAt-only list is denied by rules.
       const q = query(
         collection(db, COLLECTIONS.artists),
-        where('deletedAt', '==', null),
+        where('isPublic', '==', true),
         limit(limitValue * 10) // Get more for in-memory filtering
       );
       
@@ -654,6 +653,7 @@ export async function searchArtistsByName(
       const artists = snapshot.docs
         .map(doc => doc.data() as AIArtistDocument)
         .filter(artist => {
+          if (artist.deletedAt || artist.isPublic !== true) return false;
           if (excludeOwnerId && artist.ownerId === excludeOwnerId) {
             return false;
           }
