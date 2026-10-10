@@ -1,24 +1,53 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import {
   buildMusicGPTStyleFromArtistContext,
   createMusicGPTSong,
 } from '@/lib/ai/providers/musicgpt';
 import type { AIGenerationRequest } from '@/lib/ai/types';
-import { musicGptWebhookUrl } from '@/lib/webhooks/baseUrl';
+import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
+import { adminGetArtist } from '@/lib/server/artistsAdmin';
+import {
+  musicGptGenerationCallback,
+  musicGptWebhookUrlForLog,
+} from '@/lib/webhooks/baseUrl';
+import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
+import { redactForLog, redactSecrets } from '@/lib/webhooks/redactUrl';
 
 /**
  * Server-side API route for initiating MusicGPT generation.
  * This ensures API keys are never exposed to the client.
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // Fail before auth or MusicGPT. A generation with no callback hangs, and
+    // the request Host is not a safe base for a URL that carries the token.
+    const callback = musicGptGenerationCallback();
+    if (!callback.ok) {
+      return NextResponse.json({ error: callback.error }, { status: callback.status });
+    }
+
+    const userId = await requireUser(request);
     const body = await request.json();
-    const { prompt, lyrics, artistContext, num_outputs } = body as {
+    const { prompt, lyrics, artistContext, artistId, num_outputs } = body as {
       prompt?: string;
       lyrics?: string;
       artistContext?: AIGenerationRequest['artistContext'];
+      artistId?: string;
       num_outputs?: 1 | 2;
     };
+
+    if (typeof artistId === 'string' && artistId.trim()) {
+      const artist = await adminGetArtist(artistId.trim());
+      if (!artist) {
+        return NextResponse.json({ error: 'Artist not found' }, { status: 404 });
+      }
+      if (artist.ownerId !== userId) {
+        return NextResponse.json(
+          { error: 'Only the owner can generate for this artist' },
+          { status: 403 }
+        );
+      }
+    }
 
     if (!prompt) {
       return NextResponse.json(
@@ -27,11 +56,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // MusicGPT does not follow apex → www 307s. WEBHOOK_BASE_URL if set
-    // (apex is rewritten to www); otherwise https://www.streamstar.xyz.
-    const webhookUrl = musicGptWebhookUrl();
-
-    console.log('[MusicGPT API Route] Webhook URL being set:', webhookUrl);
+    const webhookUrl = callback.webhookUrl;
+    if (!musicGptWebhookSecret()) {
+      console.error(
+        '[MusicGPT API Route] MUSICGPT_WEBHOOK_SECRET is not set; MusicGPT callbacks will be rejected'
+      );
+    }
+    const webhookUrlForLog = musicGptWebhookUrlForLog();
+    if (webhookUrlForLog) {
+      console.log('[MusicGPT API Route] Webhook URL being set:', webhookUrlForLog);
+    }
 
     const style = buildMusicGPTStyleFromArtistContext(artistContext);
     const numOutputs: 1 | 2 = num_outputs === 2 ? 2 : 1;
@@ -61,15 +95,22 @@ export async function POST(request: Request) {
     return NextResponse.json({
       taskId,
       conversionIds,
-      raw: response,
+      raw: redactForLog(response, musicGptWebhookSecret()),
     });
   } catch (error) {
-    console.error('[MusicGPT API Route] Error:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'MusicGPT request failed';
+    if (error instanceof HttpError) return errorResponse(error);
+    const secret = musicGptWebhookSecret();
+    const errorMessage = redactSecrets(
+      error instanceof Error ? error.message : 'MusicGPT request failed',
+      secret
+    );
+    console.error('[MusicGPT API Route] Error:', redactForLog(error, secret));
     console.error('[MusicGPT API Route] Error details:', {
       message: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined,
+      stack:
+        error instanceof Error && error.stack
+          ? redactSecrets(error.stack, secret)
+          : undefined,
     });
     return NextResponse.json(
       {

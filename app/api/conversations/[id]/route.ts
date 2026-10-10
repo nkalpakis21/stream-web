@@ -1,76 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConversation, addParticipant, removeParticipant, updateConversationTitle } from '@/lib/services/conversations';
+import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
+import {
+  adminAddParticipant,
+  adminGetConversation,
+  adminRemoveParticipant,
+  adminUpdateConversationTitle,
+} from '@/lib/server/conversationsAdmin';
+
+export const runtime = 'nodejs';
 
 /**
  * GET /api/conversations/[id]
- * 
- * Get a conversation by ID.
+ *
+ * Participants only.
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const conversationId = params.id;
-    const conversation = await getConversation(conversationId);
+    const userId = await requireUser(request);
+    const conversation = await adminGetConversation(params.id);
 
     if (!conversation) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+    }
+    if (!conversation.participants.includes(userId)) {
       return NextResponse.json(
-        { error: 'Conversation not found' },
-        { status: 404 }
+        { error: 'You are not a participant in this conversation' },
+        { status: 403 }
       );
     }
 
-    // Serialize Timestamps for client
     const serialized = {
       ...conversation,
       createdAt: conversation.createdAt.toMillis(),
       updatedAt: conversation.updatedAt.toMillis(),
       lastMessageAt: conversation.lastMessageAt ? conversation.lastMessageAt.toMillis() : null,
-      // artistIds is already an array of strings, no serialization needed
     };
 
-    return NextResponse.json({
-      conversation: serialized,
-    });
+    return NextResponse.json({ conversation: serialized });
   } catch (error) {
+    if (error instanceof HttpError) return errorResponse(error);
     console.error('[API /conversations/[id]] Error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch conversation' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch conversation' }, { status: 500 });
   }
 }
 
 /**
  * PATCH /api/conversations/[id]
- * 
- * Update a conversation (add/remove participants or update title).
- * 
+ *
  * Body:
  * - action: 'add_participant' | 'remove_participant' | 'update_title'
- * - userId: string (user to add/remove, required for add/remove actions)
- * - requesterId: string (user making the request)
- * - title: string (required for update_title action)
+ * - userId: string (user to add/remove)
+ * - title: string (update_title)
+ *
+ * The requester is the token uid. `requesterId` and `x-user-id` are ignored.
  */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const requestUserId = await requireUser(request);
     const conversationId = params.id;
     const body = await request.json();
-    const { action, userId, requesterId, title } = body;
-
-    // Extract requesterId from header if not provided
-    const requestUserId = requesterId || request.headers.get('x-user-id') || request.nextUrl.searchParams.get('userId');
-    
-    if (!requestUserId) {
-      return NextResponse.json(
-        { error: 'User ID is required (requesterId or x-user-id header)' },
-        { status: 400 }
-      );
-    }
+    const { action, userId, title } = body;
 
     if (action === 'add_participant') {
       if (!userId) {
@@ -79,7 +74,7 @@ export async function PATCH(
           { status: 400 }
         );
       }
-      await addParticipant(conversationId, userId, requestUserId);
+      await adminAddParticipant(conversationId, userId, requestUserId);
     } else if (action === 'remove_participant') {
       if (!userId) {
         return NextResponse.json(
@@ -87,7 +82,7 @@ export async function PATCH(
           { status: 400 }
         );
       }
-      await removeParticipant(conversationId, userId, requestUserId);
+      await adminRemoveParticipant(conversationId, userId, requestUserId);
     } else if (action === 'update_title') {
       if (!title || typeof title !== 'string') {
         return NextResponse.json(
@@ -95,7 +90,7 @@ export async function PATCH(
           { status: 400 }
         );
       }
-      await updateConversationTitle(conversationId, title, requestUserId);
+      await adminUpdateConversationTitle(conversationId, title, requestUserId);
     } else {
       return NextResponse.json(
         { error: 'Invalid action. Must be add_participant, remove_participant, or update_title' },
@@ -105,18 +100,13 @@ export async function PATCH(
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof HttpError) return errorResponse(error);
     console.error('[API /conversations/[id]] Error:', error);
-    
+
     if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json(
-      { error: 'Failed to update conversation' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to update conversation' }, { status: 500 });
   }
 }

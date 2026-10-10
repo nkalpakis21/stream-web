@@ -7,6 +7,17 @@
  */
 
 import { AIProvider, AIGenerationRequest, AIGenerationResponse } from '../types';
+import { redactForLog, redactSecrets, redactUrl } from '@/lib/webhooks/redactUrl';
+
+/** Token embedded in the callback URL, used only to scrub logs. */
+function callbackToken(webhookUrl?: string): string | null {
+  if (!webhookUrl) return null;
+  try {
+    return new URL(webhookUrl).searchParams.get('token');
+  } catch {
+    return null;
+  }
+}
 
 type ArtistContext = NonNullable<AIGenerationRequest['artistContext']>;
 
@@ -136,8 +147,12 @@ export async function createMusicGPTSong(payload: {
     ...(payload.webhook_url && { webhook_url: payload.webhook_url }),
   };
   
-  console.log('[MusicGPT] Making request to:', url);
-  console.log('[MusicGPT] Payload:', JSON.stringify(requestPayload, null, 2));
+  const callbackSecret = callbackToken(payload.webhook_url);
+  console.log('[MusicGPT] Making request to:', redactUrl(url));
+  console.log(
+    '[MusicGPT] Payload:',
+    JSON.stringify(redactForLog(requestPayload, callbackSecret), null, 2)
+  );
   
   try {
     const res = await fetch(url, {
@@ -151,22 +166,32 @@ export async function createMusicGPTSong(payload: {
     });
 
     console.log('[MusicGPT] Response status:', res.status);
-    console.log('[MusicGPT] Response headers:', Object.fromEntries(res.headers.entries()));
+    console.log(
+      '[MusicGPT] Response headers:',
+      redactForLog(Object.fromEntries(res.headers.entries()), callbackSecret)
+    );
 
     // Read response body as text first so we can log it
     const responseText = await res.text();
-    console.log('[MusicGPT] Response body:', responseText);
+    const safeResponseText = redactSecrets(responseText, callbackSecret);
+    console.log('[MusicGPT] Response body:', safeResponseText);
 
     if (!res.ok) {
       // Try to get error details from response
       let errorMessage = `MusicGPT request failed with status ${res.status}`;
       try {
         if (responseText) {
-          // Log error body for debugging (but don't expose in production)
-          console.error('[MusicGPT] Error response:', responseText);
+          console.error('[MusicGPT] Error response:', safeResponseText);
           try {
-            const parsed = JSON.parse(responseText);
-            errorMessage = parsed.error || parsed.message || parsed.detail || errorMessage;
+            const parsed = JSON.parse(responseText) as {
+              error?: unknown;
+              message?: unknown;
+              detail?: unknown;
+            };
+            const detail = [parsed.error, parsed.message, parsed.detail].find(
+              (value) => typeof value === 'string' && value.trim()
+            );
+            if (typeof detail === 'string') errorMessage = detail;
           } catch {
             // If not JSON, use the text as-is (truncated)
             errorMessage = `${errorMessage}: ${responseText.substring(0, 200)}`;
@@ -175,7 +200,7 @@ export async function createMusicGPTSong(payload: {
       } catch (e) {
         // Ignore errors reading error body
       }
-      throw new Error(errorMessage);
+      throw new Error(redactSecrets(errorMessage, callbackSecret));
     }
 
     // Parse the response body
@@ -188,7 +213,7 @@ export async function createMusicGPTSong(payload: {
         [key: string]: unknown;
       };
     } catch (parseError) {
-      console.error('[MusicGPT] Failed to parse response as JSON:', responseText);
+      console.error('[MusicGPT] Failed to parse response as JSON:', redactSecrets(responseText, callbackSecret));
       throw new Error('MusicGPT returned invalid JSON response');
     }
   } catch (error) {
@@ -196,7 +221,7 @@ export async function createMusicGPTSong(payload: {
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error(`MusicGPT request failed: ${String(error)}`);
+    throw new Error(redactSecrets(`MusicGPT request failed: ${String(error)}`, callbackSecret));
   }
 }
 

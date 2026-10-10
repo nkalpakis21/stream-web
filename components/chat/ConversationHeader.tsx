@@ -11,6 +11,7 @@ import { Users, MessageCircle, Edit2, Check, X, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { getAvatarGradient, getInitials } from '@/lib/utils/avatar';
 import { useToast, ToastContainer } from '@/components/ui/toast';
+import { getFreshIdToken } from '@/lib/api/clientAuth';
 
 interface ConversationHeaderProps {
   conversationId: string;
@@ -182,11 +183,12 @@ export function ConversationHeader({ conversationId }: ConversationHeaderProps) 
 
     setSavingTitle(true);
     try {
+      const token = await getFreshIdToken(user);
       const response = await fetch(`/api/conversations/${conversationId}`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
-          'x-user-id': user.uid,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           action: 'update_title',

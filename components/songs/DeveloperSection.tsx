@@ -178,10 +178,12 @@ export function DeveloperSection({ generations, songId }: DeveloperSectionProps)
         // Send webhooks
         for (const webhook of webhooks) {
           try {
-            const response = await fetch('/api/webhooks/musicgpt', {
+            const token = user ? await user.getIdToken() : null;
+            const response = await fetch('/api/webhooks/musicgpt/simulate', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
               },
               body: JSON.stringify(webhook),
             });

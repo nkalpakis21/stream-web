@@ -561,6 +561,13 @@ service cloud.firestore {
     match /xSongPosts/{songId} {
       allow read, write: if false;
     }
+    // Pending coin metadata. TTL deletes coinUploads/{id} via expireAt.
+    match /coinMetadataUploads/{uid} {
+      allow read, write: if false;
+      match /coinUploads/{uploadId} {
+        allow read, write: if false;
+      }
+    }
 
     match /{document=**} {
       allow read, write: if false;
