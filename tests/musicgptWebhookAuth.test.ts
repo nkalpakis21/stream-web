@@ -21,6 +21,7 @@ describe('MusicGPT webhook token', () => {
 
   it('puts the secret on the callback URL and not in the logged path', () => {
     const url = musicGptWebhookUrl('https://www.streamstar.xyz', 's3cret/with space');
+    assert.ok(url);
     const parsed = new URL(url);
     assert.equal(parsed.origin + parsed.pathname, 'https://www.streamstar.xyz/api/webhooks/musicgpt');
     assert.equal(parsed.searchParams.get('token'), 's3cret/with space');
@@ -30,6 +31,7 @@ describe('MusicGPT webhook token', () => {
   it('redacts the token query value and the raw secret', () => {
     const secret = 's3cret/with space';
     const url = musicGptWebhookUrl('https://www.streamstar.xyz', secret);
+    assert.ok(url);
     assert.equal(
       redactUrl(url),
       'https://www.streamstar.xyz/api/webhooks/musicgpt?token=[redacted]'

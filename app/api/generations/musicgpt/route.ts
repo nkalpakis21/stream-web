@@ -6,7 +6,10 @@ import {
 import type { AIGenerationRequest } from '@/lib/ai/types';
 import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
 import { adminGetArtist } from '@/lib/server/artistsAdmin';
-import { musicGptWebhookUrl, musicGptWebhookUrlForLog } from '@/lib/webhooks/baseUrl';
+import {
+  musicGptGenerationCallback,
+  musicGptWebhookUrlForLog,
+} from '@/lib/webhooks/baseUrl';
 import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
 import { redactForLog, redactSecrets } from '@/lib/webhooks/redactUrl';
 
@@ -16,6 +19,13 @@ import { redactForLog, redactSecrets } from '@/lib/webhooks/redactUrl';
  */
 export async function POST(request: NextRequest) {
   try {
+    // Fail before auth or MusicGPT. A generation with no callback hangs, and
+    // the request Host is not a safe base for a URL that carries the token.
+    const callback = musicGptGenerationCallback();
+    if (!callback.ok) {
+      return NextResponse.json({ error: callback.error }, { status: callback.status });
+    }
+
     const userId = await requireUser(request);
     const body = await request.json();
     const { prompt, lyrics, artistContext, artistId, num_outputs } = body as {
@@ -46,15 +56,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // MusicGPT does not follow apex → www 307s. WEBHOOK_BASE_URL if set
-    // (apex is rewritten to www); otherwise https://www.streamstar.xyz.
-    const webhookUrl = musicGptWebhookUrl();
+    const webhookUrl = callback.webhookUrl;
     if (!musicGptWebhookSecret()) {
       console.error(
         '[MusicGPT API Route] MUSICGPT_WEBHOOK_SECRET is not set; MusicGPT callbacks will be rejected'
       );
     }
-    console.log('[MusicGPT API Route] Webhook URL being set:', musicGptWebhookUrlForLog());
+    const webhookUrlForLog = musicGptWebhookUrlForLog();
+    if (webhookUrlForLog) {
+      console.log('[MusicGPT API Route] Webhook URL being set:', webhookUrlForLog);
+    }
 
     const style = buildMusicGPTStyleFromArtistContext(artistContext);
     const numOutputs: 1 | 2 = num_outputs === 2 ? 2 : 1;

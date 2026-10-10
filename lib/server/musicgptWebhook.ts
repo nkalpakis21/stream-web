@@ -19,6 +19,7 @@ import {
 } from '@/lib/server/notificationsAdmin';
 import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
 import { redactForLog } from '@/lib/webhooks/redactUrl';
+import { revalidateHomepage } from '@/lib/webhooks/revalidate';
 
 export interface MusicGPTWebhookPayload {
   success: boolean;
@@ -421,19 +422,7 @@ export async function processMusicGptWebhook(
 
     await tryPostSongLive(song.id, 'generation-completed');
 
-    try {
-      const revalidateUrl = process.env.NEXT_PUBLIC_APP_URL
-        ? `${process.env.NEXT_PUBLIC_APP_URL}/api/revalidate`
-        : 'https://streamstar.xyz/api/revalidate';
-      await fetch(revalidateUrl, {
-        method: 'POST',
-        headers: {
-          'x-revalidate-secret': process.env.REVALIDATE_SECRET || '',
-        },
-      });
-    } catch (error) {
-      console.error('Failed to revalidate homepage:', error);
-    }
+    await revalidateHomepage();
   }
 
   return NextResponse.json({ ok: true });
