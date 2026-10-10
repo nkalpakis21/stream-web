@@ -100,6 +100,13 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
+    // Feature kill switch. Public read so the app can load it before sign-in.
+    // This document only; clients cannot write (Admin SDK / console only).
+    match /config/mobile {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false; // Deny by default
     }
