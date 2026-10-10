@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createComment, getComments, updateComment, deleteComment } from '@/lib/services/comments';
-import type { CommentDocument } from '@/types/firestore';
+import { getComments } from '@/lib/services/comments';
+import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
+import {
+  adminCreateComment,
+  adminDeleteComment,
+  adminUpdateComment,
+} from '@/lib/server/commentsAdmin';
+
+export const runtime = 'nodejs';
 
 /**
  * GET /api/comments
@@ -75,18 +82,20 @@ export async function GET(request: NextRequest) {
  * Body:
  * - targetType: 'artist' | 'song' (required)
  * - targetId: string (required)
- * - authorId: string (required)
  * - content: string (required)
  * - parentCommentId: string | null (optional, for replies)
+ *
+ * The author is the verified Firebase uid. `authorId` in the body is ignored.
  */
 export async function POST(request: NextRequest) {
   try {
+    const authorId = await requireUser(request);
     const body = await request.json();
-    const { targetType, targetId, authorId, content, parentCommentId = null } = body;
+    const { targetType, targetId, content, parentCommentId = null } = body;
 
-    if (!targetType || !targetId || !authorId || !content) {
+    if (!targetType || !targetId || !content) {
       return NextResponse.json(
-        { error: 'targetType, targetId, authorId, and content are required' },
+        { error: 'targetType, targetId, and content are required' },
         { status: 400 }
       );
     }
@@ -98,7 +107,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const comment = await createComment(targetType, targetId, authorId, content, parentCommentId);
+    const comment = await adminCreateComment(targetType, targetId, authorId, content, parentCommentId);
 
     // Serialize Timestamps for client
     const serialized = {
@@ -112,6 +121,7 @@ export async function POST(request: NextRequest) {
       comment: serialized,
     });
   } catch (error) {
+    if (error instanceof HttpError) return errorResponse(error);
     console.error('[API /comments] Error:', error);
     
     if (error instanceof Error) {
@@ -135,25 +145,28 @@ export async function POST(request: NextRequest) {
  * 
  * Body:
  * - commentId: string (required)
- * - authorId: string (required)
  * - content: string (required)
+ *
+ * The author is the verified Firebase uid. `authorId` in the body is ignored.
  */
 export async function PATCH(request: NextRequest) {
   try {
+    const authorId = await requireUser(request);
     const body = await request.json();
-    const { commentId, authorId, content } = body;
+    const { commentId, content } = body;
 
-    if (!commentId || !authorId || !content) {
+    if (!commentId || !content) {
       return NextResponse.json(
-        { error: 'commentId, authorId, and content are required' },
+        { error: 'commentId and content are required' },
         { status: 400 }
       );
     }
 
-    await updateComment(commentId, authorId, content);
+    await adminUpdateComment(commentId, authorId, content);
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof HttpError) return errorResponse(error);
     console.error('[API /comments] Error:', error);
     
     if (error instanceof Error) {
@@ -177,24 +190,27 @@ export async function PATCH(request: NextRequest) {
  * 
  * Body:
  * - commentId: string (required)
- * - authorId: string (required)
+ *
+ * The author is the verified Firebase uid. `authorId` in the body is ignored.
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const authorId = await requireUser(request);
     const body = await request.json();
-    const { commentId, authorId } = body;
+    const { commentId } = body;
 
-    if (!commentId || !authorId) {
+    if (!commentId) {
       return NextResponse.json(
-        { error: 'commentId and authorId are required' },
+        { error: 'commentId is required' },
         { status: 400 }
       );
     }
 
-    await deleteComment(commentId, authorId);
+    await adminDeleteComment(commentId, authorId);
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof HttpError) return errorResponse(error);
     console.error('[API /comments] Error:', error);
     
     if (error instanceof Error) {

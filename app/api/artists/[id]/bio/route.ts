@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { updateArtistLore, getArtist } from '@/lib/services/artists';
+import { adminGetArtist, adminUpdateArtistLore } from '@/lib/server/artistsAdmin';
 import { MAX_ARTIST_BIO_LENGTH } from '@/lib/brand/bio';
 import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
 
@@ -32,7 +32,7 @@ export async function PATCH(
       );
     }
 
-    const artist = await getArtist(artistId);
+    const artist = await adminGetArtist(artistId);
     if (!artist) {
       throw new HttpError(404, 'Artist not found');
     }
@@ -41,7 +41,7 @@ export async function PATCH(
       throw new HttpError(403, 'Only the owner can update the artist bio');
     }
 
-    const updatedArtist = await updateArtistLore(artistId, userId, bio);
+    const updatedArtist = await adminUpdateArtistLore(artistId, userId, bio);
 
     const serialized = {
       ...updatedArtist,

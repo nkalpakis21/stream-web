@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { updateArtistName, getArtist } from '@/lib/services/artists';
+import { adminGetArtist, adminUpdateArtistName } from '@/lib/server/artistsAdmin';
 import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +25,7 @@ export async function PATCH(
       throw new HttpError(400, 'Name is required and must be a string');
     }
 
-    const artist = await getArtist(artistId);
+    const artist = await adminGetArtist(artistId);
     if (!artist) {
       throw new HttpError(404, 'Artist not found');
     }
@@ -34,7 +34,7 @@ export async function PATCH(
       throw new HttpError(403, 'Only the owner can update the artist name');
     }
 
-    const updatedArtist = await updateArtistName(artistId, userId, name);
+    const updatedArtist = await adminUpdateArtistName(artistId, userId, name);
 
     const serialized = {
       ...updatedArtist,

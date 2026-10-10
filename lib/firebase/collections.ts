@@ -29,6 +29,11 @@ export const COLLECTIONS = {
    */
   xSongPosts: 'xSongPosts',
   /**
+   * Anonymous play-count rate limits. Doc ids are HMACs, never raw IPs.
+   * Server-only. Enable a Firestore TTL policy on field `expireAt`.
+   */
+  playRateLimits: 'playRateLimits',
+  /**
    * Parent for pump.fun metadata uploads. Each upload is
    * coinMetadataUploads/{uid}/coinUploads/{id} with expireAt (now + 24h).
    * Admin SDK only. Firestore TTL on collection group `coinUploads`.

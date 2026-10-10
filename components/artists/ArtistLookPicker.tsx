@@ -9,6 +9,7 @@ import {
 } from '@/components/artists/PhotoFrameEditor';
 import {
   getFreshIdToken,
+  isAuthFailure,
   SIGN_IN_AGAIN_MESSAGE,
   userFacingApiError,
 } from '@/lib/api/clientAuth';
@@ -204,6 +205,10 @@ export function ArtistLookPicker({
   };
 
   const handleGenerate = async () => {
+    if (!user) {
+      setError('Sign in to generate looks.');
+      return;
+    }
     if (!artistName.trim()) {
       setError('Enter an artist name before generating looks.');
       return;
@@ -222,9 +227,13 @@ export function ArtistLookPicker({
         referenceImage = await blobToDataUri(framed);
       }
 
+      const token = await getFreshIdToken(user);
       const response = await fetch('/api/artists/looks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           name: artistName.trim(),
           lore,
@@ -237,7 +246,11 @@ export function ArtistLookPicker({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(userFacingGenerateError(response.status, data.error));
+        throw new Error(
+          isAuthFailure(response.status, data.error)
+            ? userFacingApiError(response.status, data.error, "Couldn't generate looks right now.")
+            : userFacingGenerateError(response.status, data.error)
+        );
       }
       const urls = Array.isArray(data.looks)
         ? data.looks.map((look: { url?: string }) => look.url).filter(Boolean)
