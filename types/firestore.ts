@@ -14,14 +14,26 @@ import { Timestamp } from 'firebase/firestore';
 
 export interface UserDocument {
   id: string; // Firestore document ID
-  email: string;
   displayName: string | null;
   photoURL: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   deletedAt: Timestamp | null; // Soft delete
-  /** Linked Solana wallet address (base58). Set when user connects and links wallet. */
+}
+
+/**
+ * Owner-only. Stored at users/{uid}/private/profile.
+ * email and solanaWalletAddress are not on the public user document.
+ */
+export interface UserPrivateProfile {
+  email?: string;
+  /** Linked Solana wallet address (base58). Set when the user connects and links a wallet. */
   solanaWalletAddress?: string | null;
+  /**
+   * Server timestamp written by Admin link-wallet. Strip uses it to keep this
+   * wallet when the public doc still has an older copy.
+   */
+  walletUpdatedAt?: Timestamp;
 }
 
 // ============================================================================
@@ -49,6 +61,12 @@ export interface PumpFunCoin {
   symbol: string | null;
   launchedAt: Timestamp | null;
   creatorWallet: string | null;
+  /**
+   * Server-owned. Admin sets this after the bonding-curve creator matches
+   * coinMints.creatorWallet for this owner's create-tx binding. Absent until
+   * then. Clients cannot write it.
+   */
+  verifiedAt?: Timestamp | null;
 }
 
 export function emptyPumpFunCoin(): PumpFunCoin {
@@ -134,6 +152,29 @@ export interface AIArtistDocument {
    * without launching a coin (the default).
    */
   pumpFun?: PumpFunCoin | null;
+  /**
+   * `{id}` of Storage object `c/{id}.json`. Artist document root, not inside
+   * pumpFun. Account deletion reads `artist.coinMetadataId` here. Written by
+   * the launch-confirm route after Storage `uploadedBy` matches this user.
+   */
+  coinMetadataId?: string | null;
+  /**
+   * Admin-bucket object path of the coin image, or null when that image is
+   * not in our bucket. Artist document root. Never a client-supplied path.
+   */
+  coinImagePath?: string | null;
+  /**
+   * Server timestamp written by scripts/mark-legacy-mints.ts when absent.
+   * A later run of that script leaves an existing value unchanged.
+   * The mint cron skips an artist that has this set. Clients cannot write it.
+   */
+  mintSweepExemptAt?: Timestamp | null;
+  /**
+   * Server timestamp written the first time the mint cron sees pumpFun.mint
+   * on an artist that is not exempt. The 30-minute unbound clear uses this,
+   * not createdAt. Clients cannot write it.
+   */
+  mintFirstSeenAt?: Timestamp | null;
   /**
    * Optional public X account for this artist. Absent/undefined on older
    * documents is equivalent to disconnected. Tokens are never stored here.
@@ -232,6 +273,13 @@ export interface SongDocument {
    */
   playCount?: number;
   /**
+   * Server-owned play counts by client. Keys are ios, android, and web.
+   * Clients cannot write this map.
+   */
+  playsBySource?: Partial<Record<'ios' | 'android' | 'web', number>>;
+  /** Server-owned count of plays with background: true. */
+  playsBackground?: number;
+  /**
    * Audio length in seconds when known. Omitted on older songs — never invent.
    */
   duration?: number;
@@ -285,6 +333,11 @@ export interface GenerationParameters {
 
 export interface GenerationDocument {
   id: string;
+  /**
+   * Signed-in user who requested the job. Web creates always set this.
+   * TF 15 omits it; rules then rely on the parent song's owner.
+   */
+  ownerId?: string;
   /**
    * Parent song this generation was requested for.
    * All versions created from this generation will share this songId.

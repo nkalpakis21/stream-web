@@ -1,95 +1,763 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to validate artist name format
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
     function isValidArtistName(name) {
-      return name is string &&
-             name.size() >= 2 &&
-             name.size() <= 50 &&
-             name.matches('^[a-zA-Z0-9\\s\\-_]+$');
+      return name is string
+        && name.size() >= 2
+        && name.size() <= 50
+        && name.matches('^[a-zA-Z0-9\\s\\-_]+$');
     }
-    
-    // Helper function to check if user owns the artist
-    function isArtistOwner(artistId) {
-      return request.auth != null &&
-             get(/databases/$(database)/documents/artists/$(artistId)).data.ownerId == request.auth.uid;
-    }
-    
-    // Helper function to validate conversation title format
+
     function isValidConversationTitle(title) {
-      return title is string &&
-             title.size() >= 1 &&
-             title.size() <= 100 &&
-             title.matches('^[a-zA-Z0-9\\s\\-_]+$');
+      return title is string
+        && title.size() >= 1
+        && title.size() <= 100
+        && title.matches('^[a-zA-Z0-9\\s\\-_]+$');
     }
-    
+
+    function isValidDisplayName(name) {
+      return name is string
+        && name.size() >= 2
+        && name.size() <= 30
+        && name.matches('^[a-zA-Z0-9\\s\\-_]+$');
+    }
+
+    function artistDoc(artistId) {
+      return get(/databases/$(database)/documents/artists/$(artistId)).data;
+    }
+
+    function songDoc(songId) {
+      return get(/databases/$(database)/documents/songs/$(songId)).data;
+    }
+
+    function isArtistOwner(artistId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/artists/$(artistId))
+        && artistDoc(artistId).ownerId == request.auth.uid;
+    }
+
+    function isSongOwner(songId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/songs/$(songId))
+        && songDoc(songId).ownerId == request.auth.uid;
+    }
+
+    // Public song, or the signed-in owner. Child queries must equality-filter
+    // the parent id so this lookup is the same for every candidate document.
+    function canReadSong(songId) {
+      return exists(/databases/$(database)/documents/songs/$(songId))
+        && (songDoc(songId).isPublic == true || isOwner(songDoc(songId).ownerId));
+    }
+
+    function canReadArtist(artistId) {
+      return exists(/databases/$(database)/documents/artists/$(artistId))
+        && (artistDoc(artistId).isPublic == true || isOwner(artistDoc(artistId).ownerId));
+    }
+
+    function isConversationParticipant(conversationId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/conversations/$(conversationId))
+        && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+    }
+
+    // Follow-up: the next mobile build drops pumpFun from the client create
+    // and lets the confirm route own it. Until then, TF 15 writes the coin
+    // at create, so a user can attach an arbitrary mint to their own new artist.
+    // Absent, null, or exactly these keys. verifiedAt is server-owned and rejected.
+    function pumpFunOnCreate() {
+      return !('pumpFun' in request.resource.data)
+        || request.resource.data.pumpFun == null
+        || (
+          request.resource.data.pumpFun.keys().hasOnly([
+            'mint',
+            'url',
+            'symbol',
+            'launchedAt',
+            'creatorWallet'
+          ])
+          && (request.resource.data.pumpFun.mint == null || (
+            request.resource.data.pumpFun.mint is string
+            && request.resource.data.pumpFun.mint.size() <= 128
+          ))
+          && (request.resource.data.pumpFun.url == null || (
+            request.resource.data.pumpFun.url is string
+            && request.resource.data.pumpFun.url.size() <= 2048
+          ))
+          && (request.resource.data.pumpFun.symbol == null || (
+            request.resource.data.pumpFun.symbol is string
+            && request.resource.data.pumpFun.symbol.size() <= 32
+          ))
+          && (request.resource.data.pumpFun.launchedAt == null
+            || request.resource.data.pumpFun.launchedAt is timestamp)
+          && (request.resource.data.pumpFun.creatorWallet == null || (
+            request.resource.data.pumpFun.creatorWallet is string
+            && request.resource.data.pumpFun.creatorWallet.size() <= 128
+          ))
+        );
+    }
+
+    // Default disconnected shape from emptyXConnection(): status is not
+    // connected, and every other value is null or empty.
+    function xOnCreate() {
+      return !('x' in request.resource.data)
+        || request.resource.data.x == null
+        || (
+          request.resource.data.x.keys().hasOnly([
+            'status',
+            'username',
+            'userId',
+            'connectedAt',
+            'pausedAt',
+            'lastError',
+            'lastErrorAt',
+            'profileSyncedAt',
+            'recentPostTexts',
+            'posts'
+          ])
+          && request.resource.data.x.status == 'disconnected'
+          && request.resource.data.x.username == null
+          && request.resource.data.x.userId == null
+          && request.resource.data.x.connectedAt == null
+          && request.resource.data.x.pausedAt == null
+          && request.resource.data.x.lastError == null
+          && request.resource.data.x.lastErrorAt == null
+          && request.resource.data.x.profileSyncedAt == null
+          && (
+            !('recentPostTexts' in request.resource.data.x)
+            || (
+              request.resource.data.x.recentPostTexts is list
+              && request.resource.data.x.recentPostTexts.size() == 0
+            )
+          )
+          && (
+            !('posts' in request.resource.data.x)
+            || (
+              request.resource.data.x.posts is list
+              && request.resource.data.x.posts.size() == 0
+            )
+          )
+        );
+    }
+
+    // diff() throws a null-value error on maps that store nulls (pumpFun, x,
+    // coverProvider). Compare the server-owned leaves instead.
+    // Do not compare these maps with == or !=. Maps that store nulls throw.
+    // Updates cannot change pumpFun, including by adding verifiedAt.
+    // Key sets must match so a new leaf cannot appear. Do not compare the
+    // maps with ==. Maps that store nulls throw.
+    function samePumpFun() {
+      return (!('pumpFun' in resource.data) && !('pumpFun' in request.resource.data))
+        || (
+          'pumpFun' in resource.data
+          && 'pumpFun' in request.resource.data
+          && !(resource.data.pumpFun is map)
+          && !(request.resource.data.pumpFun is map)
+          && resource.data.pumpFun == null
+          && request.resource.data.pumpFun == null
+        )
+        || (
+          'pumpFun' in resource.data
+          && 'pumpFun' in request.resource.data
+          && resource.data.pumpFun is map
+          && request.resource.data.pumpFun is map
+          && request.resource.data.pumpFun.keys().hasOnly(resource.data.pumpFun.keys())
+          && resource.data.pumpFun.keys().hasOnly(request.resource.data.pumpFun.keys())
+          && request.resource.data.pumpFun.mint == resource.data.pumpFun.mint
+          && request.resource.data.pumpFun.url == resource.data.pumpFun.url
+          && request.resource.data.pumpFun.symbol == resource.data.pumpFun.symbol
+          && request.resource.data.pumpFun.creatorWallet == resource.data.pumpFun.creatorWallet
+          && request.resource.data.pumpFun.launchedAt == resource.data.pumpFun.launchedAt
+        );
+    }
+
+    // Null on both sides stays updatable. Maps must have the same keys, so a
+    // client cannot add a leaf. Scalar == is only used when the key exists.
+    function sameXField(field) {
+      return !(field in resource.data.x)
+        || request.resource.data.x[field] == resource.data.x[field];
+    }
+
+    function sameXList(field) {
+      return !(field in resource.data.x)
+        || (
+          resource.data.x[field] == null
+          && request.resource.data.x[field] == null
+        )
+        || (
+          resource.data.x[field] is list
+          && request.resource.data.x[field] is list
+          && request.resource.data.x[field].hasAll(resource.data.x[field])
+          && resource.data.x[field].hasAll(request.resource.data.x[field])
+        );
+    }
+
+    function sameX() {
+      return (!('x' in resource.data) && !('x' in request.resource.data))
+        || (
+          'x' in resource.data
+          && 'x' in request.resource.data
+          && !(resource.data.x is map)
+          && !(request.resource.data.x is map)
+          && resource.data.x == null
+          && request.resource.data.x == null
+        )
+        || (
+          'x' in resource.data
+          && 'x' in request.resource.data
+          && resource.data.x is map
+          && request.resource.data.x is map
+          && request.resource.data.x.keys().hasOnly(resource.data.x.keys())
+          && resource.data.x.keys().hasOnly(request.resource.data.x.keys())
+          && sameXField('status')
+          && sameXField('username')
+          && sameXField('userId')
+          && sameXField('connectedAt')
+          && sameXField('pausedAt')
+          && sameXField('lastError')
+          && sameXField('lastErrorAt')
+          && sameXField('profileSyncedAt')
+          && sameXList('posts')
+          && sameXList('recentPostTexts')
+        );
+    }
+
+    // Missing is not null. Accept either, and reject any other value.
+    function absentOrNull(data, field) {
+      return !(field in data) || data[field] == null;
+    }
+
+    function existingSongVersionMatches(versionId, parentSongId) {
+      return exists(/databases/$(database)/documents/songVersions/$(versionId))
+        && get(/databases/$(database)/documents/songVersions/$(versionId)).data.songId
+          == parentSongId;
+    }
+
+    function artistVersionMatches(versionId, artistId) {
+      return versionId is string
+        && exists(/databases/$(database)/documents/artistVersions/$(versionId))
+        && get(/databases/$(database)/documents/artistVersions/$(versionId)).data.artistId
+          == artistId;
+    }
+
+    // Missing on both sides, or present on both and equal.
+    // Do not use this for maps that store nulls (pumpFun, x).
+    function fieldUnchanged(field) {
+      return (!(field in resource.data) && !(field in request.resource.data))
+        || (
+          field in resource.data
+          && field in request.resource.data
+          && request.resource.data[field] == resource.data[field]
+        );
+    }
+
+    function sameCoverProvider() {
+      return (
+        (!('coverProvider' in resource.data) || resource.data.coverProvider == null)
+        && (!('coverProvider' in request.resource.data) || request.resource.data.coverProvider == null)
+      ) || (
+        resource.data.coverProvider != null
+        && request.resource.data.coverProvider != null
+        && request.resource.data.coverProvider.posterModel == resource.data.coverProvider.posterModel
+        && request.resource.data.coverProvider.loopModel == resource.data.coverProvider.loopModel
+        && request.resource.data.coverProvider.posterRequestId == resource.data.coverProvider.posterRequestId
+        && request.resource.data.coverProvider.loopRequestId == resource.data.coverProvider.loopRequestId
+      );
+    }
+
+    function artistProfileUpdate() {
+      return isOwner(resource.data.ownerId)
+        && fieldUnchanged('name')
+        && fieldUnchanged('nameLowercase')
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.deletedAt == null
+        && samePumpFun()
+        && sameX()
+        && fieldUnchanged('coinMetadataId')
+        && fieldUnchanged('coinImagePath')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'avatarURL',
+          'styleDNA',
+          'lore',
+          'vocalIdentity',
+          'currentVersionId',
+          'updatedAt'
+        ]);
+        // mintSweepExemptAt and mintFirstSeenAt are absent here on purpose.
+        // A client cannot add or change either field.
+    }
+
+    function songServerFieldsUnchanged() {
+      return fieldUnchanged('ownerId')
+        && fieldUnchanged('artistId')
+        && fieldUnchanged('id')
+        && fieldUnchanged('createdAt')
+        && fieldUnchanged('parentSongId')
+        && fieldUnchanged('collaborationType')
+        && fieldUnchanged('albumCoverPath')
+        && fieldUnchanged('albumCoverThumbnail')
+        && fieldUnchanged('coverPosterUrl')
+        && fieldUnchanged('coverVideoUrl')
+        && fieldUnchanged('coverMotionStatus')
+        && fieldUnchanged('coverMotionError')
+        && fieldUnchanged('coverUpdatedAt')
+        && fieldUnchanged('tokenMintAddress')
+        && fieldUnchanged('tokenMintCreatedAt')
+        && fieldUnchanged('duration')
+        && sameCoverProvider()
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'ownerId',
+          'artistId',
+          'artistVersionId',
+          'title',
+          'isPublic',
+          'createdAt',
+          'updatedAt',
+          'deletedAt',
+          'currentVersionId',
+          'parentSongId',
+          'collaborationType',
+          'albumCoverPath',
+          'albumCoverThumbnail',
+          'coverPosterUrl',
+          'coverVideoUrl',
+          'coverMotionStatus',
+          'coverMotionError',
+          'coverUpdatedAt',
+          'coverProvider',
+          'playCount',
+          'playsBySource',
+          'playsBackground',
+          'duration',
+          'tokenMintAddress',
+          'tokenMintCreatedAt'
+        ]);
+    }
+
+    function songOwnerUpdate() {
+      return isOwner(resource.data.ownerId)
+        && songServerFieldsUnchanged()
+        && fieldUnchanged('playCount')
+        && fieldUnchanged('playsBySource')
+        && fieldUnchanged('playsBackground')
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 300
+        && request.resource.data.isPublic is bool;
+    }
+
+    // Create may store playCount 0 and null cover fields (TF 15 setDoc).
+    // A non-zero play count or any non-null cover is denied. Updates cannot
+    // change these fields. Follow-up: reject them on create once mobile omits them.
+    function songCreateClean() {
+      return (!('playCount' in request.resource.data) || request.resource.data.playCount == 0)
+        && !('playsBySource' in request.resource.data)
+        && !('playsBackground' in request.resource.data)
+        && (!('coverPosterUrl' in request.resource.data) || request.resource.data.coverPosterUrl == null)
+        && (!('coverVideoUrl' in request.resource.data) || request.resource.data.coverVideoUrl == null)
+        && (!('coverMotionStatus' in request.resource.data) || request.resource.data.coverMotionStatus == null)
+        && (!('coverMotionError' in request.resource.data) || request.resource.data.coverMotionError == null)
+        && (!('coverUpdatedAt' in request.resource.data) || request.resource.data.coverUpdatedAt == null)
+        && (!('coverProvider' in request.resource.data) || request.resource.data.coverProvider == null)
+        && (!('albumCoverPath' in request.resource.data) || request.resource.data.albumCoverPath == null)
+        && (!('albumCoverThumbnail' in request.resource.data) || request.resource.data.albumCoverThumbnail == null)
+        && (!('tokenMintAddress' in request.resource.data) || request.resource.data.tokenMintAddress == null)
+        && (!('tokenMintCreatedAt' in request.resource.data) || request.resource.data.tokenMintCreatedAt == null);
+    }
+
+    function coinMetadataClean() {
+      return (!('coinMetadataId' in request.resource.data) || request.resource.data.coinMetadataId == null)
+        && (!('coinImagePath' in request.resource.data) || request.resource.data.coinImagePath == null);
+    }
+
+    match /users/{uid} {
+      // Public profile: display name and avatar. email and solanaWalletAddress
+      // live on users/{uid}/private/profile and are not readable here.
+      allow get: if true;
+      // Prefix search: where displayName >= q AND displayName <= q+\uf8ff.
+      allow list: if resource.data.displayName is string;
+
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly([
+          'displayName',
+          'photoURL',
+          'createdAt',
+          'updatedAt',
+          'deletedAt'
+        ])
+        && request.resource.data.deletedAt == null
+        && (
+          !('displayName' in request.resource.data)
+          || request.resource.data.displayName == null
+          || isValidDisplayName(request.resource.data.displayName)
+        );
+
+      allow update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly([
+          'displayName',
+          'photoURL',
+          'createdAt',
+          'updatedAt',
+          'deletedAt'
+        ])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'displayName',
+          'updatedAt',
+          'photoURL'
+        ])
+        && fieldUnchanged('createdAt')
+        && fieldUnchanged('deletedAt')
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['displayName'])
+          || isValidDisplayName(request.resource.data.displayName)
+        );
+
+      // In-app account deletion (mobile). Web soft-deletes are not used on users.
+      // Client deleteDoc does not cascade into private/profile. Web account
+      // delete uses Admin recursiveDelete, which does.
+      allow delete: if isOwner(uid);
+
+      match /private/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+    }
+
     match /artists/{artistId} {
-      // Anyone authenticated can read artists
-      allow read: if request.auth != null;
-      
-      // Create artist - validate name format and ownership
-      allow create: if request.auth != null &&
-                    request.auth.uid == request.resource.data.ownerId &&
-                    isValidArtistName(request.resource.data.name) &&
-                    request.resource.data.nameLowercase == request.resource.data.name.lower() &&
-                    request.resource.data.deletedAt == null;
-      
-      // Update artist - validate ownership and name format
-      allow update: if request.auth != null &&
-                    isArtistOwner(artistId) &&
-                    isValidArtistName(request.resource.data.name) &&
-                    request.resource.data.nameLowercase == request.resource.data.name.lower() &&
-                    request.resource.data.ownerId == resource.data.ownerId &&
-                    request.resource.data.deletedAt == null;
-      
-      // No hard deletes - use soft delete via deletedAt
+      allow get: if resource.data.isPublic == true || isOwner(resource.data.ownerId);
+      // Every list must constrain isPublic == true or ownerId == request.auth.uid.
+      // Name search and mint lookup are public-only unless the caller is the owner.
+      allow list: if resource.data.isPublic == true
+        || (signedIn() && resource.data.ownerId == request.auth.uid);
+
+      allow create: if signedIn()
+        && request.auth.uid == request.resource.data.ownerId
+        && request.resource.data.id == artistId
+        && isValidArtistName(request.resource.data.name)
+        && request.resource.data.nameLowercase == request.resource.data.name.lower()
+        && request.resource.data.deletedAt == null
+        && request.resource.data.isPublic is bool
+        && pumpFunOnCreate()
+        && xOnCreate()
+        && coinMetadataClean()
+        && !('mintSweepExemptAt' in request.resource.data)
+        && !('mintFirstSeenAt' in request.resource.data);
+
+      // currentVersionId may move only to a version of this artist. The version
+      // name must match the artist, so a foreign version cannot rename it.
+      allow update: if artistProfileUpdate()
+        && (
+          fieldUnchanged('currentVersionId')
+          || (
+            artistVersionMatches(request.resource.data.currentVersionId, artistId)
+            && get(/databases/$(database)/documents/artistVersions/$(request.resource.data.currentVersionId)).data.name
+              == resource.data.name
+          )
+        );
+
+      // Owner hard-delete for in-app account deletion. ownerId is fixed at create.
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    match /artistVersions/{versionId} {
+      allow read: if canReadArtist(resource.data.artistId);
+      // The artist is written first (web createArtist and TF 15), so it exists
+      // and the version name must match it. No client updates this collection.
+      allow create: if signedIn()
+        && request.resource.data.id == versionId
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.artistId is string
+        && isArtistOwner(request.resource.data.artistId)
+        && request.resource.data.name == artistDoc(request.resource.data.artistId).name;
+      allow update, delete: if false;
+    }
+
+    match /songs/{songId} {
+      allow get: if resource.data.isPublic == true || isOwner(resource.data.ownerId);
+      allow list: if resource.data.isPublic == true
+        || (signedIn() && resource.data.ownerId == request.auth.uid);
+
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.id == songId
+        && request.resource.data.artistId is string
+        && isArtistOwner(request.resource.data.artistId)
+        && request.resource.data.deletedAt == null
+        && request.resource.data.isPublic is bool
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 300
+        && songCreateClean()
+        && request.resource.data.currentVersionId is string
+        && (
+          !exists(/databases/$(database)/documents/songVersions/$(request.resource.data.currentVersionId))
+          || existingSongVersionMatches(request.resource.data.currentVersionId, songId)
+        )
+        && artistVersionMatches(
+          request.resource.data.artistVersionId,
+          request.resource.data.artistId
+        );
+
+      // Plays are server-owned. Clients cannot bump playCount, playsBySource, or playsBackground.
+      // Version pointers are checked only when they change. Web writes the song
+      // before its version, so create cannot require the new version to exist.
+      allow update: if songOwnerUpdate()
+        && (
+          fieldUnchanged('currentVersionId')
+          || (
+            request.resource.data.currentVersionId is string
+            && existingSongVersionMatches(request.resource.data.currentVersionId, songId)
+          )
+        )
+        && (
+          fieldUnchanged('artistVersionId')
+          || artistVersionMatches(
+            request.resource.data.artistVersionId,
+            resource.data.artistId
+          )
+        );
+
+      // Owner hard-delete for in-app account deletion.
+      // Web deleteSong soft-deletes via update of deletedAt.
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    match /songVersions/{versionId} {
+      allow read: if canReadSong(resource.data.songId);
+      // Clients may open a silent version. Audio URLs are written by the
+      // server (Admin SDK) when a MusicGPT job finishes.
+      allow create: if signedIn()
+        && request.resource.data.id == versionId
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.songId is string
+        && absentOrNull(request.resource.data, 'audioURL')
+        && absentOrNull(request.resource.data, 'providerOutputId')
+        && isSongOwner(request.resource.data.songId);
+      allow update: if isSongOwner(resource.data.songId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isPrimary'])
+        && request.resource.data.isPrimary is bool
+        && fieldUnchanged('audioURL')
+        && fieldUnchanged('providerOutputId')
+        && request.resource.data.createdBy == resource.data.createdBy;
       allow delete: if false;
     }
-    
-    // Conversations: Users can only access conversations they're in
+
+    // TF 15 writes no owner field. Web sends ownerId, which must be the caller
+    // when present. The parent song owner is always required. No client update
+    // or delete. Completion is an Admin write.
+    match /generations/{generationId} {
+      allow read: if canReadSong(resource.data.songId);
+      allow create: if signedIn()
+        && request.resource.data.id == generationId
+        && request.resource.data.songId is string
+        && request.resource.data.status == 'pending'
+        && absentOrNull(request.resource.data, 'completedAt')
+        && absentOrNull(request.resource.data, 'contentHash')
+        && request.resource.data.output is map
+        && absentOrNull(request.resource.data.output, 'audioURL')
+        && (
+          !('stems' in request.resource.data.output)
+          || request.resource.data.output.stems == null
+          || (
+            request.resource.data.output.stems is list
+            && request.resource.data.output.stems.size() == 0
+          )
+        )
+        && (
+          !('ownerId' in request.resource.data)
+          || request.resource.data.ownerId == request.auth.uid
+        )
+        && !('createdBy' in request.resource.data)
+        && isSongOwner(request.resource.data.songId);
+      allow update, delete: if false;
+    }
+
+    match /collaborations/{collaborationId} {
+      allow get: if true;
+      allow list: if resource.data.sourceSongId is string;
+      allow create: if signedIn()
+        && request.resource.data.id == collaborationId
+        && request.resource.data.collaboratorId == request.auth.uid
+        && request.resource.data.sourceSongId is string
+        && request.resource.data.targetSongId is string
+        && request.resource.data.type in ['fork', 'remix', 'response', 'extension'];
+      allow update, delete: if false;
+    }
+
+    match /follows/{followId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.id == followId
+        && request.resource.data.followerId == request.auth.uid
+        && request.resource.data.artistId is string;
+      allow delete: if signedIn() && resource.data.followerId == request.auth.uid;
+      allow update: if false;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && (
+        resource.data.userId == request.auth.uid
+        || isSongOwner(resource.data.songId)
+      );
+      // Recipients mark read. The song owner soft-deletes notifications for that song.
+      // Creating notifications is server-owned (generation complete).
+      allow update: if signedIn() && (
+        (
+          resource.data.userId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+          && request.resource.data.read == true
+        ) || (
+          isSongOwner(resource.data.songId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt'])
+        )
+      );
+      allow create, delete: if false;
+    }
+
     match /conversations/{conversationId} {
-      allow read: if request.auth != null && request.auth.uid in resource.data.participants;
-      allow create: if request.auth != null && request.auth.uid in request.resource.data.participants;
-      // Allow update if user is participant AND (updating lastMessageAt/lastMessagePreview OR creator updating title)
-      allow update: if request.auth != null && 
-                     request.auth.uid in resource.data.participants &&
-                     (
-                       // Updating last message info (any participant)
-                       (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessageAt', 'lastMessagePreview', 'updatedAt'])) ||
-                       // Creator updating title
-                       (request.auth.uid == resource.data.createdBy &&
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'updatedAt']) &&
-                        (request.resource.data.title == null || isValidConversationTitle(request.resource.data.title)) &&
-                        request.resource.data.participants == resource.data.participants &&
-                        request.resource.data.type == resource.data.type)
-                     );
+      allow read: if signedIn() && request.auth.uid in resource.data.participants;
+      allow create: if signedIn()
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.participants.size() >= 2
+        && request.resource.data.participants.size() <= 50
+        && request.resource.data.type in ['direct', 'group']
+        && (request.resource.data.type != 'direct' || request.resource.data.participants.size() == 2)
+        && (
+          !('createdBy' in request.resource.data)
+          || request.resource.data.createdBy == request.auth.uid
+        );
+      allow update: if signedIn()
+        && request.auth.uid in resource.data.participants
+        && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'lastMessageAt',
+            'lastMessagePreview',
+            'updatedAt'
+          ])
+          || (
+            request.auth.uid == resource.data.createdBy
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'updatedAt'])
+            && (request.resource.data.title == null || isValidConversationTitle(request.resource.data.title))
+            && request.resource.data.participants == resource.data.participants
+            && request.resource.data.type == resource.data.type
+          )
+          || (
+            resource.data.type == 'group'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'updatedAt'])
+            && request.resource.data.type == resource.data.type
+            && request.resource.data.participants.size() >= 1
+          )
+        );
+      allow delete: if false;
     }
-    
-    // Messages: Users can only send/read messages in conversations they're in
+
     match /messages/{messageId} {
-      allow read: if request.auth != null && 
-                     exists(/databases/$(database)/documents/conversations/$(resource.data.conversationId)) &&
-                     request.auth.uid in get(/databases/$(database)/documents/conversations/$(resource.data.conversationId)).data.participants;
-      allow create: if request.auth != null && 
-                       request.auth.uid == request.resource.data.senderId &&
-                       exists(/databases/$(database)/documents/conversations/$(request.resource.data.conversationId)) &&
-                       request.auth.uid in get(/databases/$(database)/documents/conversations/$(request.resource.data.conversationId)).data.participants;
-      allow update: if request.auth != null && request.auth.uid == resource.data.senderId;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.senderId;
+      allow read: if isConversationParticipant(resource.data.conversationId);
+      allow create: if signedIn()
+        && request.resource.data.id == messageId
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.deletedAt == null
+        && request.resource.data.content is string
+        && request.resource.data.content.size() > 0
+        && request.resource.data.content.size() <= 5000
+        && request.auth.uid in request.resource.data.readBy
+        && isConversationParticipant(request.resource.data.conversationId);
+      allow update: if isConversationParticipant(resource.data.conversationId) && (
+        (
+          request.auth.uid == resource.data.senderId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt'])
+        ) || (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasAll(['readBy'])
+          && request.resource.data.readBy.hasAll(resource.data.readBy)
+          && request.resource.data.readBy.hasOnly(resource.data.readBy.concat([request.auth.uid]))
+        )
+      );
+      allow delete: if false;
     }
-    
-    // Other collection rules...
-    // X OAuth tokens and song-live idempotency — Admin SDK only.
+
+    match /comments/{commentId} {
+      allow read: if resource.data.deletedAt == null;
+      allow create: if signedIn()
+        && request.resource.data.id == commentId
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.deletedAt == null
+        && request.resource.data.targetType in ['artist', 'song']
+        && request.resource.data.targetId is string
+        && request.resource.data.content is string
+        && request.resource.data.content.size() > 0
+        && request.resource.data.content.size() <= 2000;
+      allow update: if signedIn()
+        && resource.data.authorId == request.auth.uid
+        && request.resource.data.authorId == resource.data.authorId
+        && request.resource.data.targetId == resource.data.targetId
+        && request.resource.data.targetType == resource.data.targetType
+        && request.resource.data.content is string
+        && request.resource.data.content.size() > 0
+        && request.resource.data.content.size() <= 2000
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'content',
+          'updatedAt',
+          'deletedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    // Feature kill switch. Public read so mobile can load it before sign-in.
+    // This document only. Clients cannot write (Admin SDK / console only).
+    match /config/mobile {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // X OAuth tokens and song-live idempotency. Admin SDK only.
     match /artistXAuth/{artistId} {
       allow read, write: if false;
     }
     match /xSongPosts/{songId} {
       allow read, write: if false;
     }
+    // Pending coin metadata. TTL deletes coinUploads/{id} via expireAt.
+    // Admin SDK only, including every nested coinUploads doc.
+    match /coinMetadataUploads/{uid} {
+      allow read, write: if false;
+      match /coinUploads/{uploadId} {
+        allow read, write: if false;
+      }
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // Mint bindings written by create-tx. Admin SDK only.
+    match /coinMints/{mintId} {
+      allow read, write: if false;
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // Anonymous play-count rate limits. Doc ids are HMACs. Admin SDK only.
+    match /playRateLimits/{limitId} {
+      allow read, write: if false;
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
 
     match /{document=**} {
-      allow read, write: if false; // Deny by default
+      allow read, write: if false;
     }
   }
 }

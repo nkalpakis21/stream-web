@@ -28,6 +28,29 @@ export const COLLECTIONS = {
    * Server-only (rules deny all).
    */
   xSongPosts: 'xSongPosts',
+  /**
+   * Anonymous play-count rate limits. Doc ids are HMACs, never raw IPs.
+   * Server-only. Enable a Firestore TTL policy on field `expireAt`.
+   */
+  playRateLimits: 'playRateLimits',
+  /**
+   * Parent for pump.fun metadata uploads. Each upload is
+   * coinMetadataUploads/{uid}/coinUploads/{id} with expireAt (now + 24h).
+   * Admin SDK only. Firestore TTL on collection group `coinUploads`.
+   */
+  coinMetadataUploads: 'coinMetadataUploads',
+  /**
+   * Server-only binding from a MusicGPT task id to the uid that started it.
+   * Doc id is the provider task id. `songId` is null when the client did not
+   * send one (older mobile). Admin SDK only. `expireAt` is now + 7 days.
+   * Firestore TTL is the musicgptTasks field override in firestore.indexes.json.
+   */
+  musicgptTasks: 'musicgptTasks',
+  /**
+   * Mint bound to the uid that asked create-tx to build it.
+   * Admin SDK only. Clients cannot read or write this collection.
+   */
+  coinMints: 'coinMints',
 } as const;
 
 export type CollectionName = typeof COLLECTIONS[keyof typeof COLLECTIONS];
@@ -41,6 +64,11 @@ export const getCollectionPath = (collection: CollectionName): string => {
 
 export const getUserPath = (userId: string): string => {
   return `${COLLECTIONS.users}/${userId}`;
+};
+
+/** Owner-only email and wallet. Not readable from the public user document. */
+export const getUserPrivateProfilePath = (userId: string): string => {
+  return `${COLLECTIONS.users}/${userId}/private/profile`;
 };
 
 export const getArtistPath = (artistId: string): string => {

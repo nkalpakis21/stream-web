@@ -5,6 +5,7 @@ import {
   coinMetadataObjectPaths,
   collectEmails,
   commitBulkDeletes,
+  deleteAccountIdentity,
   firebaseStorageObjectPath,
   isAuthUserNotFound,
   isPersonalValue,
@@ -406,6 +407,149 @@ describe('bulk deletes', () => {
       },
     };
     await assert.rejects(() => commitBulkDeletes(writer, ['a', 'b']), /delete-failed/);
+  });
+});
+
+describe('coin metadata upload delete', () => {
+  const uid = 'user-1';
+  const uploadId = '0123456789abcdef0123456789abcdef';
+
+  function identityDb(options: {
+    uploads?: string[];
+    listError?: unknown;
+    parentMissing?: boolean;
+    deleteError?: unknown;
+  }) {
+    const events: string[] = [];
+    let flushed = false;
+    const pending: Array<() => void> = [];
+    const db = {
+      events,
+      collection(name: string) {
+        return {
+          doc(id: string) {
+            const path = `${name}/${id}`;
+            return {
+              path,
+              collection(sub: string) {
+                return {
+                  async get() {
+                    events.push(`list:${path}/${sub}`);
+                    if (options.listError) throw options.listError;
+                    return {
+                      docs: (options.uploads ?? []).map(id => ({
+                        ref: { path: `${path}/${sub}/${id}` },
+                      })),
+                    };
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+      bulkWriter() {
+        return {
+          onWriteError() {
+            return this;
+          },
+          delete(ref: { path: string }) {
+            return new Promise<void>((resolve, reject) => {
+              pending.push(() => {
+                if (!flushed) {
+                  reject(new Error(`awaited ${ref.path} before flush`));
+                  return;
+                }
+                events.push(`delete:${ref.path}`);
+                if (options.deleteError) {
+                  reject(options.deleteError);
+                  return;
+                }
+                if (options.parentMissing && ref.path === `coinMetadataUploads/${uid}`) {
+                  reject(Object.assign(new Error('missing'), { code: 5 }));
+                  return;
+                }
+                resolve();
+              });
+            });
+          },
+          async flush() {
+            flushed = true;
+            const batch = pending.splice(0, pending.length);
+            for (const settle of batch) settle();
+          },
+          async close() {
+            events.push('close');
+          },
+        };
+      },
+      async recursiveDelete(ref: { path: string }) {
+        events.push(`recursive:${ref.path}`);
+      },
+    };
+    return db;
+  }
+
+  it('deletes coinUploads and the parent before the Auth user', { timeout: 1000 }, async () => {
+    const db = identityDb({ uploads: [uploadId] });
+    await deleteAccountIdentity(db as never, uid, async userId => {
+      db.events.push(`auth:${userId}`);
+    });
+    assert.deepEqual(db.events, [
+      `list:coinMetadataUploads/${uid}/coinUploads`,
+      `delete:coinMetadataUploads/${uid}/coinUploads/${uploadId}`,
+      `delete:coinMetadataUploads/${uid}`,
+      'close',
+      `recursive:users/${uid}`,
+      `auth:${uid}`,
+    ]);
+  });
+
+  it('treats a missing coinMetadataUploads doc as success and still deletes Auth', async () => {
+    const db = identityDb({ uploads: [], parentMissing: true });
+    await deleteAccountIdentity(db as never, uid, async userId => {
+      db.events.push(`auth:${userId}`);
+    });
+    assert.deepEqual(db.events, [
+      `list:coinMetadataUploads/${uid}/coinUploads`,
+      `delete:coinMetadataUploads/${uid}`,
+      'close',
+      `recursive:users/${uid}`,
+      `auth:${uid}`,
+    ]);
+  });
+
+  it('treats a missing coinUploads list as success', async () => {
+    const db = identityDb({
+      listError: Object.assign(new Error('missing'), { code: 'not-found' }),
+    });
+    await deleteAccountIdentity(db as never, uid, async userId => {
+      db.events.push(`auth:${userId}`);
+    });
+    assert.ok(db.events.includes(`auth:${uid}`));
+    assert.equal(db.events[0], `list:coinMetadataUploads/${uid}/coinUploads`);
+    assert.ok(db.events.indexOf(`recursive:users/${uid}`) < db.events.indexOf(`auth:${uid}`));
+  });
+
+  it('does not delete the Auth user when a coin upload delete fails', async () => {
+    const db = identityDb({
+      uploads: [uploadId],
+      deleteError: Object.assign(new Error('unavailable'), { code: 14 }),
+    });
+    let authCalled = false;
+    await assert.rejects(
+      () =>
+        deleteAccountIdentity(db as never, uid, async () => {
+          authCalled = true;
+        }),
+      (err: unknown) => {
+        assert.ok(err instanceof Error);
+        assert.match(err.message, /unavailable/);
+        return true;
+      }
+    );
+    assert.equal(authCalled, false);
+    assert.equal(db.events.includes(`recursive:users/${uid}`), false);
   });
 });
 

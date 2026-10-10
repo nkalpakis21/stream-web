@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast, ToastContainer } from '@/components/ui/toast';
 import { authHref } from '@/lib/auth/returnTo';
+import { getFreshIdToken } from '@/lib/api/clientAuth';
 
 interface MessageArtistButtonProps {
   artistId: string;
@@ -28,11 +29,12 @@ export function MessageArtistButton({ artistId, ownerId, className = '' }: Messa
 
     setLoading(true);
     try {
+      const token = await getFreshIdToken(user);
       const response = await fetch('/api/conversations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': user.uid,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           participants: [user.uid, ownerId],

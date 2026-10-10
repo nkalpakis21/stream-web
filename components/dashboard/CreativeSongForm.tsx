@@ -103,6 +103,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
           quality: 'medium',
         },
         provider: formData.provider,
+        artistId: selectedArtist.id,
         artistContext: {
           styleDNA: artistVersion.styleDNA,
           lore: artistVersion.lore,
