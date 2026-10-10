@@ -17,7 +17,7 @@ Inferred from stream-web PR #92, and still covered:
 | `users/{uid}` | delete | No | Owner delete of their own profile doc |
 | `config/mobile` | get | Yes | Public read, no client write |
 
-iOS TestFlight 14 and 15 create `songs`, `songVersions`, `generations`, `artists`, and `artistVersions` with client `setDoc`. Rules require `ownerId` or `createdBy` to be `request.auth.uid` on create. Updates cannot change `ownerId` / `createdBy`, and cannot write audio URLs, covers, `pumpFun`, `x`, `coinMetadataId`, `coinImagePath`, `playCount`, `playsBySource`, or `playsBackground`. The CTO says the app does not call `updateDoc`.
+iOS TestFlight 14 and 15 create `songs`, `songVersions`, `generations`, `artists`, and `artistVersions` with client `setDoc`. Song and artist creates require `ownerId == request.auth.uid`. Version creates require `createdBy == request.auth.uid`. Generation creates require the parent song's owner. `ownerId` is optional there: TF 15 omits it, and web sends the caller's uid. Updates cannot change `ownerId` / `createdBy`, and cannot write audio URLs, covers, `pumpFun`, `x`, `coinMetadataId`, `coinImagePath`, `playCount`, `playsBySource`, or `playsBackground`. The CTO says the app does not call `updateDoc`.
 
 ## Client list rules for songs and artists
 
@@ -80,7 +80,7 @@ Rules reject client creates and updates that include `email` or `solanaWalletAdd
 | `songs` | Updates cannot touch `ownerId`, covers, `playCount`, `playsBySource`, `playsBackground`, or legacy token fields. Create may write `playCount: 0` and null cover fields (TF 15). A non-zero count or a non-null cover is denied |
 | `artists` | Updates cannot touch `ownerId`, `pumpFun`, `x`, `coinMetadataId`, or `coinImagePath`. Create may write `pumpFun` (null or the five coin keys, including a real mint) and `x` only in the disconnected default. `coinMetadataId` and `coinImagePath` are never client-writable |
 | `songVersions` | Create requires `audioURL == null` and `providerOutputId == null`. Owner may still change `isPrimary` |
-| `generations` | Create requires a pending job, null audio, null or empty stems, no `ownerId` or `createdBy`, and the parent song owned by the caller. No client update or delete |
+| `generations` | Create requires a pending job, null audio, null or empty stems, and the parent song owned by the caller. `ownerId`, when present, must be the caller. `createdBy` is rejected. No client update or delete |
 | `artistVersions` | `createdBy` and `artistId` cannot change. Owner may update the rest |
 | `playRateLimits/**` | All client reads and writes denied. Admin only (`lib/server/playRateLimit.ts`) |
 | `coinMetadataUploads/**` including `coinUploads` | All client reads and writes denied. Admin only |
@@ -127,7 +127,7 @@ It is **not** a full export of production indexes. Chat, comments, follows, noti
 - **Test-mode prod rules** stay in force until this file is deployed. This change does not deploy.
 - **Unmigrated user documents** still return `email` and `solanaWalletAddress` on a direct client `get`, because rules cannot hide fields. Web service reads strip them. Run `scripts/migrate-user-private.ts` (not run here) before treating a raw client get as safe. A client `deleteDoc` of `users/{uid}` does not delete `private/profile`. Web `DELETE /api/account` uses `recursiveDelete` and does.
 - **Artist create may store a launched `pumpFun`.** Follow-up: the next mobile build drops `pumpFun` and `x` from the client create and lets the confirm route own them. Until then a user can attach an arbitrary mint to their own new artist. Updates still cannot change `pumpFun` or `x`. `coinMetadataId` and `coinImagePath` stay server-only.
-- **Generation create has no `ownerId`.** Follow-up: the next mobile build adds `ownerId`. Until then the parent song owner is the authority, and clients cannot update or delete the job.
+- **TF 15 generation create still omits `ownerId`.** Web sends it. Follow-up: the next mobile build adds `ownerId`. The parent song owner stays required, and clients cannot update or delete the job.
 - **Song create may write `playCount: 0` and null cover fields.** Follow-up: reject those fields on create once mobile omits them. Updates already cannot change them.
 - **Private songs and artists on server-rendered pages** (`app/songs/[id]/page.tsx`, `app/artists/[id]/page.tsx`) call `getSong` / `getArtist` with the client SDK and no user. A private doc fails that read for everyone, including the owner. X connect/pause/disconnect routes have the same `getArtist` gap.
 - **`checkArtistNameAvailable`** only sees public artists, so it cannot tell that another user's private artist already has the name. Nothing in the app calls it. `adminUpdateArtistName` still checks every artist.

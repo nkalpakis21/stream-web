@@ -465,9 +465,9 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // TF 15 creates a pending job with no ownerId or createdBy. The parent
-    // song's owner is the authority. Follow-up: the next mobile build adds ownerId.
-    // Clients cannot update or delete. Completion is an Admin write.
+    // TF 15 writes no owner field. Web sends ownerId, which must be the caller
+    // when present. The parent song owner is always required. No client update
+    // or delete. Completion is an Admin write.
     match /generations/{generationId} {
       allow read: if canReadSong(resource.data.songId);
       allow create: if signedIn()
@@ -481,7 +481,10 @@ service cloud.firestore {
           request.resource.data.output.stems == null
           || request.resource.data.output.stems.size() == 0
         )
-        && !('ownerId' in request.resource.data)
+        && (
+          !('ownerId' in request.resource.data)
+          || request.resource.data.ownerId == request.auth.uid
+        )
         && !('createdBy' in request.resource.data)
         && isSongOwner(request.resource.data.songId);
       allow update, delete: if false;

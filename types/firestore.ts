@@ -311,6 +311,11 @@ export interface GenerationParameters {
 export interface GenerationDocument {
   id: string;
   /**
+   * Signed-in user who requested the job. Web creates always set this.
+   * TF 15 omits it; rules then rely on the parent song's owner.
+   */
+  ownerId?: string;
+  /**
    * Parent song this generation was requested for.
    * All versions created from this generation will share this songId.
    */

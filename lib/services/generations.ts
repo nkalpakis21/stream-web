@@ -69,6 +69,11 @@ export async function createGeneration(
     providerTaskId?: string;
   }
 ): Promise<GenerationDocument> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('Authentication required to start generation');
+  }
+
   // For async providers like MusicGPT, we need to get the task ID first
   // before creating the generation document. This ensures we don't create
   // orphaned records if the API call fails.
@@ -78,10 +83,6 @@ export async function createGeneration(
     try {
       // Call server-side API route to initiate MusicGPT generation
       // This ensures API keys are never exposed to the client
-      const user = auth.currentUser;
-      if (!user) {
-        throw new Error('Authentication required to start generation');
-      }
       const token = await user.getIdToken();
       const apiResponse = await fetch('/api/generations/musicgpt', {
         method: 'POST',
@@ -144,6 +145,7 @@ export async function createGeneration(
 
   const generation: GenerationDocument = {
     id: generationId,
+    ownerId: user.uid,
     songId,
     artistVersionId,
     songVersionId: null,

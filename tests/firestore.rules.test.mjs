@@ -1209,6 +1209,308 @@ test('TF 15 create payloads pass and the abusive variants are denied', async () 
   await assertSucceeds(getDoc(doc(anon, 'config/mobile')));
 });
 
+test('web client create payloads pass, and a missing or foreign owner is denied', async () => {
+  await seedCatalog();
+  await seed(async (db) => {
+    await setDoc(doc(db, 'songs/bobSong'), songData({
+      id: 'bobSong',
+      ownerId: 'bob',
+    }));
+  });
+  const alice = dbFor('alice');
+  const styleDNA = {
+    genres: ['jazz'],
+    moods: ['calm'],
+    tempoRange: { min: 80, max: 120 },
+    influences: [],
+  };
+
+  // createArtist: empty coin (launch opted out) plus emptyXConnection().
+  await assertSucceeds(setDoc(doc(alice, 'artists/webArtist'), {
+    id: 'webArtist',
+    ownerId: 'alice',
+    name: 'Nova Web',
+    nameLowercase: 'nova web',
+    avatarURL: null,
+    styleDNA,
+    lore: 'A short bio',
+    vocalIdentity: null,
+    isPublic: true,
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    currentVersionId: 'webAv',
+    pumpFun: {
+      mint: null,
+      url: null,
+      symbol: null,
+      launchedAt: null,
+      creatorWallet: null,
+    },
+    x: {
+      status: 'disconnected',
+      username: null,
+      userId: null,
+      connectedAt: null,
+      pausedAt: null,
+      lastError: null,
+      lastErrorAt: null,
+      profileSyncedAt: null,
+      recentPostTexts: [],
+      posts: [],
+    },
+  }));
+  // createArtist when the wallet launch returns a coin. Same keys, real values.
+  await assertSucceeds(setDoc(doc(alice, 'artists/webLaunched'), {
+    id: 'webLaunched',
+    ownerId: 'alice',
+    name: 'Nova Coin',
+    nameLowercase: 'nova coin',
+    avatarURL: 'https://cdn.example/look.jpg',
+    styleDNA,
+    lore: 'Launched',
+    vocalIdentity: 'warm alto',
+    isPublic: false,
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    currentVersionId: 'webAvLaunch',
+    pumpFun: {
+      mint: 'MintFromWeb111',
+      url: 'https://pump.fun/coin/MintFromWeb111',
+      symbol: 'WEB',
+      launchedAt: now,
+      creatorWallet: 'Wallet1111111111111111111111111111111111',
+    },
+    x: {
+      status: 'disconnected',
+      username: null,
+      userId: null,
+      connectedAt: null,
+      pausedAt: null,
+      lastError: null,
+      lastErrorAt: null,
+      profileSyncedAt: null,
+      recentPostTexts: [],
+      posts: [],
+    },
+  }));
+
+  // Initial artist version from createArtist, then a later createArtistVersion.
+  await assertSucceeds(setDoc(doc(alice, 'artistVersions/webAv'), {
+    id: 'webAv',
+    artistId: 'webArtist',
+    versionNumber: 1,
+    name: 'Nova Web',
+    avatarURL: null,
+    styleDNA,
+    lore: 'A short bio',
+    vocalIdentity: null,
+    createdBy: 'alice',
+    createdAt: now,
+    parentVersionId: null,
+  }));
+  await assertSucceeds(setDoc(doc(alice, 'artistVersions/webAv2'), {
+    id: 'webAv2',
+    artistId: 'webArtist',
+    versionNumber: 2,
+    name: 'Nova Web',
+    avatarURL: 'https://cdn.example/look.jpg',
+    styleDNA,
+    lore: 'Updated bio',
+    vocalIdentity: 'warm alto',
+    createdBy: 'alice',
+    createdAt: now,
+    parentVersionId: 'webAv',
+  }));
+
+  // createSong, then its first song version, then createSongVersion.
+  await assertSucceeds(setDoc(doc(alice, 'songs/webSong'), {
+    id: 'webSong',
+    ownerId: 'alice',
+    artistId: 'webArtist',
+    artistVersionId: 'webAv',
+    title: 'First Light',
+    isPublic: true,
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    currentVersionId: 'webVer',
+    parentSongId: null,
+    collaborationType: null,
+    albumCoverPath: null,
+    albumCoverThumbnail: null,
+    coverPosterUrl: null,
+    coverVideoUrl: null,
+    coverMotionStatus: null,
+    coverMotionError: null,
+    coverUpdatedAt: null,
+    coverProvider: null,
+    playCount: 0,
+  }));
+  await assertSucceeds(setDoc(doc(alice, 'songVersions/webVer'), {
+    id: 'webVer',
+    songId: 'webSong',
+    versionNumber: 1,
+    title: 'First Light',
+    createdBy: 'alice',
+    createdAt: now,
+    parentVersionId: null,
+    audioURL: null,
+    providerOutputId: null,
+    isPrimary: true,
+  }));
+  await assertSucceeds(setDoc(doc(alice, 'songVersions/webVer2'), {
+    id: 'webVer2',
+    songId: 'webSong',
+    versionNumber: 2,
+    title: 'First Light',
+    createdBy: 'alice',
+    createdAt: now,
+    parentVersionId: 'webVer',
+    audioURL: null,
+    providerOutputId: null,
+    isPrimary: false,
+  }));
+
+  // createGeneration after MusicGPT returns a task, with ownerId.
+  await assertSucceeds(setDoc(doc(alice, 'generations/webGen'), {
+    id: 'webGen',
+    ownerId: 'alice',
+    songId: 'webSong',
+    artistVersionId: 'webAv',
+    songVersionId: null,
+    prompt: { structured: {}, freeText: 'a chorus' },
+    parameters: { quality: 'medium' },
+    provider: 'musicgpt',
+    status: 'pending',
+    providerTaskId: 'task-web',
+    providerConversionIds: ['conv-1'],
+    providerProcessedConversions: [],
+    output: {
+      audioURL: null,
+      stems: null,
+      metadata: { conversionIds: ['conv-1'] },
+    },
+    error: null,
+    createdAt: now,
+    completedAt: null,
+    contentHash: null,
+  }));
+  // Stub provider path from the same function.
+  await assertSucceeds(setDoc(doc(alice, 'generations/webStub'), {
+    id: 'webStub',
+    ownerId: 'alice',
+    songId: 'webSong',
+    artistVersionId: 'webAv',
+    songVersionId: null,
+    prompt: { structured: {}, freeText: 'a chorus' },
+    parameters: { quality: 'medium' },
+    provider: 'stub',
+    status: 'pending',
+    providerTaskId: null,
+    providerConversionIds: null,
+    providerProcessedConversions: [],
+    output: { audioURL: null, stems: null, metadata: {} },
+    error: null,
+    createdAt: now,
+    completedAt: null,
+    contentHash: null,
+  }));
+
+  const songMissing = songData({ id: 'songMissing' });
+  delete songMissing.ownerId;
+  await assertFails(setDoc(doc(alice, 'songs/songMissing'), songMissing));
+  await assertFails(setDoc(doc(alice, 'songs/songForeign'), songData({
+    id: 'songForeign',
+    ownerId: 'bob',
+  })));
+
+  const artistMissing = artistData({ id: 'artistMissing', name: 'Missing', nameLowercase: 'missing' });
+  delete artistMissing.ownerId;
+  await assertFails(setDoc(doc(alice, 'artists/artistMissing'), artistMissing));
+  await assertFails(setDoc(doc(alice, 'artists/artistForeign'), artistData({
+    id: 'artistForeign',
+    name: 'Foreign',
+    nameLowercase: 'foreign',
+    ownerId: 'bob',
+  })));
+
+  const versionMissing = versionData({ id: 'verMissing', songId: 'song1' });
+  delete versionMissing.createdBy;
+  await assertFails(setDoc(doc(alice, 'songVersions/verMissing'), versionMissing));
+  await assertFails(setDoc(doc(alice, 'songVersions/verForeign'), versionData({
+    id: 'verForeign',
+    songId: 'song1',
+    createdBy: 'bob',
+  })));
+
+  const artistVersionMissing = {
+    id: 'avMissing',
+    artistId: 'artist1',
+    versionNumber: 2,
+    name: 'Nova',
+    avatarURL: null,
+    styleDNA,
+    lore: 'A public artist',
+    vocalIdentity: null,
+    createdAt: now,
+    parentVersionId: null,
+  };
+  await assertFails(setDoc(doc(alice, 'artistVersions/avMissing'), artistVersionMissing));
+  await assertFails(setDoc(doc(alice, 'artistVersions/avForeign'), {
+    ...artistVersionMissing,
+    id: 'avForeign',
+    createdBy: 'bob',
+  }));
+
+  // TF 15 omits ownerId and is allowed only because Alice owns the song.
+  await assertSucceeds(setDoc(doc(alice, 'generations/tfShape'), {
+    id: 'tfShape',
+    songId: 'song1',
+    artistVersionId: 'av1',
+    songVersionId: null,
+    prompt: { structured: {}, freeText: 'tf' },
+    parameters: {},
+    provider: 'musicgpt',
+    status: 'pending',
+    providerTaskId: null,
+    providerConversionIds: null,
+    providerProcessedConversions: [],
+    output: { audioURL: null, stems: null, metadata: {} },
+    error: null,
+    createdAt: now,
+    completedAt: null,
+    contentHash: null,
+  }));
+  await assertFails(setDoc(doc(dbFor('bob'), 'generations/tfOther'), {
+    id: 'tfOther',
+    songId: 'song1',
+    status: 'pending',
+    completedAt: null,
+    contentHash: null,
+    output: { audioURL: null, stems: null, metadata: {} },
+  }));
+  await assertFails(setDoc(doc(alice, 'generations/genForeign'), {
+    id: 'genForeign',
+    ownerId: 'bob',
+    songId: 'song1',
+    status: 'pending',
+    completedAt: null,
+    contentHash: null,
+    output: { audioURL: null, stems: null, metadata: {} },
+  }));
+  await assertFails(setDoc(doc(alice, 'generations/genOtherSong'), {
+    id: 'genOtherSong',
+    ownerId: 'alice',
+    songId: 'bobSong',
+    status: 'pending',
+    completedAt: null,
+    contentHash: null,
+    output: { audioURL: null, stems: null, metadata: {} },
+  }));
+});
+
 test('catch-all denies unknown collections', async () => {
   await assertFails(getDoc(doc(dbFor(null), 'secrets/one')));
   await assertFails(setDoc(doc(dbFor('alice'), 'secrets/one'), { leak: true }));
