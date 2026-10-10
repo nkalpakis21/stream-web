@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { Firestore } from 'firebase-admin/firestore';
-import { adminUpdateArtistName } from '../lib/server/artistsAdmin';
+import { adminUpdateArtistLore, adminUpdateArtistName } from '../lib/server/artistsAdmin';
 
 type Doc = Record<string, unknown>;
 
@@ -120,6 +120,25 @@ describe('admin artist rename', () => {
       /already taken/
     );
     assert.equal(docs.get('artists/artist1')?.name, 'Nova');
+  });
+
+  it('does not copy a mismatched version name onto the artist', async () => {
+    const { db, docs } = createFakeDb();
+    seedArtist(docs, 'artist1', 'alice', 'Nova');
+    docs.set('artistVersions/artist1-v1', {
+      ...docs.get('artistVersions/artist1-v1'),
+      name: 'Sneaky',
+    });
+
+    const updated = await adminUpdateArtistLore('artist1', 'alice', 'A longer bio', db);
+
+    assert.equal(updated.name, 'Nova');
+    assert.equal(updated.nameLowercase, 'nova');
+    assert.equal(docs.get('artists/artist1')?.name, 'Nova');
+    assert.equal(docs.get('artists/artist1')?.nameLowercase, 'nova');
+    const versionId = updated.currentVersionId as string;
+    assert.notEqual(versionId, 'artist1-v1');
+    assert.equal(docs.get(`artistVersions/${versionId}`)?.name, 'Nova');
   });
 
   it('allows the owner to keep their own current name', async () => {

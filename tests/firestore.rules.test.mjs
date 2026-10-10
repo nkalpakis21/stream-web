@@ -1014,9 +1014,143 @@ test('artist versions follow the parent artist and only the owner can create the
     createdAt: now,
     parentVersionId: 'av1',
   }));
-  await assertSucceeds(updateDoc(doc(alice, 'artistVersions/av1'), { lore: 'Edited by owner' }));
+  await assertFails(updateDoc(doc(alice, 'artistVersions/av1'), { lore: 'Edited by owner' }));
   await assertFails(updateDoc(doc(alice, 'artistVersions/av1'), { createdBy: 'bob' }));
   await assertFails(updateDoc(doc(dbFor('bob'), 'artistVersions/av1'), { lore: 'hijack' }));
+
+  await assertFails(setDoc(doc(alice, 'artistVersions/avForeignName'), {
+    id: 'avForeignName',
+    artistId: 'artist1',
+    versionNumber: 3,
+    name: 'Sneaky',
+    avatarURL: null,
+    styleDNA: { genres: [], moods: [], tempoRange: { min: 1, max: 2 }, influences: [] },
+    lore: 'Renamed through a version',
+    vocalIdentity: null,
+    createdBy: 'alice',
+    createdAt: now,
+    parentVersionId: 'av1',
+  }));
+});
+
+test('swapping currentVersionId to a foreign version is denied', async () => {
+  await seedCatalog();
+  await seed(async (db) => {
+    await setDoc(doc(db, 'artistVersions/avSneaky'), {
+      id: 'avSneaky',
+      artistId: 'artist1',
+      versionNumber: 2,
+      name: 'Sneaky',
+      avatarURL: null,
+      styleDNA: { genres: [], moods: [], tempoRange: { min: 1, max: 2 }, influences: [] },
+      lore: 'A public artist',
+      vocalIdentity: null,
+      createdBy: 'alice',
+      createdAt: now,
+      parentVersionId: 'av1',
+    });
+    await setDoc(doc(db, 'artistVersions/otherAv'), {
+      id: 'otherAv',
+      artistId: 'privateArtist',
+      versionNumber: 1,
+      name: 'Nova',
+      avatarURL: null,
+      styleDNA: { genres: [], moods: [], tempoRange: { min: 1, max: 2 }, influences: [] },
+      lore: 'A public artist',
+      vocalIdentity: null,
+      createdBy: 'alice',
+      createdAt: now,
+      parentVersionId: null,
+    });
+    await setDoc(doc(db, 'artistVersions/avSameName'), {
+      id: 'avSameName',
+      artistId: 'artist1',
+      versionNumber: 3,
+      name: 'Nova',
+      avatarURL: 'https://cdn.example/look.jpg',
+      styleDNA: { genres: [], moods: [], tempoRange: { min: 1, max: 2 }, influences: [] },
+      lore: 'A public artist',
+      vocalIdentity: null,
+      createdBy: 'alice',
+      createdAt: now,
+      parentVersionId: 'av1',
+    });
+  });
+  const ref = doc(dbFor('alice'), 'artists/artist1');
+  await assertFails(updateDoc(ref, { currentVersionId: 'avSneaky', updatedAt: now }));
+  await assertFails(updateDoc(ref, { currentVersionId: 'otherAv', updatedAt: now }));
+  await assertSucceeds(updateDoc(ref, {
+    currentVersionId: 'avSameName',
+    avatarURL: 'https://cdn.example/look.jpg',
+    updatedAt: now,
+  }));
+});
+
+test('a legacy artist with a missing or mismatched nameLowercase can update its avatar', async () => {
+  await seed(async (db) => {
+    const missing = artistData({
+      id: 'legacyMissing',
+      currentVersionId: 'legacyAv',
+      avatarURL: null,
+    });
+    delete missing.nameLowercase;
+    await setDoc(doc(db, 'artists/legacyMissing'), missing);
+    await setDoc(doc(db, 'artistVersions/legacyAv'), {
+      id: 'legacyAv',
+      artistId: 'legacyMissing',
+      versionNumber: 1,
+      name: 'Nova',
+      avatarURL: null,
+      createdBy: 'alice',
+      createdAt: now,
+      parentVersionId: null,
+    });
+    await setDoc(doc(db, 'artistVersions/legacyAv2'), {
+      id: 'legacyAv2',
+      artistId: 'legacyMissing',
+      versionNumber: 2,
+      name: 'Nova',
+      avatarURL: 'https://cdn.example/look.jpg',
+      createdBy: 'alice',
+      createdAt: now,
+      parentVersionId: 'legacyAv',
+    });
+
+    await setDoc(doc(db, 'artists/legacyMismatch'), artistData({
+      id: 'legacyMismatch',
+      name: 'Nova',
+      nameLowercase: 'not-nova',
+      currentVersionId: 'mismatchAv',
+      avatarURL: null,
+    }));
+    await setDoc(doc(db, 'artistVersions/mismatchAv2'), {
+      id: 'mismatchAv2',
+      artistId: 'legacyMismatch',
+      versionNumber: 2,
+      name: 'Nova',
+      avatarURL: 'https://cdn.example/other-look.jpg',
+      createdBy: 'alice',
+      createdAt: now,
+      parentVersionId: null,
+    });
+  });
+
+  const alice = dbFor('alice');
+  await assertSucceeds(updateDoc(doc(alice, 'artists/legacyMissing'), {
+    avatarURL: 'https://cdn.example/look.jpg',
+    currentVersionId: 'legacyAv2',
+    updatedAt: now,
+  }));
+  await assertSucceeds(updateDoc(doc(alice, 'artists/legacyMismatch'), {
+    avatarURL: 'https://cdn.example/other-look.jpg',
+    currentVersionId: 'mismatchAv2',
+    updatedAt: now,
+  }));
+  const missing = await assertSucceeds(getDoc(doc(alice, 'artists/legacyMissing')));
+  assert.equal(missing.data().name, 'Nova');
+  assert.equal('nameLowercase' in missing.data(), false);
+  const mismatched = await assertSucceeds(getDoc(doc(alice, 'artists/legacyMismatch')));
+  assert.equal(mismatched.data().nameLowercase, 'not-nova');
 });
 
 test('collaboration records are readable by source song and created only as yourself', async () => {

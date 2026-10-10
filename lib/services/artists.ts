@@ -17,7 +17,8 @@ import {
   Timestamp,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { auth, db } from '@/lib/firebase/config';
+import { getFreshIdToken, userFacingApiError } from '@/lib/api/clientAuth';
 import {
   COLLECTIONS,
   getArtistPath,
@@ -158,7 +159,35 @@ export async function getArtistVersions(
 }
 
 /**
- * Create a new version of an artist
+ * A new name is an Admin write. The client profile merge never sends `name`
+ * or `nameLowercase`, so a version cannot rename the artist.
+ */
+async function renameArtistThroughAdmin(artistId: string, name: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('Your session expired. Sign in again to continue.');
+  }
+  const token = await getFreshIdToken(user);
+  const response = await fetch(`/api/artists/${artistId}/name`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ name }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      userFacingApiError(response.status, data.error, 'Failed to update artist name')
+    );
+  }
+}
+
+/**
+ * Create a new version of an artist.
+ * The version name is always the artist document's name. A caller that passes
+ * a different `name` is renamed through Admin first.
  */
 export async function createArtistVersion(
   artistId: string,
@@ -171,8 +200,7 @@ export async function createArtistVersion(
     vocalIdentity?: string | null;
   }
 ): Promise<AIArtistVersionDocument> {
-  // Get current artist and version
-  const artist = await getArtist(artistId);
+  let artist = await getArtist(artistId);
   if (!artist) {
     throw new Error(`Artist ${artistId} not found`);
   }
@@ -180,12 +208,33 @@ export async function createArtistVersion(
     throw new Error('Only the owner can create new versions');
   }
 
+  const requestedName = typeof updates.name === 'string' ? updates.name.trim() : undefined;
+  const nameChanges = requestedName != null && requestedName !== artist.name;
+  if (nameChanges && requestedName) {
+    await renameArtistThroughAdmin(artistId, requestedName);
+    const renamed = await getArtist(artistId);
+    if (!renamed) {
+      throw new Error(`Artist ${artistId} not found`);
+    }
+    artist = renamed;
+  }
+
   const currentVersion = await getArtistVersion(artist.currentVersionId);
   if (!currentVersion) {
     throw new Error('Current version not found');
   }
 
-  // Create new version
+  const changesProfile =
+    updates.avatarURL !== undefined ||
+    updates.styleDNA !== undefined ||
+    updates.lore !== undefined ||
+    updates.vocalIdentity !== undefined;
+
+  // Admin rename already wrote the version and pointed currentVersionId at it.
+  if (nameChanges && !changesProfile) {
+    return currentVersion;
+  }
+
   const versionRef = doc(collection(db, COLLECTIONS.artistVersions));
   const versionId = versionRef.id;
 
@@ -193,7 +242,7 @@ export async function createArtistVersion(
     id: versionId,
     artistId,
     versionNumber: currentVersion.versionNumber + 1,
-    name: updates.name ?? currentVersion.name,
+    name: artist.name,
     avatarURL: updates.avatarURL ?? currentVersion.avatarURL,
     styleDNA: updates.styleDNA ?? currentVersion.styleDNA,
     lore: updates.lore ?? currentVersion.lore,
@@ -205,13 +254,10 @@ export async function createArtistVersion(
 
   await setDoc(versionRef, newVersion);
 
-  // Update artist to point to new version
   const artistRef = doc(db, getArtistPath(artistId));
   await setDoc(
     artistRef,
     {
-      name: newVersion.name,
-      nameLowercase: newVersion.name.toLowerCase().trim(),
       avatarURL: newVersion.avatarURL,
       styleDNA: newVersion.styleDNA,
       lore: newVersion.lore,

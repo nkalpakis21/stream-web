@@ -90,7 +90,7 @@ async function adminCreateArtistVersion(
     id: versionRef.id,
     artistId,
     versionNumber: currentVersion.versionNumber + 1,
-    name: updates.name ?? currentVersion.name,
+    name: updates.name ?? artist.name,
     avatarURL: currentVersion.avatarURL,
     styleDNA: currentVersion.styleDNA,
     lore: updates.lore ?? currentVersion.lore,
@@ -153,14 +153,14 @@ export async function adminUpdateArtistName(
 export async function adminUpdateArtistLore(
   artistId: string,
   userId: string,
-  lore: string
+  lore: string,
+  db: Firestore = getAdminDb()
 ): Promise<AIArtistDocument> {
   const trimmed = lore.trim();
   if (trimmed.length > MAX_ARTIST_BIO_LENGTH) {
     throw new Error(`Bio must be ${MAX_ARTIST_BIO_LENGTH} characters or less`);
   }
 
-  const db = getAdminDb();
   const artist = await adminGetArtistFrom(db, artistId);
   if (!artist) throw new Error('Artist not found');
   if (artist.ownerId !== userId) {

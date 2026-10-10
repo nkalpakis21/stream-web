@@ -81,7 +81,7 @@ Rules reject client creates and updates that include `email` or `solanaWalletAdd
 | `artists` | Client updates cannot change `name`, `nameLowercase`, `ownerId`, `pumpFun`, `x`, `coinMetadataId`, or `coinImagePath`. Rename is `PATCH /api/artists/[id]/name` (Admin). Create may write `pumpFun` only as null or exactly `mint`, `url`, `symbol`, `launchedAt`, `creatorWallet`. `verifiedAt` is rejected. `x` is the disconnected default; `posts` and `recentPostTexts` may be absent or empty |
 | `songVersions` | Create requires `audioURL == null` and `providerOutputId == null`. Owner may still change `isPrimary` |
 | `generations` | Create requires a pending job, null audio, null or empty stems, and the parent song owned by the caller. `ownerId`, when present, must be the caller. `createdBy` is rejected. No client update or delete |
-| `artistVersions` | `createdBy` and `artistId` cannot change. Owner may update the rest |
+| `artistVersions` | Create only. `name` must equal the parent artist's `name` (the artist is written first). Client update and delete are denied |
 | `playRateLimits/**` | All client reads and writes denied. Admin only (`lib/server/playRateLimit.ts`) |
 | `coinMetadataUploads/**` including `coinUploads` | All client reads and writes denied. Admin only |
 | `config/mobile` | Public read. Client write denied |

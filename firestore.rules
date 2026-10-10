@@ -286,8 +286,6 @@ service cloud.firestore {
         && fieldUnchanged('coinMetadataId')
         && fieldUnchanged('coinImagePath')
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'name',
-          'nameLowercase',
           'avatarURL',
           'styleDNA',
           'lore',
@@ -452,7 +450,17 @@ service cloud.firestore {
         && xOnCreate()
         && coinMetadataClean();
 
-      allow update: if artistProfileUpdate();
+      // currentVersionId may move only to a version of this artist. The version
+      // name must match the artist, so a foreign version cannot rename it.
+      allow update: if artistProfileUpdate()
+        && (
+          fieldUnchanged('currentVersionId')
+          || (
+            artistVersionMatches(request.resource.data.currentVersionId, artistId)
+            && get(/databases/$(database)/documents/artistVersions/$(request.resource.data.currentVersionId)).data.name
+              == resource.data.name
+          )
+        );
 
       // Owner hard-delete for in-app account deletion. ownerId is fixed at create.
       allow delete: if isOwner(resource.data.ownerId);
@@ -460,18 +468,15 @@ service cloud.firestore {
 
     match /artistVersions/{versionId} {
       allow read: if canReadArtist(resource.data.artistId);
+      // The artist is written first (web createArtist and TF 15), so it exists
+      // and the version name must match it. No client updates this collection.
       allow create: if signedIn()
         && request.resource.data.id == versionId
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.artistId is string
-        && isArtistOwner(request.resource.data.artistId);
-      // Owner may update a version. createdBy is the ownership field and cannot change.
-      allow update: if signedIn()
-        && resource.data.createdBy == request.auth.uid
-        && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.artistId == resource.data.artistId
-        && request.resource.data.id == resource.data.id;
-      allow delete: if false;
+        && isArtistOwner(request.resource.data.artistId)
+        && request.resource.data.name == artistDoc(request.resource.data.artistId).name;
+      allow update, delete: if false;
     }
 
     match /songs/{songId} {
