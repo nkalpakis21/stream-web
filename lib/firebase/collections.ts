@@ -54,11 +54,6 @@ export const getUserPath = (userId: string): string => {
   return `${COLLECTIONS.users}/${userId}`;
 };
 
-/** Owner-only email and wallet. Not readable from the public user document. */
-export const getUserPrivateProfilePath = (userId: string): string => {
-  return `${COLLECTIONS.users}/${userId}/private/profile`;
-};
-
 export const getArtistPath = (artistId: string): string => {
   return `${COLLECTIONS.artists}/${artistId}`;
 };

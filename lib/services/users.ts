@@ -18,23 +18,11 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-import { getUserPath, getUserPrivateProfilePath, getArtistPath } from '@/lib/firebase/collections';
+import { getUserPath, getArtistPath } from '@/lib/firebase/collections';
 import { COLLECTIONS } from '@/lib/firebase/collections';
-import type { UserDocument, UserPrivateProfile } from '@/types/firestore';
+import type { UserDocument } from '@/types/firestore';
 import { getFollowing } from './follows';
 import type { AIArtistDocument } from '@/types/firestore';
-
-/** Public fields only. email and solanaWalletAddress stay on private/profile. */
-function toPublicUser(id: string, data: Record<string, unknown>): UserDocument {
-  return {
-    id,
-    displayName: (data.displayName as UserDocument['displayName']) ?? null,
-    photoURL: (data.photoURL as UserDocument['photoURL']) ?? null,
-    createdAt: data.createdAt as UserDocument['createdAt'],
-    updatedAt: data.updatedAt as UserDocument['updatedAt'],
-    deletedAt: (data.deletedAt as UserDocument['deletedAt']) ?? null,
-  };
-}
 
 /**
  * Get a user document by ID
@@ -47,31 +35,12 @@ export async function getUser(userId: string): Promise<UserDocument | null> {
     return null;
   }
 
-  const user = toPublicUser(userId, userDoc.data() as Record<string, unknown>);
+  const user = userDoc.data() as UserDocument;
   if (user.deletedAt) {
     return null; // Treat soft-deleted users as not found
   }
 
   return user;
-}
-
-/**
- * Owner-only email and wallet. Rules deny this read for everyone else.
- */
-export async function getUserPrivateProfile(
-  userId: string
-): Promise<UserPrivateProfile | null> {
-  const profileRef = doc(db, getUserPrivateProfilePath(userId));
-  const profileDoc = await getDoc(profileRef);
-  if (!profileDoc.exists()) return null;
-  const data = profileDoc.data();
-  return {
-    email: typeof data.email === 'string' ? data.email : undefined,
-    solanaWalletAddress:
-      typeof data.solanaWalletAddress === 'string' || data.solanaWalletAddress === null
-        ? data.solanaWalletAddress
-        : undefined,
-  };
 }
 
 /**
@@ -106,13 +75,16 @@ export async function updateUserDisplayName(
   const userDoc = await getDoc(userRef);
   
   if (userDoc.exists()) {
+    // Update existing document
     await updateDoc(userRef, {
       displayName: trimmed,
       updatedAt: serverTimestamp(),
     });
   } else {
+    // Create new user document if it doesn't exist
     const now = Timestamp.now();
     await setDoc(userRef, {
+      email: userEmail || '',
       displayName: trimmed,
       photoURL: null,
       createdAt: now,
@@ -120,21 +92,13 @@ export async function updateUserDisplayName(
       deletedAt: null,
     });
   }
-
-  if (userEmail) {
-    await setDoc(
-      doc(db, getUserPrivateProfilePath(userId)),
-      { email: userEmail },
-      { merge: true }
-    );
-  }
 }
 
 /**
  * Get display name for a user with fallback strategy:
  * 1. displayName (if set)
- * 2. Truncated user ID
- * Email is not on the public user document.
+ * 2. Email username (part before @)
+ * 3. Truncated user ID (last resort)
  */
 export async function getUserDisplayName(userId: string): Promise<string> {
   const user = await getUser(userId);
@@ -145,6 +109,11 @@ export async function getUserDisplayName(userId: string): Promise<string> {
 
   if (user.displayName) {
     return user.displayName;
+  }
+
+  if (user.email) {
+    const emailUsername = user.email.split('@')[0];
+    return emailUsername;
   }
 
   return `User ${userId.substring(0, 8)}...`;
@@ -223,7 +192,8 @@ export async function getUsersData(
 
     userSnapshots.forEach(snapshot => {
       if (snapshot.exists()) {
-        const user = toPublicUser(snapshot.id, snapshot.data() as Record<string, unknown>);
+        const user = snapshot.data() as UserDocument;
+        // Filter out deleted users
         if (!user.deletedAt) {
           usersMap.set(user.id, user);
         }
@@ -272,7 +242,7 @@ export async function searchUsersByDisplayName(
     
     // Filter results
     let users = snapshot.docs
-      .map(docSnap => toPublicUser(docSnap.id, docSnap.data() as Record<string, unknown>))
+      .map(doc => doc.data() as UserDocument)
       .filter(user => {
         // Filter out excluded user
         if (excludeUserId && user.id === excludeUserId) {
@@ -299,7 +269,7 @@ export async function searchUsersByDisplayName(
       
       const snapshot = await getDocs(fallbackQuery);
       let users = snapshot.docs
-        .map(docSnap => toPublicUser(docSnap.id, docSnap.data() as Record<string, unknown>))
+        .map(doc => doc.data() as UserDocument)
         .filter(user => {
           // Filter deleted users
           if (user.deletedAt) {
@@ -385,7 +355,8 @@ export async function getUsersFromFollowedArtists(
       
       userSnapshots.forEach(snapshot => {
         if (snapshot.exists()) {
-          const user = toPublicUser(snapshot.id, snapshot.data() as Record<string, unknown>);
+          const user = snapshot.data() as UserDocument;
+          // Filter out deleted users
           if (!user.deletedAt) {
             users.push(user);
           }

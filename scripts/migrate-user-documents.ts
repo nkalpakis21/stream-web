@@ -278,13 +278,13 @@ async function createUserDocument(
 
   if (!dryRun) {
     await userRef.set({
+      email: email,
       displayName: displayName,
       photoURL: authUser.photoURL || null,
       createdAt: createdAt,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       deletedAt: null,
     });
-    await userRef.collection('private').doc('profile').set({ email }, { merge: true });
   }
 
   return { created: true, displayName, conflict: hadConflict };

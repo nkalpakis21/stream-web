@@ -14,20 +14,13 @@ import { Timestamp } from 'firebase/firestore';
 
 export interface UserDocument {
   id: string; // Firestore document ID
+  email: string;
   displayName: string | null;
   photoURL: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   deletedAt: Timestamp | null; // Soft delete
-}
-
-/**
- * Owner-only. Stored at users/{uid}/private/profile.
- * email and solanaWalletAddress are not on the public user document.
- */
-export interface UserPrivateProfile {
-  email?: string;
-  /** Linked Solana wallet address (base58). Set when the user connects and links a wallet. */
+  /** Linked Solana wallet address (base58). Set when user connects and links wallet. */
   solanaWalletAddress?: string | null;
 }
 

@@ -180,15 +180,13 @@ async function seedCatalog() {
       contentHash: null,
     });
     await setDoc(doc(db, 'users/alice'), {
+      email: 'alice@example.com',
       displayName: 'Alice',
       photoURL: null,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
-    });
-    await setDoc(doc(db, 'users/alice/private/profile'), {
-      email: 'alice@example.com',
-      solanaWalletAddress: 'Wallet1111111111111111111111111111111111',
+      solanaWalletAddress: null,
     });
     await setDoc(doc(db, 'playRateLimits/limit1'), { count: 1 });
     await setDoc(doc(db, 'coinMetadataUploads/alice'), { uid: 'alice' });
@@ -543,9 +541,9 @@ test('user profile get and display-name search work; unbounded user list does no
   await assertFails(getDocs(collection(anon, 'users')));
 });
 
-test('public user docs omit email and wallet; the private profile is owner-only', async () => {
+test('users can create and update only their own profile, not their email', async () => {
   const bob = dbFor('bob');
-  await assertFails(setDoc(doc(bob, 'users/bob'), {
+  await assertSucceeds(setDoc(doc(bob, 'users/bob'), {
     email: 'bob@example.com',
     displayName: 'Bob',
     photoURL: null,
@@ -553,47 +551,20 @@ test('public user docs omit email and wallet; the private profile is owner-only'
     updatedAt: now,
     deletedAt: null,
   }));
-  await assertFails(setDoc(doc(bob, 'users/bob'), {
-    displayName: 'Bob',
-    solanaWalletAddress: 'Wallet1111111111111111111111111111111111',
-    deletedAt: null,
-  }));
-  await assertSucceeds(setDoc(doc(bob, 'users/bob'), {
-    displayName: 'Bob',
-    photoURL: null,
-    createdAt: now,
-    updatedAt: now,
-    deletedAt: null,
-  }));
-  const created = await assertSucceeds(getDoc(doc(dbFor(null), 'users/bob')));
-  assert.equal(created.exists(), true);
-  assert.equal(Object.hasOwn(created.data(), 'email'), false);
-  assert.equal(Object.hasOwn(created.data(), 'solanaWalletAddress'), false);
   await assertSucceeds(updateDoc(doc(bob, 'users/bob'), {
     displayName: 'Bobby',
     updatedAt: now,
   }));
-  await assertFails(updateDoc(doc(bob, 'users/bob'), { email: 'eve@example.com' }));
-  await assertFails(updateDoc(doc(bob, 'users/bob'), {
+  await assertSucceeds(updateDoc(doc(bob, 'users/bob'), {
     solanaWalletAddress: 'Wallet1111111111111111111111111111111111',
+    updatedAt: now,
   }));
+  await assertFails(updateDoc(doc(bob, 'users/bob'), { email: 'eve@example.com' }));
   await assertFails(setDoc(doc(bob, 'users/alice'), {
+    email: 'bob@example.com',
     displayName: 'Not Alice',
     deletedAt: null,
   }));
-
-  await assertSucceeds(setDoc(doc(bob, 'users/bob/private/profile'), {
-    email: 'bob@example.com',
-    solanaWalletAddress: 'Wallet1111111111111111111111111111111111',
-  }));
-  const own = await assertSucceeds(getDoc(doc(bob, 'users/bob/private/profile')));
-  assert.equal(own.data().email, 'bob@example.com');
-  await assertFails(getDoc(doc(dbFor(null), 'users/bob/private/profile')));
-  await assertFails(getDoc(doc(dbFor('alice'), 'users/bob/private/profile')));
-  await assertFails(setDoc(doc(dbFor('alice'), 'users/bob/private/profile'), {
-    email: 'alice@example.com',
-  }));
-  await assertFails(getDocs(collection(dbFor(null), 'users/bob/private')));
 });
 
 test('follows are public to read and only the follower can write', async () => {

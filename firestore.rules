@@ -276,16 +276,16 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      // Public profile: display name and avatar. email and solanaWalletAddress
-      // live on users/{uid}/private/profile and are not readable here.
+      // Profile reads are public (display names on songs, comments, chat).
+      // email and solanaWalletAddress live on the same document; rules cannot hide them.
+      // Held: a later change may make this doc owner-only and move public fields
+      // to publicProfiles/{uid}. That design is not implemented.
       allow get: if true;
       // Prefix search: where displayName >= q AND displayName <= q+\uf8ff.
       allow list: if resource.data.displayName is string;
 
       allow create: if isOwner(uid)
         && request.resource.data.deletedAt == null
-        && !('email' in request.resource.data)
-        && !('solanaWalletAddress' in request.resource.data)
         && (
           !('displayName' in request.resource.data)
           || request.resource.data.displayName == null
@@ -296,42 +296,25 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'displayName',
           'updatedAt',
+          'solanaWalletAddress',
           'photoURL'
         ])
         && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['displayName'])
           || isValidDisplayName(request.resource.data.displayName)
+        )
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['solanaWalletAddress'])
+          || request.resource.data.solanaWalletAddress == null
+          || (
+            request.resource.data.solanaWalletAddress is string
+            && request.resource.data.solanaWalletAddress.size() >= 32
+            && request.resource.data.solanaWalletAddress.size() <= 44
+          )
         );
 
       // In-app account deletion (mobile). Web soft-deletes are not used on users.
-      // Client deleteDoc does not cascade into private/profile. Web account
-      // delete uses Admin recursiveDelete, which does.
       allow delete: if isOwner(uid);
-
-      match /private/{docId} {
-        allow read: if isOwner(uid);
-        allow create, update: if isOwner(uid)
-          && docId == 'profile'
-          && request.resource.data.keys().hasOnly(['email', 'solanaWalletAddress'])
-          && (
-            !('email' in request.resource.data)
-            || (
-              request.resource.data.email is string
-              && request.resource.data.email.size() > 0
-              && request.resource.data.email.size() <= 320
-            )
-          )
-          && (
-            !('solanaWalletAddress' in request.resource.data)
-            || request.resource.data.solanaWalletAddress == null
-            || (
-              request.resource.data.solanaWalletAddress is string
-              && request.resource.data.solanaWalletAddress.size() >= 32
-              && request.resource.data.solanaWalletAddress.size() <= 44
-            )
-          );
-        allow delete: if isOwner(uid);
-      }
     }
 
     match /artists/{artistId} {

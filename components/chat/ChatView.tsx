@@ -268,7 +268,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
             // Fallback to user display name for non-artist conversations
             const senderUser = usersData.get(message.senderId);
             if (senderUser) {
-              senderName = senderUser.displayName || `User ${message.senderId.substring(0, 8)}...`;
+              senderName = senderUser.displayName || senderUser.email?.split('@')[0] || `User ${message.senderId.substring(0, 8)}...`;
             } else {
               senderName = `User ${message.senderId.substring(0, 8)}...`;
             }
