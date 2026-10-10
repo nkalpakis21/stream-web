@@ -103,10 +103,10 @@ These replaced the old client-SDK server writes from the previous inventory:
 | Stub generation status | `lib/server/generationsAdmin.ts` |
 | Notifications created by the webhook | `lib/server/notificationsAdmin.ts` |
 | Coin launch `pumpFun`, `coinMetadataId`, `coinImagePath` | `lib/services/artistPumpFun.ts` (Admin) |
-| Mint binding `coinMints/{mint}` | `lib/server/coinMints.ts` (Admin, before create-tx returns) |
+| Mint binding `coinMints/{mint}` | `lib/server/coinMints.ts` (Admin, before create-tx returns). Account delete overwrites this uid's docs with `{ deletedAt }` and does not delete them (`lib/server/deleteAccount.ts`) |
 | Legacy mint exemption `mintSweepExemptAt` | `scripts/mark-legacy-mints.ts` via `lib/server/markLegacyMints.ts` (Admin; idempotent, does not overwrite an existing stamp) |
 | First sighting `mintFirstSeenAt` | `lib/server/mintSweep.ts` (Admin cron) |
-| Account delete of `users/{uid}`, including `private/profile` | `lib/server/deleteAccount.ts` `recursiveDelete` |
+| Account delete of `users/{uid}`, including `private/profile` | `lib/server/deleteAccount.ts` `recursiveDelete`. The same delete tombstones `coinMints` where `uid` matches. That equality uses the automatic single-field index. No composite and no field override were added |
 | X tokens and song-live posts | `lib/x/tokens.ts`, `lib/x/postSong.ts` |
 | Cover pipeline | `lib/covers/store.ts` |
 
@@ -127,10 +127,11 @@ The file also records the song and artist composites the existing public and own
 - `conversations`: `participants CONTAINS`, `updatedAt DESC` (`getUserConversations`, `ChatList`)
 - `messages`: `conversationId ASC`, `deletedAt ASC`, `createdAt DESC` (`getMessages`, `ChatView`, `adminGetMessages`)
 - `notifications`: `songId ASC`, `createdAt DESC` (`getNotificationsBySong`)
+- `follows`: `artistId ASC`, `createdAt DESC` (`adminGetFollowers` in `lib/server/notificationsAdmin.ts`, and the same shape in `getFollowers`)
 
 TTL field overrides, collection group, field `expireAt`: `coinUploads` and `playRateLimits`. Same policies as #96 and #98.
 
-Comments (`targetType` + `targetId` + `parentCommentId` + `deletedAt` + `createdAt`, and replies `parentCommentId` + `deletedAt` + `createdAt`), follows (`followerId`/`artistId` + `createdAt`), and unread notifications (`userId` + `read` + `createdAt`) are still queried and are not in this file. A prod index export was not available here. Do not deploy indexes until those are reconciled.
+Comments (`targetType` + `targetId` + `parentCommentId` + `deletedAt` + `createdAt`, and replies `parentCommentId` + `deletedAt` + `createdAt`), follows (`followerId` + `createdAt`), and unread notifications (`userId` + `read` + `createdAt`) are still queried and are not in this file. A prod index export was not available here. Do not deploy indexes until those are reconciled.
 
 ## Holes rules do not close
 

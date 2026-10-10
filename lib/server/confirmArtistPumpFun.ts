@@ -24,7 +24,8 @@
  * saved coin unverified. No coinMints doc still returns the saved coin,
  * without verifiedAt, and logs coin_saved_unbound. The cron may clear that
  * coin later. A mint already stored on a different artist is 409 and is
- * not written.
+ * not written. A tombstoned coinMints doc (`deletedAt` set, no uid) is 409
+ * before persist and before verify, and nothing is written.
  */
 
 import { type Firestore } from 'firebase-admin/firestore';
@@ -41,6 +42,7 @@ import {
 } from '@/lib/services/artistPumpFun';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
+import { isTombstonedCoinMint } from '@/lib/server/coinMints';
 import {
   verifyArtistMint,
   type VerifyArtistMintDeps,
@@ -155,6 +157,19 @@ export async function handlePumpFunConfirm(
     }
     if (taken) {
       throw new HttpError(409, 'This mint is already on another artist.');
+    }
+
+    let bindingData: unknown;
+    try {
+      const bindingSnap = await db.collection(COLLECTIONS.coinMints).doc(mint).get();
+      bindingData = bindingSnap.exists ? bindingSnap.data() : null;
+    } catch (err) {
+      if (err instanceof HttpError) throw err;
+      console.error('[pump.fun] mint binding lookup failed', { artistId });
+      throw new HttpError(503, 'Could not check whether this mint is already used.');
+    }
+    if (isTombstonedCoinMint(bindingData)) {
+      throw new HttpError(409, 'This mint is already bound to another account.');
     }
 
     const metadataUri = parsed.data.metadataUri?.trim() || parsed.data.uri?.trim() || null;

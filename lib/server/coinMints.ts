@@ -1,6 +1,10 @@
 /**
  * Bind a pump.fun mint to the verified uid before create-tx returns
  * an unsigned transaction. The doc is Admin-only: `coinMints/{mint}`.
+ *
+ * Account delete overwrites each of this uid's docs with `{ deletedAt }`
+ * and drops `uid` and `creatorWallet`. That tombstone stays. It counts as
+ * bound to someone else, so a later bind is 409.
  */
 
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
@@ -69,6 +73,18 @@ export function readCoinMintBinding(data: unknown): CoinMintBinding | null {
 }
 
 /**
+ * Account delete left this mint bound. `deletedAt` is set and `uid` is gone.
+ * That is not an empty doc: it still belongs to the deleted account.
+ */
+export function isTombstonedCoinMint(data: unknown): boolean {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  const record = data as { uid?: unknown; deletedAt?: unknown };
+  if (record.deletedAt == null) return false;
+  const uid = typeof record.uid === 'string' ? record.uid.trim() : '';
+  return uid.length === 0;
+}
+
+/**
  * Create `coinMints/{mint}` for this uid. Same uid may retry.
  * A different uid gets 409. Any other write failure becomes 500
  * and must not be followed by a transaction.
@@ -82,8 +98,10 @@ export async function bindCoinMint(
     return await db.runTransaction(async tx => {
       const snap = await tx.get(ref);
       if (snap.exists) {
-        const existing = readCoinMintBinding(snap.data());
-        if (!existing || existing.uid !== input.uid) {
+        const data = snap.data();
+        const existing = readCoinMintBinding(data);
+        // A tombstone has no uid. It is still bound to the deleted account.
+        if (isTombstonedCoinMint(data) || !existing || existing.uid !== input.uid) {
           throw new HttpError(409, 'This mint is already bound to another account.');
         }
         return 'exists' as const;

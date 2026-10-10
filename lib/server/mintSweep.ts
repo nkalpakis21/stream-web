@@ -15,8 +15,9 @@
  * The first time the cron sees one, it writes root `mintFirstSeenAt` (server
  * timestamp) and does nothing else that run. A missing coinMints doc is
  * cleared only when that stamp is more than 30 minutes old. A binding for
- * another uid, or an on-chain creator that differs from
- * coinMints.creatorWallet, clears on the next run without waiting.
+ * another uid, a tombstone (`deletedAt` set and no uid), or an on-chain
+ * creator that differs from coinMints.creatorWallet, clears on the next
+ * run without waiting.
  * A missing bonding curve is left alone until mintFirstSeenAt is more
  * than 30 minutes old, then cleared as a mismatch.
  *

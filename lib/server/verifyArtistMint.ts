@@ -21,8 +21,9 @@
  * mismatch only once mintFirstSeenAt is more than 30 minutes old. A
  * graduated curve (`complete`) still verifies when the creator matches.
  * A `coinMints` doc whose uid is not the artist owner is an immediate clear.
- * RPC errors and the 5s timeout leave the document alone so the next run
- * can retry.
+ * A tombstone (`deletedAt` set and no `uid`) is the same immediate clear:
+ * `coin_cleared_mismatch`, with no 30-minute wait. RPC errors and the 5s
+ * timeout leave the document alone so the next run can retry.
  *
  * No `coinMints` doc is not a confirm-route failure. Confirm saves the coin
  * without verifiedAt and logs coin_saved_unbound. The cron clears that coin
@@ -38,7 +39,11 @@ import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
-import { readCoinMintBinding, type CoinMintBinding } from '@/lib/server/coinMints';
+import {
+  isTombstonedCoinMint,
+  readCoinMintBinding,
+  type CoinMintBinding,
+} from '@/lib/server/coinMints';
 import { getSolanaRpcUrl } from '@/lib/solana/pumpFun';
 import { emptyPumpFunCoin } from '@/types/firestore';
 
@@ -227,10 +232,29 @@ export async function lookupBondingCurveCreator(mint: string): Promise<CreatorLo
   }
 }
 
-async function readBinding(db: Firestore, mint: string): Promise<CoinMintBinding | null> {
+async function readBinding(
+  db: Firestore,
+  mint: string
+): Promise<CoinMintBinding | 'tombstone' | null> {
   const snap = await db.collection(COLLECTIONS.coinMints).doc(mint).get();
   if (!snap.exists) return null;
-  return readCoinMintBinding(snap.data());
+  const data = snap.data();
+  if (isTombstonedCoinMint(data)) return 'tombstone';
+  return readCoinMintBinding(data);
+}
+
+async function clearMismatch(
+  db: Firestore,
+  artistId: string,
+  mint: string
+): Promise<VerifyArtistMintResult> {
+  const wrote = await commitMintDecision(db, artistId, mint, {
+    action: 'clear',
+    reason: 'mismatch',
+  });
+  if (wrote === 'skipped') return { result: 'unchanged', reason: 'mint_changed' };
+  console.info('coin_cleared_mismatch', { artistId, mint });
+  return { result: 'cleared', reason: 'mismatch' };
 }
 
 async function resolveLookup(
@@ -297,6 +321,7 @@ export async function verifyArtistMint(
 
   const ownerId = typeof artist.ownerId === 'string' ? artist.ownerId : '';
   const binding = await readBinding(db, mint);
+  if (binding === 'tombstone') return clearMismatch(db, artistId, mint);
   if (!binding) {
     if (deps.unbound === 'clear') {
       const wrote = await commitMintDecision(db, artistId, mint, {
@@ -325,13 +350,7 @@ export async function verifyArtistMint(
   if (decision.action === 'leave') {
     if (decision.reason === 'unbound') return { result: 'unbound', mint };
     if (decision.reason === 'missing_curve' && deps.missingCurve === 'clear') {
-      const wrote = await commitMintDecision(db, artistId, mint, {
-        action: 'clear',
-        reason: 'mismatch',
-      });
-      if (wrote === 'skipped') return { result: 'unchanged', reason: 'mint_changed' };
-      console.info('coin_cleared_mismatch', { artistId, mint });
-      return { result: 'cleared', reason: 'mismatch' };
+      return clearMismatch(db, artistId, mint);
     }
     if (decision.reason === 'missing_curve') {
       return { result: 'unchanged', reason: 'missing_curve' };
@@ -339,14 +358,11 @@ export async function verifyArtistMint(
     return { result: 'unchanged', reason: 'rpc' };
   }
 
+  if (decision.action === 'clear') return clearMismatch(db, artistId, mint);
+
   const wrote = await commitMintDecision(db, artistId, mint, decision);
   if (wrote === 'skipped') return { result: 'unchanged', reason: 'mint_changed' };
-  if (decision.action === 'verify') {
-    return { result: 'matched', creatorWallet: decision.creatorWallet };
-  }
-
-  console.info('coin_cleared_mismatch', { artistId, mint });
-  return { result: 'cleared', reason: 'mismatch' };
+  return { result: 'matched', creatorWallet: decision.creatorWallet };
 }
 
 /** Read-only report. Does not write. */
@@ -355,6 +371,17 @@ export async function inspectArtistMint(
   deps: VerifyArtistMintDeps & { db: Firestore }
 ): Promise<MintCheckRow> {
   const binding = await readBinding(deps.db, input.mint);
+  if (binding === 'tombstone') {
+    return {
+      artistId: input.artistId,
+      name: input.name,
+      mint: input.mint,
+      boundUid: null,
+      creatorWallet: null,
+      onchainCreator: null,
+      result: 'mismatch',
+    };
+  }
   const base = {
     artistId: input.artistId,
     name: input.name,
