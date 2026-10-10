@@ -3,15 +3,16 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 
-/** At most one counted play per listener per song in this window. */
-export const PLAY_SONG_INTERVAL_MS = 30_000;
-/** Cap counted plays per listener across songs. */
-export const PLAY_CLIENT_WINDOW_MS = 60_000;
-export const PLAY_CLIENT_MAX_PER_WINDOW = 20;
+/** Window for counted plays of one song from one IP. */
+export const PLAY_SONG_WINDOW_MS = 30_000;
+/** Counted plays allowed per (IP, song) inside PLAY_SONG_WINDOW_MS. */
+export const PLAY_SONG_MAX_PER_WINDOW = 5;
+/** Window for counted plays from one IP across every song. */
+export const PLAY_IP_WINDOW_MS = 60_000;
+/** Counted plays allowed per IP inside PLAY_IP_WINDOW_MS. */
+export const PLAY_IP_MAX_PER_WINDOW = 300;
 /** Firestore TTL field. Deletion is not instant; the windows above are enforced in code. */
 export const PLAY_LIMIT_TTL_MS = 24 * 60 * 60 * 1000;
-
-const DEVICE_ID_HEADER = 'x-device-id';
 
 export function playLimitHmacSecret(): string | null {
   const secret = process.env.PLAY_LIMIT_HMAC_SECRET?.trim();
@@ -19,17 +20,11 @@ export function playLimitHmacSecret(): string | null {
 }
 
 /**
- * HMAC-SHA256 of IP and optional device id. IPv4 is too small to hash plainly.
- * The raw IP is not returned or stored.
+ * HMAC-SHA256 of the client IP only. The raw IP is not returned or stored.
+ * `x-device-id` is not part of the key.
  */
-export function playListenerKey(
-  ip: string,
-  deviceId: string | null,
-  secret: string
-): string {
-  return createHmac('sha256', secret)
-    .update(`${ip}\n${deviceId ?? ''}`)
-    .digest('hex');
+export function playListenerKey(ip: string, secret: string): string {
+  return createHmac('sha256', secret).update(ip).digest('hex');
 }
 
 export function playSongLimitDocId(listenerKey: string, songId: string): string {
@@ -55,48 +50,61 @@ export function requestClientIp(request: {
   return 'unknown';
 }
 
-/** This repo does not send a device id. Honor the header when a client does. */
-export function requestDeviceId(request: {
-  headers: { get(name: string): string | null };
-}): string | null {
-  const deviceId = request.headers.get(DEVICE_ID_HEADER)?.trim();
-  return deviceId || null;
-}
-
 export function evaluatePlayLimit(input: {
   nowMs: number;
-  songLastCountedAtMs: number | null;
-  clientWindowStartMs: number | null;
-  clientCount: number;
-}): { allowed: boolean; nextWindowStartMs: number; nextCount: number } {
-  const songLast = input.songLastCountedAtMs;
-  if (songLast != null && input.nowMs - songLast < PLAY_SONG_INTERVAL_MS) {
+  songWindowStartMs: number | null;
+  songCount: number;
+  ipWindowStartMs: number | null;
+  ipCount: number;
+}): {
+  allowed: boolean;
+  nextSongWindowStartMs: number;
+  nextSongCount: number;
+  nextIpWindowStartMs: number;
+  nextIpCount: number;
+} {
+  const songWindow = openWindow(
+    input.songWindowStartMs,
+    input.songCount,
+    input.nowMs,
+    PLAY_SONG_WINDOW_MS
+  );
+  const ipWindow = openWindow(
+    input.ipWindowStartMs,
+    input.ipCount,
+    input.nowMs,
+    PLAY_IP_WINDOW_MS
+  );
+
+  if (songWindow.count >= PLAY_SONG_MAX_PER_WINDOW || ipWindow.count >= PLAY_IP_MAX_PER_WINDOW) {
     return {
       allowed: false,
-      nextWindowStartMs: input.clientWindowStartMs ?? input.nowMs,
-      nextCount: input.clientCount,
+      nextSongWindowStartMs: songWindow.startMs,
+      nextSongCount: songWindow.count,
+      nextIpWindowStartMs: ipWindow.startMs,
+      nextIpCount: ipWindow.count,
     };
-  }
-
-  let windowStart = input.clientWindowStartMs ?? input.nowMs;
-  let count = input.clientCount;
-  if (
-    input.clientWindowStartMs == null ||
-    input.nowMs - windowStart >= PLAY_CLIENT_WINDOW_MS
-  ) {
-    windowStart = input.nowMs;
-    count = 0;
-  }
-
-  if (count >= PLAY_CLIENT_MAX_PER_WINDOW) {
-    return { allowed: false, nextWindowStartMs: windowStart, nextCount: count };
   }
 
   return {
     allowed: true,
-    nextWindowStartMs: windowStart,
-    nextCount: count + 1,
+    nextSongWindowStartMs: songWindow.startMs,
+    nextSongCount: songWindow.count + 1,
+    nextIpWindowStartMs: ipWindow.startMs,
+    nextIpCount: ipWindow.count + 1,
   };
+}
+
+function openWindow(
+  startMs: number | null,
+  count: number,
+  nowMs: number,
+  windowMs: number
+): { startMs: number; count: number } {
+  if (startMs == null || nowMs - startMs >= windowMs) {
+    return { startMs: nowMs, count: 0 };
+  }
+  return { startMs, count };
 }
 
 function millisOf(value: unknown): number | null {
@@ -126,11 +134,7 @@ export async function reservePlayCount(
   }
 
   try {
-    const listenerKey = playListenerKey(
-      requestClientIp(request),
-      requestDeviceId(request),
-      secret
-    );
+    const listenerKey = playListenerKey(requestClientIp(request), secret);
     const db = getAdminDb();
     const songRef = db
       .collection(COLLECTIONS.playRateLimits)
@@ -146,25 +150,23 @@ export async function reservePlayCount(
       ]);
       const decision = evaluatePlayLimit({
         nowMs,
-        songLastCountedAtMs: songSnap.exists
-          ? millisOf(songSnap.get('lastCountedAt'))
-          : null,
-        clientWindowStartMs: clientSnap.exists
-          ? millisOf(clientSnap.get('windowStart'))
-          : null,
-        clientCount: clientSnap.exists ? Number(clientSnap.get('count') ?? 0) : 0,
+        songWindowStartMs: songSnap.exists ? millisOf(songSnap.get('windowStart')) : null,
+        songCount: songSnap.exists ? Number(songSnap.get('count') ?? 0) : 0,
+        ipWindowStartMs: clientSnap.exists ? millisOf(clientSnap.get('windowStart')) : null,
+        ipCount: clientSnap.exists ? Number(clientSnap.get('count') ?? 0) : 0,
       });
       if (!decision.allowed) return 'limited';
 
       const expireAt = Timestamp.fromMillis(nowMs + PLAY_LIMIT_TTL_MS);
       tx.set(songRef, {
         songId,
-        lastCountedAt: Timestamp.fromMillis(nowMs),
+        windowStart: Timestamp.fromMillis(decision.nextSongWindowStartMs),
+        count: decision.nextSongCount,
         expireAt,
       });
       tx.set(clientRef, {
-        windowStart: Timestamp.fromMillis(decision.nextWindowStartMs),
-        count: decision.nextCount,
+        windowStart: Timestamp.fromMillis(decision.nextIpWindowStartMs),
+        count: decision.nextIpCount,
         expireAt,
       });
       return 'counted';

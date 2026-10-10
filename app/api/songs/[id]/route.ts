@@ -11,6 +11,9 @@ import { maybePostSongLive } from '@/lib/x/postSong';
 
 export const runtime = 'nodejs';
 
+/** Matches the mobile title cap. */
+const SONG_TITLE_MAX_LENGTH = 300;
+
 function badRequest(error: string) {
   return NextResponse.json({ error }, { status: 400 });
 }
@@ -47,8 +50,16 @@ export async function PATCH(
     if (hasPlay && record.playCount !== 'increment') {
       return badRequest('playCount only accepts "increment"');
     }
-    if (hasTitle && typeof record.title !== 'string') {
-      return badRequest('title must be a string');
+    let title: string | undefined;
+    if (hasTitle) {
+      if (typeof record.title !== 'string') {
+        return badRequest('title must be a string');
+      }
+      title = record.title.trim();
+      if (!title) return badRequest('title cannot be empty');
+      if (title.length > SONG_TITLE_MAX_LENGTH) {
+        return badRequest(`title must be ${SONG_TITLE_MAX_LENGTH} characters or fewer`);
+      }
     }
     if (hasPublic && typeof record.isPublic !== 'boolean') {
       return badRequest('isPublic must be a boolean');
@@ -82,7 +93,7 @@ export async function PATCH(
     }
 
     await adminUpdateSongOwnerFields(songId, {
-      title: hasTitle ? (record.title as string) : undefined,
+      title,
       isPublic: hasPublic ? (record.isPublic as boolean) : undefined,
       incrementPlayCount,
     });

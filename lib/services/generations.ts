@@ -60,6 +60,8 @@ export async function createGeneration(
       vocalIdentity?: string | null;
     };
     lyrics?: string;
+    /** When set, the MusicGPT route checks this artist is owned by the caller. */
+    artistId?: string;
   } & {
     /**
      * Optional provider task/job identifier for async providers.
@@ -76,15 +78,22 @@ export async function createGeneration(
     try {
       // Call server-side API route to initiate MusicGPT generation
       // This ensures API keys are never exposed to the client
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('Authentication required to start generation');
+      }
+      const token = await user.getIdToken();
       const apiResponse = await fetch('/api/generations/musicgpt', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           prompt: data.prompt.freeText,
           // Includes locked vocalIdentity; server maps it into music_style.
           artistContext: data.artistContext,
+          ...(data.artistId ? { artistId: data.artistId } : {}),
           ...(data.lyrics && { lyrics: data.lyrics }),
         }),
       });

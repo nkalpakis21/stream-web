@@ -1,9 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import {
   buildMusicGPTStyleFromArtistContext,
   createMusicGPTSong,
 } from '@/lib/ai/providers/musicgpt';
 import type { AIGenerationRequest } from '@/lib/ai/types';
+import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
+import { adminGetArtist } from '@/lib/server/artistsAdmin';
 import { musicGptWebhookUrl, musicGptWebhookUrlForLog } from '@/lib/webhooks/baseUrl';
 import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
 import { redactForLog, redactSecrets } from '@/lib/webhooks/redactUrl';
@@ -12,15 +14,30 @@ import { redactForLog, redactSecrets } from '@/lib/webhooks/redactUrl';
  * Server-side API route for initiating MusicGPT generation.
  * This ensures API keys are never exposed to the client.
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUser(request);
     const body = await request.json();
-    const { prompt, lyrics, artistContext, num_outputs } = body as {
+    const { prompt, lyrics, artistContext, artistId, num_outputs } = body as {
       prompt?: string;
       lyrics?: string;
       artistContext?: AIGenerationRequest['artistContext'];
+      artistId?: string;
       num_outputs?: 1 | 2;
     };
+
+    if (typeof artistId === 'string' && artistId.trim()) {
+      const artist = await adminGetArtist(artistId.trim());
+      if (!artist) {
+        return NextResponse.json({ error: 'Artist not found' }, { status: 404 });
+      }
+      if (artist.ownerId !== userId) {
+        return NextResponse.json(
+          { error: 'Only the owner can generate for this artist' },
+          { status: 403 }
+        );
+      }
+    }
 
     if (!prompt) {
       return NextResponse.json(
@@ -70,6 +87,7 @@ export async function POST(request: Request) {
       raw: redactForLog(response, musicGptWebhookSecret()),
     });
   } catch (error) {
+    if (error instanceof HttpError) return errorResponse(error);
     const secret = musicGptWebhookSecret();
     const errorMessage = redactSecrets(
       error instanceof Error ? error.message : 'MusicGPT request failed',

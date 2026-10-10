@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
 import {
   FAL_KEY_MISSING_MESSAGE,
   generateArtistLooks,
@@ -27,15 +28,19 @@ export async function GET() {
   return NextResponse.json({ available: isFalConfigured() });
 }
 
-export async function POST(request: Request) {
-  if (!isFalConfigured()) {
-    return NextResponse.json(
-      { error: FAL_KEY_MISSING_MESSAGE, available: false },
-      { status: 503 }
-    );
-  }
-
+export async function POST(request: NextRequest) {
   try {
+    // Body is a name and style hints, not an artist id. Looks can be generated
+    // before the artist document exists, so there is no owner check here.
+    await requireUser(request);
+
+    if (!isFalConfigured()) {
+      return NextResponse.json(
+        { error: FAL_KEY_MISSING_MESSAGE, available: false },
+        { status: 503 }
+      );
+    }
+
     const json = await request.json();
     const parsed = generateBodySchema.safeParse(json);
     if (!parsed.success) {
@@ -57,6 +62,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ looks, available: true });
   } catch (error) {
+    if (error instanceof HttpError) return errorResponse(error);
     const message =
       error instanceof Error ? error.message : 'Failed to generate artist looks';
     console.error('[API /artists/looks]', message);
