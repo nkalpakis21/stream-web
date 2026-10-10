@@ -6,9 +6,14 @@
  * No-ops when the same mint is already stored. Rejects a different mint
  * or an empty write so a live coin is never overwritten with blanks.
  * Optional coinMetadataId is stored on the artist document root only after
- * Storage uploadedBy matches this user. Older clients that omit it still
- * persist the coin. A metadata URI is used when present. Otherwise the id
- * remembered from this user's metadata upload is used. mint stays on pumpFun.
+ * Storage uploadedBy matches this user. If the object is missing, Storage
+ * errors or times out, uploadedBy is a different uid, the explicit id is
+ * malformed, or the id cannot be verified for any other reason, the coin is
+ * still saved without coinMetadataId and coinImagePath. A different uploader
+ * logs coin_metadata_unverified with reason foreign_uploader and no uid. A
+ * malformed explicit id logs invalid_id and does not open a client path.
+ * The same rules apply when the id is taken from a metadata URI or from
+ * coinMetadataUploads. Metadata never rejects this route. mint stays on pumpFun.
  */
 
 import { NextRequest, NextResponse } from 'next/server';

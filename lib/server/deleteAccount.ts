@@ -1,17 +1,21 @@
 /**
  * Hard-delete one account. Firestore first, Firebase Auth last.
  * Idempotent: a retry after a partial failure deletes whatever is left.
+ * coinMetadataUploads/{uid} and its coinUploads/{id} docs are removed
+ * before the Auth user. A missing coin-metadata doc is success.
  */
 
 import * as admin from 'firebase-admin';
 import type {
   BulkWriter,
+  DocumentReference,
   Firestore,
   Query,
   QueryDocumentSnapshot,
 } from 'firebase-admin/firestore';
 import { getAdminBucket, getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
+import { COIN_METADATA_UPLOADS } from '@/lib/services/coinMetadataPending';
 import { fetchMetaplexMetadataUri } from '@/lib/solana/metaplexCoinMetadata';
 import { getSolanaRpcUrl } from '@/lib/solana/pumpFun';
 
@@ -32,6 +36,12 @@ function firebaseErrorCode(err: unknown): string | null {
 
 export function isAuthUserNotFound(err: unknown): boolean {
   return firebaseErrorCode(err) === 'auth/user-not-found';
+}
+
+function isFirestoreNotFound(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const code = (err as { code?: unknown }).code;
+  return code === 5 || code === '5' || code === 'not-found' || code === 'NOT_FOUND';
 }
 
 function bucketNotConfigured(err: unknown): boolean {
@@ -735,6 +745,71 @@ export async function commitBulkDeletes<T>(
   await Promise.all(ops);
 }
 
+/**
+ * Delete coinMetadataUploads/{uid} and every coinUploads/{id} under it.
+ * Children are queued with the parent, then flush, then Promise.all.
+ * A missing document is success so a retry can continue.
+ */
+export async function deleteCoinMetadataUploads(db: Firestore, uid: string): Promise<void> {
+  const parent = db.collection(COLLECTIONS.coinMetadataUploads).doc(uid);
+  const childRefs: DocumentReference[] = [];
+  try {
+    const snap = await parent.collection(COIN_METADATA_UPLOADS).get();
+    for (const doc of snap.docs) childRefs.push(doc.ref);
+  } catch (err) {
+    if (!isFirestoreNotFound(err)) throw err;
+  }
+
+  const writer = db.bulkWriter();
+  writer.onWriteError(error => {
+    console.error(
+      '[account] coin metadata upload delete failed',
+      error.code,
+      error.documentRef.path
+    );
+    return error.failedAttempts < 5;
+  });
+
+  let writerClosed = false;
+  const closeWriter = async () => {
+    if (writerClosed) return;
+    writerClosed = true;
+    await writer.close();
+  };
+
+  try {
+    const refs = [...childRefs, parent];
+    for (let i = 0; i < refs.length; i += PAGE_SIZE) {
+      await commitBulkDeletes(writer, refs.slice(i, i + PAGE_SIZE));
+    }
+    await closeWriter();
+  } catch (err) {
+    await closeWriter().catch(() => undefined);
+    if (isFirestoreNotFound(err)) return;
+    throw err;
+  }
+}
+
+/**
+ * Remove pending coin metadata, then the user document, then the Auth user.
+ * Coin metadata is deleted first. A missing coinMetadataUploads doc does not
+ * stop the rest. Auth is last.
+ */
+export async function deleteAccountIdentity(
+  db: Firestore,
+  uid: string,
+  deleteAuthUser: (uid: string) => Promise<void>
+): Promise<void> {
+  await deleteCoinMetadataUploads(db, uid);
+  await db.recursiveDelete(db.collection(COLLECTIONS.users).doc(uid));
+  try {
+    await deleteAuthUser(uid);
+  } catch (err) {
+    if (isAuthUserNotFound(err)) return;
+    throw err;
+  }
+}
+
 async function deleteDocIds(
   db: Firestore,
   writer: BulkWriter,
@@ -993,12 +1068,7 @@ export async function deleteAccount(
 
   await stripCoinPersonalData(uid, emails, coinPathList);
 
-  await db.recursiveDelete(db.collection(COLLECTIONS.users).doc(uid));
-
-  try {
-    await admin.auth().deleteUser(uid);
-  } catch (err) {
-    if (isAuthUserNotFound(err)) return;
-    throw err;
-  }
+  await deleteAccountIdentity(db, uid, async userId => {
+    await admin.auth().deleteUser(userId);
+  });
 }

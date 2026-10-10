@@ -76,6 +76,7 @@ function metadataBucket(options: {
   image?: unknown;
   missing?: boolean;
   bucketName?: string;
+  metadataError?: unknown;
 }): CoinMetadataBucket & { calls: string[] } {
   const calls: string[] = [];
   return {
@@ -85,6 +86,7 @@ function metadataBucket(options: {
       calls.push(objectPath);
       return {
         async getMetadata() {
+          if (options.metadataError) throw options.metadataError;
           if (options.missing) {
             throw Object.assign(new Error('No such object'), { code: 404 });
           }
@@ -98,6 +100,73 @@ function metadataBucket(options: {
       };
     },
   };
+}
+
+function unverifiedLogs() {
+  const entries: Array<{ artistId: string; reason: string; keys: string[] }> = [];
+  const original = console.info;
+  console.info = (...args: unknown[]) => {
+    if (args[0] !== 'coin_metadata_unverified' || !args[1] || typeof args[1] !== 'object') {
+      return;
+    }
+    const record = args[1] as { artistId?: unknown; reason?: unknown };
+    entries.push({
+      artistId: String(record.artistId),
+      reason: String(record.reason),
+      keys: Object.keys(record),
+    });
+  };
+  return {
+    entries,
+    restore() {
+      console.info = original;
+    },
+  };
+}
+
+function assertCoinSavedWithoutMetadata(write: Record<string, unknown> | undefined) {
+  assert.ok(write);
+  const pump = write.pumpFun as PumpFunCoin;
+  assert.ok(pump);
+  assert.equal(pump.mint, launchInput().mint);
+  assert.equal(pump.url, launchInput().url);
+  assert.equal(pump.symbol, launchInput().symbol);
+  assert.equal(pump.creatorWallet, launchInput().creatorWallet);
+  const launchedAt = pump.launchedAt as { toMillis?: () => number } | null;
+  assert.equal(launchedAt?.toMillis?.(), launchInput().launchedAtMs);
+  assert.equal(Object.hasOwn(write, 'coinMetadataId'), false);
+  assert.equal(Object.hasOwn(write, 'coinImagePath'), false);
+  assert.equal(Object.hasOwn(pump, 'coinMetadataId'), false);
+  assert.equal(Object.hasOwn(pump, 'coinImagePath'), false);
+}
+
+async function assertSavesWithoutMetadata(
+  reason: string,
+  bucket: CoinMetadataBucket,
+  extra: Partial<PersistArtistPumpFunInput> = {},
+  deps: { lookupMetadataId?: (input: { userId: string; symbol: string }) => Promise<string | null> } = {}
+) {
+  const db = memoryDb(artist({ ownerId: UID }));
+  const logs = unverifiedLogs();
+  try {
+    const result = await persistArtistPumpFun(launchInput(extra), { db, bucket, ...deps });
+    assert.equal(result.noop, false);
+    assert.equal(result.coinMetadataId, null);
+    assert.equal(result.coinImagePath, null);
+    assert.equal(result.pumpFun.mint, launchInput().mint);
+    assertCoinSavedWithoutMetadata(db.writes[0]);
+    assert.equal(db.writes.length, 1);
+  } finally {
+    logs.restore();
+  }
+  assert.deepEqual(
+    logs.entries.map(entry => ({ artistId: entry.artistId, reason: entry.reason })),
+    [{ artistId: 'artist-1', reason }]
+  );
+  for (const entry of logs.entries) {
+    assert.deepEqual(entry.keys, ['artistId', 'reason']);
+    assert.equal(JSON.stringify(entry).includes(UID), false);
+  }
 }
 
 function assertStoredAtArtistRoot(
@@ -290,66 +359,50 @@ describe('persistArtistPumpFun coin metadata', () => {
     assertStoredAtArtistRoot(db.writes[0], METADATA_ID, null);
   });
 
-  it('rejects an id uploaded by someone else and does not write', async () => {
-    const db = memoryDb(artist({ ownerId: UID }));
+  it('saves the coin without metadata fields when the id was uploaded by someone else', async () => {
     const bucket = metadataBucket({
       uploadedBy: 'other-user',
       image: firebaseDownloadUrl(BUCKET, IMAGE_PATH),
     });
-
-    await assert.rejects(
-      () =>
-        persistArtistPumpFun(launchInput({ coinMetadataId: METADATA_ID }), {
-          db,
-          bucket,
-        }),
-      (err: unknown) => {
-        assert.ok(err instanceof ArtistPumpFunPersistError);
-        assert.equal(err.status, 403);
-        return true;
-      }
-    );
-    assert.equal(db.writes.length, 0);
+    await assertSavesWithoutMetadata('foreign_uploader', bucket, { coinMetadataId: METADATA_ID });
     assert.deepEqual(bucket.calls, [pumpFunMetadataObjectPath(METADATA_ID)]);
   });
 
-  it('rejects a missing metadata object for an explicit id', async () => {
-    const db = memoryDb(artist({ ownerId: UID }));
+  it('saves the coin without metadata fields when the object is missing', async () => {
     const bucket = metadataBucket({ missing: true });
-
-    await assert.rejects(
-      () =>
-        persistArtistPumpFun(launchInput({ coinMetadataId: METADATA_ID }), {
-          db,
-          bucket,
-        }),
-      (err: unknown) => {
-        assert.ok(err instanceof ArtistPumpFunPersistError);
-        assert.equal(err.status, 404);
-        return true;
-      }
-    );
-    assert.equal(db.writes.length, 0);
+    await assertSavesWithoutMetadata('not_found', bucket, { coinMetadataId: METADATA_ID });
+    assert.deepEqual(bucket.calls, [pumpFunMetadataObjectPath(METADATA_ID)]);
   });
 
-  it('does not open a client-supplied path', async () => {
-    const db = memoryDb(artist({ ownerId: UID }));
-    const bucket = metadataBucket({ uploadedBy: UID, image: IMAGE_PATH });
+  it('saves the coin without metadata fields when storage returns 503', async () => {
+    const bucket = metadataBucket({
+      metadataError: Object.assign(new Error('Service unavailable'), { code: 503 }),
+    });
+    await assertSavesWithoutMetadata('storage_error', bucket, { coinMetadataId: METADATA_ID });
+    assert.equal(bucket.calls.length, 1);
+  });
 
-    await assert.rejects(
-      () =>
-        persistArtistPumpFun(
-          launchInput({ coinMetadataId: `c/${METADATA_ID}.json` }),
-          { db, bucket }
-        ),
-      (err: unknown) => {
-        assert.ok(err instanceof ArtistPumpFunPersistError);
-        assert.equal(err.status, 400);
-        return true;
-      }
-    );
+  it('saves the coin without metadata fields when storage times out', async () => {
+    const bucket = metadataBucket({
+      metadataError: Object.assign(new Error('The request timed out'), { code: 'ETIMEDOUT' }),
+    });
+    await assertSavesWithoutMetadata('timeout', bucket, { coinMetadataId: METADATA_ID });
+    assert.equal(bucket.calls.length, 1);
+  });
+
+  it('saves the coin when uploadedBy is missing', async () => {
+    const bucket = metadataBucket({
+      image: firebaseDownloadUrl(BUCKET, IMAGE_PATH),
+    });
+    await assertSavesWithoutMetadata('unverified', bucket, { coinMetadataId: METADATA_ID });
+  });
+
+  it('saves the coin without metadata fields when the explicit id is malformed', async () => {
+    const bucket = metadataBucket({ uploadedBy: UID, image: IMAGE_PATH });
+    await assertSavesWithoutMetadata('invalid_id', bucket, {
+      coinMetadataId: `c/${METADATA_ID}.json`,
+    });
     assert.deepEqual(bucket.calls, []);
-    assert.equal(db.writes.length, 0);
   });
 
   it('derives the id from the metadata URI when the client omits it', async () => {
@@ -386,22 +439,21 @@ describe('persistArtistPumpFun coin metadata', () => {
     assert.equal(db.writes.length, 1);
   });
 
-  it('skips an unverified metadata URI and still saves the coin', async () => {
-    const db = memoryDb(artist({ ownerId: UID }));
+  it('saves the coin without metadata fields when a metadata URI was uploaded by someone else', async () => {
     const bucket = metadataBucket({
       uploadedBy: 'other-user',
       image: firebaseDownloadUrl(BUCKET, IMAGE_PATH),
     });
+    await assertSavesWithoutMetadata('foreign_uploader', bucket, {
+      metadataUri: `https://www.streamstar.xyz/c/${METADATA_ID}`,
+    });
+  });
 
-    const result = await persistArtistPumpFun(
-      launchInput({ metadataUri: `https://www.streamstar.xyz/c/${METADATA_ID}` }),
-      { db, bucket }
-    );
-
-    assert.equal(result.coinMetadataId, null);
-    assert.equal(result.pumpFun.mint, launchInput().mint);
-    assert.equal(Object.hasOwn(db.writes[0] ?? {}, 'coinMetadataId'), false);
-    assert.equal(db.writes.length, 1);
+  it('skips an unverifiable metadata URI and still saves the coin', async () => {
+    const bucket = metadataBucket({ missing: true });
+    await assertSavesWithoutMetadata('not_found', bucket, {
+      metadataUri: `https://www.streamstar.xyz/c/${METADATA_ID}`,
+    });
   });
 
   it('backfills the id onto a coin that was saved without one', async () => {
@@ -491,23 +543,23 @@ describe('persistArtistPumpFun coin metadata', () => {
     assertStoredAtArtistRoot(db.writes[0], METADATA_ID, IMAGE_PATH);
   });
 
-  it('does not link a remembered upload that this user did not upload', async () => {
-    const db = memoryDb(artist({ ownerId: UID }));
+  it('saves the coin without metadata fields when a remembered upload belongs to someone else', async () => {
     const bucket = metadataBucket({
       uploadedBy: 'other-user',
       image: firebaseDownloadUrl(BUCKET, IMAGE_PATH),
     });
-
-    const result = await persistArtistPumpFun(launchInput(), {
-      db,
-      bucket,
+    await assertSavesWithoutMetadata('foreign_uploader', bucket, {}, {
       lookupMetadataId: async () => METADATA_ID,
     });
+  });
 
-    assert.equal(result.coinMetadataId, null);
-    assert.equal(result.pumpFun.mint, launchInput().mint);
-    assert.equal(Object.hasOwn(db.writes[0] ?? {}, 'coinMetadataId'), false);
-    assert.equal(db.writes.length, 1);
+  it('skips an unverifiable remembered upload and still saves the coin', async () => {
+    const bucket = metadataBucket({
+      metadataError: Object.assign(new Error('Service unavailable'), { code: 503 }),
+    });
+    await assertSavesWithoutMetadata('storage_error', bucket, {}, {
+      lookupMetadataId: async () => METADATA_ID,
+    });
   });
 
   it('keeps the artist owner check', async () => {

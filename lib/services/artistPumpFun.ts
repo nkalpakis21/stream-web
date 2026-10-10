@@ -4,11 +4,17 @@
  * Never writes empty pumpFun over a live mint.
  *
  * coinMetadataId and coinImagePath are written on the artist document root
- * (not inside pumpFun). mint stays at pumpFun.mint. The id is accepted only
+ * (not inside pumpFun). mint stays at pumpFun.mint. The id is stored only
  * when `c/{id}.json` exists and Storage custom metadata `uploadedBy` is this
  * uid. The image path is read from that object's JSON. A client path is never
- * stored. When confirm omits the id, a metadata URI is used if present;
- * otherwise the id remembered from this uid's metadata upload is used.
+ * stored. A missing object, a storage error, a timeout, a malformed explicit
+ * id, `uploadedBy` for a different uid, or any other failure to verify the id
+ * still saves the coin without those fields and logs `coin_metadata_unverified`
+ * with the artist id and a reason, never a uid. A different uploader is
+ * `foreign_uploader` for an explicit id, a URI-derived id, and an id remembered
+ * from this uid's metadata upload. A malformed explicit id is `invalid_id`.
+ * Metadata never rejects the write. When confirm omits the id, a metadata URI
+ * is used if present; otherwise the remembered id is used.
  */
 
 import { FieldValue, Timestamp as AdminTimestamp } from 'firebase-admin/firestore';
@@ -118,6 +124,64 @@ function isBucketConfigError(err: unknown): boolean {
   return /bucket name not specified|Firebase Admin not initialized/i.test(message);
 }
 
+function errorCode(err: unknown): unknown {
+  if (!err || typeof err !== 'object') return undefined;
+  return (err as { code?: unknown }).code;
+}
+
+function isTimeoutError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const record = err as { name?: unknown; code?: unknown; message?: unknown };
+  if (record.name === 'AbortError' || record.name === 'TimeoutError') return true;
+  const code = record.code;
+  if (
+    code === 'ETIMEDOUT' ||
+    code === 'ECONNABORTED' ||
+    code === 'DEADLINE_EXCEEDED' ||
+    code === 'deadline-exceeded' ||
+    code === 408 ||
+    code === '408' ||
+    code === 504 ||
+    code === '504'
+  ) {
+    return true;
+  }
+  const message = typeof record.message === 'string' ? record.message : '';
+  return /timeout|timed out|deadline exceeded/i.test(message);
+}
+
+function isServerStorageError(err: unknown): boolean {
+  const code = errorCode(err);
+  if (typeof code === 'number' && code >= 500 && code <= 599) return true;
+  return typeof code === 'string' && /^5\d\d$/.test(code);
+}
+
+function isNetworkError(err: unknown): boolean {
+  const code = errorCode(err);
+  return (
+    code === 'ECONNRESET' ||
+    code === 'ENOTFOUND' ||
+    code === 'EAI_AGAIN' ||
+    code === 'ECONNREFUSED' ||
+    code === 'ENETUNREACH' ||
+    code === 'EPIPE'
+  );
+}
+
+/** Reason token for `coin_metadata_unverified`. Never includes a uid. */
+function coinMetadataFailureReason(err: unknown): string {
+  if (isStorageNotFound(err)) return 'not_found';
+  if (isTimeoutError(err)) return 'timeout';
+  if (isBucketConfigError(err)) return 'unavailable';
+  if (isServerStorageError(err)) return 'storage_error';
+  if (isNetworkError(err)) return 'network';
+  return 'unverified';
+}
+
+function logCoinMetadataUnverified(artistId: string, reason: string): void {
+  console.info('coin_metadata_unverified', { artistId, reason });
+}
+
 function imagePathFromMetadataJson(buf: Buffer, bucketName: string): string | null {
   const parsed: unknown = JSON.parse(buf.toString('utf8'));
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
@@ -128,15 +192,19 @@ function imagePathFromMetadataJson(buf: Buffer, bucketName: string): string | nu
 
 /**
  * Resolve coinMetadataId + coinImagePath for a launch write.
- * An explicit id that is missing or uploaded by someone else is rejected.
- * A metadata URI that cannot be verified is skipped (returns null) so an
- * older client can still save the coin.
+ * Returns null when there is nothing to link. A missing object, a storage
+ * error, a timeout, a malformed explicit id, a different `uploadedBy`, or any
+ * other failure also returns null after logging `coin_metadata_unverified`.
+ * The log is `{artistId, reason}` and never includes a uid. A different
+ * uploader uses `foreign_uploader`. A malformed explicit id uses `invalid_id`
+ * and does not open the object.
  */
 export async function resolveOwnedCoinMetadata(input: {
+  artistId: string;
   userId: string;
   coinMetadataId?: string | null;
   metadataUri?: string | null;
-  /** Id remembered from this uid's metadata upload. Failure skips, it does not reject. */
+  /** Id remembered from this uid's metadata upload. */
   rememberedId?: string | null;
   bucket: CoinMetadataBucket;
 }): Promise<ResolvedCoinMetadata | null> {
@@ -144,37 +212,34 @@ export async function resolveOwnedCoinMetadata(input: {
   const uri = input.metadataUri?.trim() ?? '';
   const remembered = input.rememberedId?.trim() ?? '';
 
-  let id: string;
-  let strict: boolean;
+  let id = '';
   if (explicit) {
     if (!isValidPumpFunMetadataId(explicit)) {
-      throw new ArtistPumpFunPersistError(400, 'Invalid coin metadata id.');
+      logCoinMetadataUnverified(input.artistId, 'invalid_id');
+      return null;
     }
     id = explicit;
-    strict = true;
   } else if (uri) {
     const derived = coinMetadataIdFromUri(uri);
     if (!derived) return null;
     id = derived;
-    strict = false;
   } else if (remembered) {
     if (!isValidPumpFunMetadataId(remembered)) return null;
     id = remembered;
-    strict = false;
   } else {
     return null;
   }
 
   const objectPath = coinMetadataObjectPathForId(id);
   if (!objectPath) {
-    if (!strict) return null;
-    throw new ArtistPumpFunPersistError(400, 'Invalid coin metadata id.');
+    logCoinMetadataUnverified(input.artistId, explicit ? 'invalid_id' : 'unverified');
+    return null;
   }
 
   const bucketName = input.bucket.name?.trim() ?? '';
   if (!bucketName) {
-    if (!strict) return null;
-    throw new ArtistPumpFunPersistError(503, 'Storage is temporarily unavailable.');
+    logCoinMetadataUnverified(input.artistId, 'unavailable');
+    return null;
   }
 
   const file = input.bucket.file(objectPath);
@@ -183,38 +248,27 @@ export async function resolveOwnedCoinMetadata(input: {
     const [metadata] = await file.getMetadata();
     uploadedBy = metadata?.metadata?.uploadedBy;
   } catch (err) {
-    if (isStorageNotFound(err)) {
-      if (!strict) return null;
-      throw new ArtistPumpFunPersistError(404, 'Coin metadata was not found.');
-    }
-    if (isBucketConfigError(err)) {
-      if (!strict) return null;
-      throw new ArtistPumpFunPersistError(503, 'Storage is temporarily unavailable.');
-    }
-    throw err;
+    logCoinMetadataUnverified(input.artistId, coinMetadataFailureReason(err));
+    return null;
   }
 
-  if (typeof uploadedBy !== 'string' || uploadedBy !== input.userId) {
-    if (!strict) return null;
-    throw new ArtistPumpFunPersistError(
-      403,
-      'Coin metadata was not uploaded by this account.'
-    );
+  // A different account drops the metadata fields. The coin is still saved.
+  if (typeof uploadedBy === 'string' && uploadedBy.length > 0 && uploadedBy !== input.userId) {
+    logCoinMetadataUnverified(input.artistId, 'foreign_uploader');
+    return null;
+  }
+  if (uploadedBy !== input.userId) {
+    logCoinMetadataUnverified(input.artistId, 'unverified');
+    return null;
   }
 
   let coinImagePath: string | null = null;
   try {
     const [buf] = await file.download();
     coinImagePath = imagePathFromMetadataJson(buf, bucketName);
-  } catch (err) {
-    if (isStorageNotFound(err) || err instanceof SyntaxError) {
-      coinImagePath = null;
-    } else if (isBucketConfigError(err)) {
-      if (!strict) return null;
-      throw new ArtistPumpFunPersistError(503, 'Storage is temporarily unavailable.');
-    } else {
-      throw err;
-    }
+  } catch {
+    // Ownership is already verified. Keep the id and leave the image unset.
+    coinImagePath = null;
   }
 
   return { coinMetadataId: id, coinImagePath };
@@ -237,6 +291,8 @@ function linkedCoinMetadata(artist: AIArtistDocument): {
  * document root when this user uploaded `c/{id}.json`. No-ops when the same
  * mint is already stored and the root id is already set. Rejects when a
  * different mint exists. Never writes empty pumpFun over a live coin.
+ * An unverifiable metadata id, including a different `uploadedBy` or a
+ * malformed explicit id, is omitted and the coin is still saved.
  */
 export async function persistArtistPumpFun(
   input: PersistArtistPumpFunInput,
@@ -273,6 +329,7 @@ export async function persistArtistPumpFun(
     try {
       const bucket = (deps?.bucket ?? getAdminBucket()) as CoinMetadataBucket;
       resolved = await resolveOwnedCoinMetadata({
+        artistId: input.artistId,
         userId: input.userId,
         coinMetadataId: requestedId || null,
         metadataUri: metadataUri || null,
@@ -280,11 +337,9 @@ export async function persistArtistPumpFun(
         bucket,
       });
     } catch (err) {
-      if (!requestedId) {
-        resolved = null;
-      } else {
-        throw err;
-      }
+      // Metadata never rejects a confirmed coin. Owner and mint checks run later.
+      logCoinMetadataUnverified(input.artistId, coinMetadataFailureReason(err));
+      resolved = null;
     }
   }
 
