@@ -65,16 +65,17 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
           ? { publicKey, signTransaction, sendTransaction }
           : null;
 
-      const { pumpFun, launchNotice } = await resolvePumpFunForArtistCreate({
-        launchCoin: formData.launchCoin,
-        coinName: formData.coinName.trim() || formData.name,
-        ticker: formData.ticker,
-        imageUrl: avatarURL,
-        description: formData.lore,
-        wallet: pumpWallet,
-        connection,
-        getIdToken: user ? () => getFreshIdToken(user) : undefined,
-      });
+      const { pumpFun, launchNotice, coinMetadataId, coinImagePath } =
+        await resolvePumpFunForArtistCreate({
+          launchCoin: formData.launchCoin,
+          coinName: formData.coinName.trim() || formData.name,
+          ticker: formData.ticker,
+          imageUrl: avatarURL,
+          description: formData.lore,
+          wallet: pumpWallet,
+          connection,
+          getIdToken: user ? () => getFreshIdToken(user) : undefined,
+        });
 
       const artist = await createArtist(user.uid, {
         name: formData.name,
@@ -84,6 +85,8 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
         avatarURL,
         isPublic: formData.isPublic,
         pumpFun,
+        coinMetadataId,
+        coinImagePath,
       });
 
       const shouldConnectX = formData.connectX;

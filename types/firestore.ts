@@ -135,6 +135,16 @@ export interface AIArtistDocument {
    */
   pumpFun?: PumpFunCoin | null;
   /**
+   * `c/{id}` id for this artist's coin JSON. Written at metadata upload
+   * and again when the launch confirms. Absent on older coins.
+   */
+  coinMetadataId?: string | null;
+  /**
+   * Storage object path of the look used as the coin image, when that
+   * image is in our bucket. Absent when the image is an external URL.
+   */
+  coinImagePath?: string | null;
+  /**
    * Optional public X account for this artist. Absent/undefined on older
    * documents is equivalent to disconnected. Tokens are never stored here.
    */

@@ -63,10 +63,17 @@ export type ArtistPumpFunLaunchInput = {
   wallet: ArtistPumpFunWallet;
   connection: Connection;
   getIdToken: () => Promise<string>;
+  /** Set when the artist doc already exists so metadata can store the coin image. */
+  artistId?: string;
 };
 
 export type ArtistPumpFunLaunchResult =
-  | { ok: true; coin: PumpFunCoin }
+  | {
+      ok: true;
+      coin: PumpFunCoin;
+      coinMetadataId: string | null;
+      coinImagePath: string | null;
+    }
   | { ok: false; unavailable?: true; reason: string };
 
 function fail(reason: string): ArtistPumpFunLaunchResult {
@@ -248,7 +255,11 @@ export async function launchArtistPumpFunCoin(
     return fail(userFacingApiError(undefined, error, LAUNCH_NO_TOKEN_NOTICE));
   }
 
-  const metadataRes = await postJson<{ uri: string }>(
+  const metadataRes = await postJson<{
+    uri: string;
+    coinMetadataId?: string;
+    coinImagePath?: string | null;
+  }>(
     '/api/artists/pump-fun/metadata',
     token,
     {
@@ -256,6 +267,7 @@ export async function launchArtistPumpFunCoin(
       symbol: ticker,
       description: (input.description || '').slice(0, 500),
       image: imageUrl,
+      ...(input.artistId ? { artistId: input.artistId } : {}),
     }
   );
   if (!metadataRes.ok) {
@@ -339,6 +351,8 @@ export async function launchArtistPumpFunCoin(
       launchedAt: Timestamp.now(),
       creatorWallet,
     },
+    coinMetadataId: metadataRes.data.coinMetadataId ?? null,
+    coinImagePath: metadataRes.data.coinImagePath ?? null,
   };
 }
 
@@ -369,15 +383,27 @@ export type ResolvePumpFunForArtistCreateInput = {
  */
 export async function resolvePumpFunForArtistCreate(
   input: ResolvePumpFunForArtistCreateInput
-): Promise<{ pumpFun: PumpFunCoin; launchNotice: string | null }> {
+): Promise<{
+  pumpFun: PumpFunCoin;
+  launchNotice: string | null;
+  coinMetadataId: string | null;
+  coinImagePath: string | null;
+}> {
   if (!input.launchCoin) {
-    return { pumpFun: emptyPumpFunCoin(), launchNotice: null };
+    return {
+      pumpFun: emptyPumpFunCoin(),
+      launchNotice: null,
+      coinMetadataId: null,
+      coinImagePath: null,
+    };
   }
 
   if (!input.wallet || !input.connection || !input.getIdToken) {
     return {
       pumpFun: emptyPumpFunCoin(),
       launchNotice: `Connect your wallet in the nav, then try again next time. ${LAUNCH_FAILED_NOTICE}`,
+      coinMetadataId: null,
+      coinImagePath: null,
     };
   }
 
@@ -394,6 +420,8 @@ export async function resolvePumpFunForArtistCreate(
   return {
     pumpFun: pumpFunFromLaunchResult(result),
     launchNotice: result.ok ? null : result.reason,
+    coinMetadataId: result.ok ? result.coinMetadataId : null,
+    coinImagePath: result.ok ? result.coinImagePath : null,
   };
 }
 
@@ -403,12 +431,19 @@ export async function resolvePumpFunForArtistCreate(
  * after success. The artist document is left unchanged on failure.
  */
 export async function launchPumpFunForExistingArtist(
-  input: Omit<ResolvePumpFunForArtistCreateInput, 'launchCoin'>
-): Promise<{ coin: PumpFunCoin | null; launchNotice: string | null }> {
+  input: Omit<ResolvePumpFunForArtistCreateInput, 'launchCoin'> & { artistId?: string }
+): Promise<{
+  coin: PumpFunCoin | null;
+  launchNotice: string | null;
+  coinMetadataId: string | null;
+  coinImagePath: string | null;
+}> {
   if (!input.wallet || !input.connection || !input.getIdToken) {
     return {
       coin: null,
       launchNotice: `Connect your wallet in the nav, then try again next time. ${LAUNCH_NO_TOKEN_NOTICE}`,
+      coinMetadataId: null,
+      coinImagePath: null,
     };
   }
 
@@ -420,11 +455,22 @@ export async function launchPumpFunForExistingArtist(
     wallet: input.wallet,
     connection: input.connection,
     getIdToken: input.getIdToken,
+    artistId: input.artistId,
   });
 
   if (!result.ok) {
-    return { coin: null, launchNotice: result.reason };
+    return {
+      coin: null,
+      launchNotice: result.reason,
+      coinMetadataId: null,
+      coinImagePath: null,
+    };
   }
 
-  return { coin: result.coin, launchNotice: null };
+  return {
+    coin: result.coin,
+    launchNotice: null,
+    coinMetadataId: result.coinMetadataId,
+    coinImagePath: result.coinImagePath,
+  };
 }

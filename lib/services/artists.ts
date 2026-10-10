@@ -48,6 +48,8 @@ export async function createArtist(
     isPublic?: boolean;
     /** Optional artist-level pump.fun coin. Defaults to all-null (no token). */
     pumpFun?: PumpFunCoin | null;
+    coinMetadataId?: string | null;
+    coinImagePath?: string | null;
   }
 ): Promise<AIArtistDocument> {
   const artistRef = doc(collection(db, COLLECTIONS.artists));
@@ -90,6 +92,8 @@ export async function createArtist(
     deletedAt: null,
     currentVersionId: versionId,
     pumpFun: data.pumpFun ?? emptyPumpFunCoin(),
+    ...(data.coinMetadataId ? { coinMetadataId: data.coinMetadataId } : {}),
+    ...(data.coinImagePath ? { coinImagePath: data.coinImagePath } : {}),
     x: emptyXConnection(),
   };
 

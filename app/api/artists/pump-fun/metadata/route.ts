@@ -9,9 +9,12 @@
 
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
-import { getAdminBucket } from '@/lib/firebase/admin';
+import { getAdminBucket, getAdminDb } from '@/lib/firebase/admin';
+import { COLLECTIONS } from '@/lib/firebase/collections';
+import { firebaseStorageObjectPath } from '@/lib/server/deleteAccount';
 import {
   MAX_COIN_NAME_LENGTH,
   MAX_TICKER_LENGTH,
@@ -33,6 +36,7 @@ const bodySchema = z.object({
   symbol: z.string().trim().min(MIN_TICKER_LENGTH).max(MAX_TICKER_LENGTH),
   description: z.string().trim().max(500).optional().default(''),
   image: z.string().trim().url(),
+  artistId: z.string().trim().min(1).max(128).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -87,6 +91,7 @@ export async function POST(request: NextRequest) {
     };
 
     const id = randomUUID().replace(/-/g, '');
+    const coinImagePath = firebaseStorageObjectPath(parsed.data.image, bucket.name);
     const uri = pumpFunMetadataPublicUri(id);
     if (isMetadataUriTooLong(uri)) {
       throw new HttpError(400, METADATA_URI_TOO_LONG_NOTICE);
@@ -118,7 +123,27 @@ export async function POST(request: NextRequest) {
       throw err;
     }
 
-    return NextResponse.json({ uri });
+    const artistId = parsed.data.artistId?.trim();
+    if (artistId && /^[A-Za-z0-9_-]+$/.test(artistId)) {
+      try {
+        const ref = getAdminDb().collection(COLLECTIONS.artists).doc(artistId);
+        const snap = await ref.get();
+        if (snap.exists && snap.get('ownerId') === userId && !snap.get('deletedAt')) {
+          await ref.set(
+            {
+              coinMetadataId: id,
+              coinImagePath,
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+        }
+      } catch {
+        console.error('[pump.fun metadata] coin image path not stored', artistId);
+      }
+    }
+
+    return NextResponse.json({ uri, coinMetadataId: id, coinImagePath });
   } catch (error) {
     return errorResponse(error);
   }

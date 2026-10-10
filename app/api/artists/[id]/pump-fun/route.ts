@@ -31,6 +31,8 @@ const bodySchema = z.object({
   symbol: z.string().trim().min(2).max(10),
   launchedAt: z.number().int().positive().optional(),
   creatorWallet: z.string().trim().min(32).max(44),
+  coinMetadataId: z.string().trim().regex(/^[0-9a-f]{32}$/).optional(),
+  coinImagePath: z.string().trim().min(1).max(512).nullable().optional(),
 });
 
 function parsePublicKey(value: string, field: string): PublicKey {
@@ -89,6 +91,8 @@ export async function POST(
       symbol,
       launchedAtMs: parsed.data.launchedAt ?? Date.now(),
       creatorWallet,
+      coinMetadataId: parsed.data.coinMetadataId,
+      coinImagePath: parsed.data.coinImagePath,
     });
 
     return NextResponse.json({

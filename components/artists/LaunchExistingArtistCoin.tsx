@@ -43,7 +43,12 @@ export function LaunchExistingArtistCoin({
 
   const busy = Boolean(disabled || launching);
 
-  const persistCoin = async (coin: PumpFunCoin, token: string) => {
+  const persistCoin = async (
+    coin: PumpFunCoin,
+    token: string,
+    coinMetadataId: string | null,
+    coinImagePath: string | null
+  ) => {
     const res = await fetch(`/api/artists/${artistId}/pump-fun`, {
       method: 'POST',
       headers: {
@@ -56,6 +61,8 @@ export function LaunchExistingArtistCoin({
         symbol: coin.symbol,
         launchedAt: coin.launchedAt?.toMillis?.() ?? Date.now(),
         creatorWallet: coin.creatorWallet,
+        ...(coinMetadataId ? { coinMetadataId } : {}),
+        ...(coinImagePath ? { coinImagePath } : {}),
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -80,15 +87,17 @@ export function LaunchExistingArtistCoin({
           ? { publicKey, signTransaction, sendTransaction }
           : null;
 
-      const { coin, launchNotice } = await launchPumpFunForExistingArtist({
-        coinName: coinName.trim() || artistName,
-        ticker,
-        imageUrl: lookUrl,
-        description: lore,
-        wallet: pumpWallet,
-        connection,
-        getIdToken: () => getFreshIdToken(user),
-      });
+      const { coin, launchNotice, coinMetadataId, coinImagePath } =
+        await launchPumpFunForExistingArtist({
+          artistId,
+          coinName: coinName.trim() || artistName,
+          ticker,
+          imageUrl: lookUrl,
+          description: lore,
+          wallet: pumpWallet,
+          connection,
+          getIdToken: () => getFreshIdToken(user),
+        });
 
       if (!coin) {
         showToast(launchNotice || LAUNCH_NO_TOKEN_NOTICE, 'error');
@@ -97,10 +106,10 @@ export function LaunchExistingArtistCoin({
 
       const token = await getFreshIdToken(user);
       try {
-        await persistCoin(coin, token);
+        await persistCoin(coin, token, coinMetadataId, coinImagePath);
       } catch (firstError) {
         try {
-          await persistCoin(coin, token);
+          await persistCoin(coin, token, coinMetadataId, coinImagePath);
         } catch {
           throw firstError;
         }

@@ -8,8 +8,15 @@ import {
   firebaseStorageObjectPath,
   isAuthUserNotFound,
   isPersonalValue,
+  prefixedObjectsDeleted,
+  resolveLaunchedCoinImages,
   stripPersonalFields,
+  type ArtistCoinSource,
 } from './deleteAccount';
+import {
+  fetchMetaplexMetadataUri,
+  metaplexMetadataUriFromAccount,
+} from '@/lib/solana/metaplexCoinMetadata';
 
 describe('recent sign-in', () => {
   const now = 1_700_000_000;
@@ -172,6 +179,168 @@ describe('coin metadata paths', () => {
       }),
       []
     );
+  });
+});
+
+describe('launched coin images', () => {
+  const bucket = 'streamstar.appspot.com';
+  const uid = 'uid-1';
+  const coinId = '0123456789abcdef0123456789abcdef';
+  const prefix = `artist-looks/${uid}/`;
+  const coinObject = `${prefix}coin.jpg`;
+  const otherObject = `${prefix}other.jpg`;
+  const olderObject = `${prefix}older.jpg`;
+  const coinUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(coinObject)}?alt=media&token=t`;
+  const avatarUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(coinObject)}?alt=media&token=a`;
+  const olderUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(olderObject)}?alt=media&token=o`;
+  const laterUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(otherObject)}?alt=media&token=n`;
+  const objects = [coinObject, otherObject, olderObject];
+
+  const launched: ArtistCoinSource = {
+    id: 'artist-1',
+    mint: 'MintAddress111111111111111111111111111111',
+    launchedAtMs: 2_000,
+    avatarURL: avatarUrl,
+    coinMetadataId: null,
+    coinImagePath: null,
+  };
+
+  it('keeps the resolved coin image and deletes the other looks', async () => {
+    const plan = await resolveLaunchedCoinImages({
+      artists: [launched],
+      versions: [],
+      bucketName: bucket,
+      readMetadataUri: async () => `https://www.streamstar.xyz/c/${coinId}`,
+      readCoinImageUrl: async objectPath => {
+        assert.equal(objectPath, `c/${coinId}.json`);
+        return coinUrl;
+      },
+    });
+    assert.deepEqual(plan.strip, [`c/${coinId}.json`]);
+    assert.deepEqual(plan.keep, [coinObject]);
+    assert.deepEqual(
+      prefixedObjectsDeleted(prefix, objects, new Set(plan.keep)),
+      [otherObject, olderObject]
+    );
+  });
+
+  it('keeps the avatar and pre-launch looks when RPC fails', async () => {
+    const logs: string[] = [];
+    const plan = await resolveLaunchedCoinImages({
+      artists: [launched],
+      versions: [
+        { artistId: 'artist-1', avatarURL: olderUrl, createdAtMs: 1_000 },
+        { artistId: 'artist-1', avatarURL: laterUrl, createdAtMs: 3_000 },
+      ],
+      bucketName: bucket,
+      readMetadataUri: async () => {
+        throw new Error('rpc down');
+      },
+      readCoinImageUrl: async () => null,
+      logFallback: artistId => logs.push(`coin_image_kept_fallback ${artistId}`),
+    });
+    assert.deepEqual(logs, ['coin_image_kept_fallback artist-1']);
+    assert.equal(logs.some(line => line.includes(uid)), false);
+    assert.deepEqual(plan.strip, []);
+    const deleted = prefixedObjectsDeleted(prefix, objects, new Set(plan.keep));
+    assert.deepEqual(deleted, [otherObject]);
+    assert.ok(plan.keep.includes(coinObject));
+    assert.ok(plan.keep.includes(olderObject));
+  });
+
+  it('deletes every look when the artist has no mint', async () => {
+    let lookedUp = false;
+    const plan = await resolveLaunchedCoinImages({
+      artists: [{ ...launched, mint: null }],
+      versions: [
+        { artistId: 'artist-1', avatarURL: olderUrl, createdAtMs: 1_000 },
+      ],
+      bucketName: bucket,
+      readMetadataUri: async () => {
+        lookedUp = true;
+        return `https://www.streamstar.xyz/c/${coinId}`;
+      },
+      readCoinImageUrl: async () => coinUrl,
+    });
+    assert.equal(lookedUp, false);
+    assert.deepEqual(plan.keep, []);
+    assert.deepEqual(plan.strip, []);
+    assert.deepEqual(
+      prefixedObjectsDeleted(prefix, objects, new Set(plan.keep)),
+      objects
+    );
+  });
+
+  it('uses stored coin ids before the network', async () => {
+    let lookedUp = false;
+    const plan = await resolveLaunchedCoinImages({
+      artists: [
+        {
+          ...launched,
+          coinMetadataId: coinId,
+          coinImagePath: coinObject,
+        },
+      ],
+      versions: [],
+      bucketName: bucket,
+      readMetadataUri: async () => {
+        lookedUp = true;
+        return null;
+      },
+      readCoinImageUrl: async () => null,
+    });
+    assert.equal(lookedUp, false);
+    assert.deepEqual(plan.keep, [coinObject]);
+    assert.deepEqual(plan.strip, [`c/${coinId}.json`]);
+  });
+});
+
+describe('metaplex metadata uri', () => {
+  it('reads the uri string from a metadata account', () => {
+    const id = '0123456789abcdef0123456789abcdef';
+    const uri = `https://www.streamstar.xyz/c/${id}`;
+    const borsh = (value: string) => {
+      const bytes = Buffer.from(value, 'utf8');
+      const header = Buffer.alloc(4);
+      header.writeUInt32LE(bytes.length, 0);
+      return Buffer.concat([header, bytes]);
+    };
+    const data = Buffer.concat([
+      Buffer.from([4]),
+      Buffer.alloc(32),
+      Buffer.alloc(32),
+      borsh('Nova'),
+      borsh('NOVA'),
+      borsh(uri),
+    ]);
+    assert.equal(metaplexMetadataUriFromAccount(data), uri);
+    assert.deepEqual(coinMetadataObjectPaths(uri), [`c/${id}.json`]);
+  });
+
+  it('reads the account through an RPC getAccountInfo response', async () => {
+    const uri = 'https://www.streamstar.xyz/c/0123456789abcdef0123456789abcdef';
+    const borsh = (value: string) => {
+      const bytes = Buffer.from(value, 'utf8');
+      const header = Buffer.alloc(4);
+      header.writeUInt32LE(bytes.length, 0);
+      return Buffer.concat([header, bytes]);
+    };
+    const data = Buffer.concat([
+      Buffer.from([4]),
+      Buffer.alloc(64),
+      borsh('Nova'),
+      borsh('NOVA'),
+      borsh(uri),
+    ]);
+    const fetchImpl = (async () =>
+      new Response(
+        JSON.stringify({
+          result: { value: { data: [data.toString('base64'), 'base64'] } },
+        }),
+        { status: 200 }
+      )) as typeof fetch;
+    const mint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+    assert.equal(await fetchMetaplexMetadataUri(mint, 'https://rpc.example', { fetchImpl }), uri);
   });
 });
 

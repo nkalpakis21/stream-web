@@ -12,6 +12,8 @@ import type {
 } from 'firebase-admin/firestore';
 import { getAdminBucket, getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
+import { fetchMetaplexMetadataUri } from '@/lib/solana/metaplexCoinMetadata';
+import { getSolanaRpcUrl } from '@/lib/solana/pumpFun';
 
 type CoinFile = ReturnType<ReturnType<typeof getAdminBucket>['file']>;
 
@@ -201,7 +203,223 @@ export function firebaseStorageObjectPath(url: string, bucketName: string): stri
   return null;
 }
 
-const COIN_ID_FIELDS = new Set(['coinId', 'metadataId', 'metadataUri', 'uri']);
+const COIN_ID_FIELDS = new Set([
+  'coinId',
+  'metadataId',
+  'metadataUri',
+  'uri',
+  'coinMetadataId',
+]);
+
+export const COIN_RESOLVE_TIMEOUT_MS = 5000;
+
+export function cleanCoinMetadataId(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const id = value.trim().toLowerCase();
+  return /^[0-9a-f]{32}$/.test(id) ? id : null;
+}
+
+/** Object path safe to keep or store. Rejects traversal and coin JSON itself. */
+export function cleanStorageObjectPath(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const path = value.trim().replace(/^\/+/, '');
+  if (!path || path.endsWith('/')) return null;
+  if (path.includes('..') || path.includes('\\') || path.includes('\0')) return null;
+  if (path.startsWith('c/')) return null;
+  return path;
+}
+
+export function timestampToMillis(value: unknown): number | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as { toMillis?: () => number; seconds?: number; _seconds?: number };
+  if (typeof record.toMillis === 'function') {
+    try {
+      const ms = record.toMillis();
+      return Number.isFinite(ms) ? ms : null;
+    } catch {
+      return null;
+    }
+  }
+  const seconds = typeof record.seconds === 'number' ? record.seconds : record._seconds;
+  if (typeof seconds === 'number' && Number.isFinite(seconds)) return Math.round(seconds * 1000);
+  return null;
+}
+
+export type ArtistCoinSource = {
+  id: string;
+  mint: string | null;
+  launchedAtMs: number | null;
+  avatarURL: string | null;
+  coinMetadataId: string | null;
+  coinImagePath: string | null;
+};
+
+export type ArtistVersionLook = {
+  artistId: string;
+  avatarURL: string | null;
+  createdAtMs: number | null;
+};
+
+export function artistCoinSource(id: string, data: unknown): ArtistCoinSource {
+  const record =
+    data && typeof data === 'object' && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : {};
+  const pump =
+    record.pumpFun && typeof record.pumpFun === 'object' && !Array.isArray(record.pumpFun)
+      ? (record.pumpFun as Record<string, unknown>)
+      : {};
+  const mint = typeof pump.mint === 'string' ? pump.mint.trim() : '';
+  return {
+    id,
+    mint: mint || null,
+    launchedAtMs: timestampToMillis(pump.launchedAt),
+    avatarURL: typeof record.avatarURL === 'string' ? record.avatarURL : null,
+    coinMetadataId: cleanCoinMetadataId(record.coinMetadataId),
+    coinImagePath: cleanStorageObjectPath(record.coinImagePath),
+  };
+}
+
+export function artistVersionLook(data: unknown): ArtistVersionLook | null {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const record = data as Record<string, unknown>;
+  const artistId = typeof record.artistId === 'string' ? record.artistId.trim() : '';
+  if (!artistId) return null;
+  return {
+    artistId,
+    avatarURL: typeof record.avatarURL === 'string' ? record.avatarURL : null,
+    createdAtMs: timestampToMillis(record.createdAt),
+  };
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('coin-resolve-timeout')), ms);
+    promise.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      err => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
+function fallbackLookPaths(
+  artist: ArtistCoinSource,
+  versions: readonly ArtistVersionLook[],
+  bucketName: string
+): string[] {
+  const keep = new Set<string>();
+  const avatar = artist.avatarURL
+    ? firebaseStorageObjectPath(artist.avatarURL, bucketName)
+    : null;
+  if (avatar) keep.add(avatar);
+  for (const version of versions) {
+    if (version.artistId !== artist.id || !version.avatarURL) continue;
+    if (
+      artist.launchedAtMs != null &&
+      version.createdAtMs != null &&
+      version.createdAtMs >= artist.launchedAtMs
+    ) {
+      continue;
+    }
+    const path = firebaseStorageObjectPath(version.avatarURL, bucketName);
+    if (path) keep.add(path);
+  }
+  return [...keep];
+}
+
+/**
+ * Paths under a prefix that a delete would remove. Kept objects and c/ stay.
+ */
+export function prefixedObjectsDeleted(
+  prefix: string,
+  objects: readonly string[],
+  keep: ReadonlySet<string>
+): string[] {
+  return objects.filter(
+    name => name.startsWith(prefix) && !keep.has(name) && !name.startsWith('c/')
+  );
+}
+
+export type CoinImagePlan = {
+  keep: string[];
+  strip: string[];
+};
+
+/**
+ * Decide which Storage objects a launched coin still needs.
+ * Stored coinMetadataId / coinImagePath win. Otherwise the mint's
+ * Metaplex URI is read. A failed lookup keeps the current avatar and
+ * looks from versions created before launchedAt, and does not throw.
+ */
+export async function resolveLaunchedCoinImages(input: {
+  artists: readonly ArtistCoinSource[];
+  versions: readonly ArtistVersionLook[];
+  bucketName: string;
+  readMetadataUri: (mint: string) => Promise<string | null>;
+  readCoinImageUrl: (objectPath: string) => Promise<string | null>;
+  timeoutMs?: number;
+  logFallback?: (artistId: string) => void;
+}): Promise<CoinImagePlan> {
+  const timeoutMs = input.timeoutMs ?? COIN_RESOLVE_TIMEOUT_MS;
+  const keep = new Set<string>();
+  const strip = new Set<string>();
+
+  const rememberImage = (imageUrl: string | null) => {
+    if (!imageUrl) return;
+    const path = firebaseStorageObjectPath(imageUrl, input.bucketName);
+    if (path && !path.startsWith('c/')) keep.add(path);
+  };
+
+  const fallback = (artist: ArtistCoinSource) => {
+    for (const path of fallbackLookPaths(artist, input.versions, input.bucketName)) {
+      keep.add(path);
+    }
+    input.logFallback?.(artist.id);
+  };
+
+  await Promise.all(
+    input.artists.map(async artist => {
+      const finish = async (): Promise<void> => {
+        if (artist.coinMetadataId || artist.coinImagePath) {
+          if (artist.coinMetadataId) strip.add(`c/${artist.coinMetadataId}.json`);
+          if (artist.coinImagePath) {
+            keep.add(artist.coinImagePath);
+            return;
+          }
+          if (artist.coinMetadataId) {
+            const imageUrl = await input.readCoinImageUrl(`c/${artist.coinMetadataId}.json`);
+            rememberImage(imageUrl);
+          }
+          return;
+        }
+        if (!artist.mint) return;
+        const uri = await input.readMetadataUri(artist.mint);
+        const jsonPaths = uri ? coinMetadataObjectPaths(uri) : [];
+        if (jsonPaths.length === 0) {
+          fallback(artist);
+          return;
+        }
+        for (const jsonPath of jsonPaths) strip.add(jsonPath);
+        const imageUrl = await input.readCoinImageUrl(jsonPaths[0]);
+        rememberImage(imageUrl);
+      };
+
+      try {
+        await withTimeout(finish(), timeoutMs);
+      } catch {
+        if (artist.mint || artist.coinMetadataId || artist.coinImagePath) fallback(artist);
+      }
+    })
+  );
+
+  return { keep: [...keep], strip: [...strip] };
+}
 
 /**
  * Storage paths for coins this account's artist docs actually point at.
@@ -260,7 +478,7 @@ async function collectIds(
   field: string,
   value: string,
   sink?: string[],
-  onDoc?: (data: unknown) => void
+  onDoc?: (data: unknown, id: string) => void
 ): Promise<string[]> {
   const ids: string[] = [];
   await mapPage(
@@ -274,7 +492,7 @@ async function collectIds(
         ids.push(doc.id);
         const data = doc.data();
         if (sink) walkStrings(data, sink);
-        if (onDoc) onDoc(data);
+        if (onDoc) onDoc(data, doc.id);
       }
     }
   );
@@ -286,7 +504,8 @@ async function collectWhereIn(
   collectionName: string,
   field: string,
   values: readonly string[],
-  sink?: string[]
+  sink?: string[],
+  onDoc?: (data: unknown, id: string) => void
 ): Promise<string[]> {
   const ids: string[] = [];
   for (let i = 0; i < values.length; i += IN_LIMIT) {
@@ -304,7 +523,9 @@ async function collectWhereIn(
       async docs => {
         for (const doc of docs) {
           ids.push(doc.id);
-          if (sink) walkStrings(doc.data(), sink);
+          const data = doc.data();
+          if (sink) walkStrings(data, sink);
+          if (onDoc) onDoc(data, doc.id);
         }
       }
     );
@@ -422,6 +643,7 @@ async function deleteAccountStorage(input: {
   songIds: readonly string[];
   docStrings: readonly string[];
   coinPaths: readonly string[];
+  extraKeep: readonly string[];
 }): Promise<void> {
   let bucket;
   try {
@@ -439,6 +661,9 @@ async function deleteAccountStorage(input: {
     input.songIds,
     input.coinPaths
   );
+  for (const path of input.extraKeep) {
+    if (path && !path.startsWith('c/')) keep.add(path);
+  }
 
   await deletePrefixExcept(bucket, `artist-looks/${input.uid}/`, keep);
   for (const songId of input.songIds) {
@@ -592,6 +817,22 @@ async function stripCoinPersonalData(
   }
 }
 
+async function readCoinImageUrl(
+  bucket: ReturnType<typeof getAdminBucket>,
+  objectPath: string
+): Promise<string | null> {
+  try {
+    const [buf] = await bucket.file(objectPath).download();
+    const parsed: unknown = JSON.parse(buf.toString('utf8'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const image = (parsed as { image?: unknown }).image;
+    return typeof image === 'string' ? image : null;
+  } catch (err) {
+    if (isStorageNotFound(err) || err instanceof SyntaxError) return null;
+    throw err;
+  }
+}
+
 export async function deleteAccount(
   uid: string,
   tokenEmail: string | null
@@ -611,17 +852,18 @@ export async function deleteAccount(
 
   const songIds = await collectIds(db, COLLECTIONS.songs, 'ownerId', uid, docStrings);
   const coinPaths = new Set<string>();
+  const artistCoins: ArtistCoinSource[] = [];
   const artistIds = await collectIds(
     db,
     COLLECTIONS.artists,
     'ownerId',
     uid,
     docStrings,
-    data => {
+    (data, id) => {
       for (const path of coinMetadataObjectPaths(data)) coinPaths.add(path);
+      artistCoins.push(artistCoinSource(id, data));
     }
   );
-  const coinPathList = [...coinPaths];
 
   const generationIds = await collectWhereIn(
     db,
@@ -637,15 +879,49 @@ export async function deleteAccount(
     songIds,
     docStrings
   );
+  const versionLooks: ArtistVersionLook[] = [];
   const artistVersionIds = await collectWhereIn(
     db,
     COLLECTIONS.artistVersions,
     'artistId',
     artistIds,
-    docStrings
+    docStrings,
+    data => {
+      const look = artistVersionLook(data);
+      if (look) versionLooks.push(look);
+    }
   );
 
-  await deleteAccountStorage({ uid, emails, songIds, docStrings, coinPaths: coinPathList });
+  let extraKeep: string[] = [];
+  try {
+    const bucket = getAdminBucket();
+    if (bucket.name) {
+      const plan = await resolveLaunchedCoinImages({
+        artists: artistCoins,
+        versions: versionLooks,
+        bucketName: bucket.name,
+        readMetadataUri: mint => fetchMetaplexMetadataUri(mint, getSolanaRpcUrl()),
+        readCoinImageUrl: objectPath => readCoinImageUrl(bucket, objectPath),
+        logFallback: artistId => {
+          console.info(`coin_image_kept_fallback ${artistId}`);
+        },
+      });
+      extraKeep = plan.keep;
+      for (const path of plan.strip) coinPaths.add(path);
+    }
+  } catch (err) {
+    if (!bucketNotConfigured(err)) throw err;
+  }
+  const coinPathList = [...coinPaths];
+
+  await deleteAccountStorage({
+    uid,
+    emails,
+    songIds,
+    docStrings,
+    coinPaths: coinPathList,
+    extraKeep,
+  });
   const xPostIds = new Set<string>(
     await collectWhereIn(db, COLLECTIONS.xSongPosts, 'artistId', artistIds)
   );
