@@ -782,4 +782,39 @@ describe('POST /api/generations/musicgpt song binding', { concurrency: false }, 
     assert.equal(songReads, 0);
     assert.deepEqual(saved, [{ songId: null, uid: 'mobile-user' }]);
   });
+
+  it('logs musicgpt_task_binding_failed and returns the existing error when the binding write fails', async () => {
+    const errors: string[] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args.map((arg) => (arg instanceof Error ? arg.message : String(arg))).join(' '));
+    };
+    try {
+      const response = await callRoute(
+        { prompt: 'a song' },
+        {
+          verifyToken: async () => ({ uid: 'mobile-user' }),
+          createMusic: async () => ({
+            task_id: 'task-webhook-secret-1',
+            conversion_id_1: 'c1',
+          }),
+          saveTaskBinding: async () => {
+            throw new Error('firestore unavailable');
+          },
+        }
+      );
+
+      assert.equal(response.status, 500);
+      const body = await response.json();
+      assert.equal(body.error, 'firestore unavailable');
+      const bindingLog = errors.findIndex((line) => line.startsWith('musicgpt_task_binding_failed'));
+      assert.ok(bindingLog >= 0);
+      assert.equal(errors[bindingLog], 'musicgpt_task_binding_failed task-[redacted]-1');
+      const genericLog = errors.findIndex((line) => line.includes('[MusicGPT API Route] Error'));
+      assert.ok(genericLog > bindingLog);
+      assert.equal(errors.some((line) => line.includes('webhook-secret')), false);
+    } finally {
+      console.error = originalError;
+    }
+  });
 });

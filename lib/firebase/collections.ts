@@ -46,6 +46,11 @@ export const COLLECTIONS = {
    * Firestore TTL is the musicgptTasks field override in firestore.indexes.json.
    */
   musicgptTasks: 'musicgptTasks',
+  /**
+   * Mint bound to the uid that asked create-tx to build it.
+   * Admin SDK only. Clients cannot read or write this collection.
+   */
+  coinMints: 'coinMints',
 } as const;
 
 export type CollectionName = typeof COLLECTIONS[keyof typeof COLLECTIONS];

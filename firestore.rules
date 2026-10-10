@@ -293,6 +293,8 @@ service cloud.firestore {
           'currentVersionId',
           'updatedAt'
         ]);
+        // mintSweepExemptAt and mintFirstSeenAt are absent here on purpose.
+        // A client cannot add or change either field.
     }
 
     function songServerFieldsUnchanged() {
@@ -448,7 +450,9 @@ service cloud.firestore {
         && request.resource.data.isPublic is bool
         && pumpFunOnCreate()
         && xOnCreate()
-        && coinMetadataClean();
+        && coinMetadataClean()
+        && !('mintSweepExemptAt' in request.resource.data)
+        && !('mintFirstSeenAt' in request.resource.data);
 
       // currentVersionId may move only to a version of this artist. The version
       // name must match the artist, so a foreign version cannot rename it.
@@ -731,6 +735,14 @@ service cloud.firestore {
       match /coinUploads/{uploadId} {
         allow read, write: if false;
       }
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // Mint bindings written by create-tx. Admin SDK only.
+    match /coinMints/{mintId} {
+      allow read, write: if false;
       match /{document=**} {
         allow read, write: if false;
       }
