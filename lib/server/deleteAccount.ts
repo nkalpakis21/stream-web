@@ -801,6 +801,7 @@ export async function deleteAccountIdentity(
   deleteAuthUser: (uid: string) => Promise<void>
 ): Promise<void> {
   await deleteCoinMetadataUploads(db, uid);
+  // recursiveDelete removes users/{uid} and nested docs, including private/profile.
   await db.recursiveDelete(db.collection(COLLECTIONS.users).doc(uid));
   try {
     await deleteAuthUser(uid);
@@ -942,11 +943,15 @@ export async function deleteAccount(
   tokenEmail: string | null
 ): Promise<void> {
   const db = getAdminDb();
-  const userSnap = await db.collection(COLLECTIONS.users).doc(uid).get();
+  const userRef = db.collection(COLLECTIONS.users).doc(uid);
+  const userSnap = await userRef.get();
+  const privateSnap = await userRef.collection('private').doc('profile').get();
   const storedEmail = userSnap.exists ? userSnap.get('email') : null;
+  const privateEmail = privateSnap.exists ? privateSnap.get('email') : null;
   const emails = collectEmails(
     tokenEmail,
-    typeof storedEmail === 'string' ? storedEmail : null
+    typeof storedEmail === 'string' ? storedEmail : null,
+    typeof privateEmail === 'string' ? privateEmail : null
   );
 
   // URLs are read before any doc delete. Storage objects are removed

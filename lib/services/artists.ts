@@ -311,6 +311,8 @@ export async function checkArtistNameAvailable(
   try {
     const q = query(
       collection(db, COLLECTIONS.artists),
+      where('isPublic', '==', true),
+      where('deletedAt', '==', null),
       where('nameLowercase', '==', normalizedName),
       limit(10)
     );
@@ -331,9 +333,12 @@ export async function checkArtistNameAvailable(
     // Fallback if index doesn't exist - query without nameLowercase filter
     if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
       console.warn('[checkArtistNameAvailable] Index missing, using fallback');
-      // For fallback, we'd need to fetch all artists and filter in memory
-      // This is inefficient but works as a fallback
-      const q = query(collection(db, COLLECTIONS.artists), limit(1000));
+      // Public artists only. An unbounded list is denied by rules.
+      const q = query(
+        collection(db, COLLECTIONS.artists),
+        where('isPublic', '==', true),
+        limit(1000)
+      );
       const snapshot = await getDocs(q);
       const conflicts = snapshot.docs
         .map(doc => doc.data() as AIArtistDocument)
@@ -545,6 +550,7 @@ export async function getLaunchedArtistsByMints(
       const batch = unique.slice(i, i + 10);
       const q = query(
         collection(db, COLLECTIONS.artists),
+        where('isPublic', '==', true),
         where('pumpFun.mint', 'in', batch)
       );
       const snapshot = await getDocs(q);
@@ -614,9 +620,10 @@ export async function searchArtistsByName(
     // Firestore range queries work well for prefix matching
     const q = query(
       collection(db, COLLECTIONS.artists),
+      where('isPublic', '==', true),
+      where('deletedAt', '==', null),
       where('nameLowercase', '>=', trimmedQuery),
       where('nameLowercase', '<=', trimmedQuery + '\uf8ff'),
-      where('deletedAt', '==', null),
       orderBy('nameLowercase', 'asc'),
       limit(limitValue * 2) // Get more to account for filtering
     );
@@ -642,11 +649,11 @@ export async function searchArtistsByName(
     // Fallback if composite index doesn't exist
     if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
       console.warn('[searchArtistsByName] Index missing, using fallback');
-      
-      // Fallback: query without orderBy and filter in memory
+
+      // Public artists only. A deletedAt-only list is denied by rules.
       const q = query(
         collection(db, COLLECTIONS.artists),
-        where('deletedAt', '==', null),
+        where('isPublic', '==', true),
         limit(limitValue * 10) // Get more for in-memory filtering
       );
       
@@ -654,6 +661,7 @@ export async function searchArtistsByName(
       const artists = snapshot.docs
         .map(doc => doc.data() as AIArtistDocument)
         .filter(artist => {
+          if (artist.deletedAt || artist.isPublic !== true) return false;
           if (excludeOwnerId && artist.ownerId === excludeOwnerId) {
             return false;
           }

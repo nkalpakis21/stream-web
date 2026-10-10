@@ -20,6 +20,7 @@ import {
   getDoc,
   getDocs,
   increment,
+  orderBy,
   query,
   setDoc,
   updateDoc,
@@ -145,8 +146,8 @@ async function seedCatalog() {
     await setDoc(doc(db, 'artists/artist1'), artistData());
     await setDoc(doc(db, 'artists/privateArtist'), artistData({
       id: 'privateArtist',
-      name: 'Hidden',
-      nameLowercase: 'hidden',
+      name: 'Nova',
+      nameLowercase: 'nova',
       isPublic: false,
     }));
     await setDoc(doc(db, 'songs/song1'), songData());
@@ -179,13 +180,20 @@ async function seedCatalog() {
       contentHash: null,
     });
     await setDoc(doc(db, 'users/alice'), {
-      email: 'alice@example.com',
       displayName: 'Alice',
       photoURL: null,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
-      solanaWalletAddress: null,
+    });
+    await setDoc(doc(db, 'users/alice/private/profile'), {
+      email: 'alice@example.com',
+      solanaWalletAddress: 'Wallet1111111111111111111111111111111111',
+    });
+    await setDoc(doc(db, 'playRateLimits/limit1'), { count: 1 });
+    await setDoc(doc(db, 'coinMetadataUploads/alice'), { uid: 'alice' });
+    await setDoc(doc(db, 'coinMetadataUploads/alice/coinUploads/upload1'), {
+      expireAt: now,
     });
     await setDoc(doc(db, 'config/mobile'), {
       walletEnabled: true,
@@ -272,6 +280,12 @@ test('owner can create an artist and cannot seize another uid or a launched coin
     },
   })));
 
+  await assertFails(setDoc(doc(alice, 'artists/meta'), artistData({
+    id: 'meta',
+    coinMetadataId: 'meta-id',
+    coinImagePath: 'artist-looks/alice/original.jpg',
+  })));
+
   await assertFails(setDoc(doc(alice, 'artists/linked'), artistData({
     id: 'linked',
     x: {
@@ -324,15 +338,33 @@ test('owner can update artist profile fields and cannot change ownerId, coin, or
     },
   }));
   await assertFails(updateDoc(doc(dbFor('bob'), 'artists/artist1'), { lore: 'hijack' }));
+  await assertFails(updateDoc(ref, { coinMetadataId: 'meta-id' }));
+  await assertFails(updateDoc(ref, { coinImagePath: 'artist-looks/alice/original.jpg' }));
 });
 
-test('name search is allowed and an unbounded artist list is not', async () => {
+test('name search returns only public artists and an unbounded list is denied', async () => {
   await seedCatalog();
   const anon = dbFor(null);
-  await assertSucceeds(getDocs(query(
+  await assertFails(getDocs(query(
     collection(anon, 'artists'),
     where('nameLowercase', '==', 'nova'),
   )));
+  await assertFails(getDocs(query(
+    collection(anon, 'artists'),
+    where('nameLowercase', '>=', 'nova'),
+    where('nameLowercase', '<=', 'nova\uf8ff'),
+  )));
+  const found = await assertSucceeds(getDocs(query(
+    collection(anon, 'artists'),
+    where('isPublic', '==', true),
+    where('deletedAt', '==', null),
+    where('nameLowercase', '>=', 'nova'),
+    where('nameLowercase', '<=', 'nova\uf8ff'),
+    orderBy('nameLowercase', 'asc'),
+  )));
+  const ids = found.docs.map(snapshot => snapshot.id);
+  assert.deepEqual(ids, ['artist1']);
+  assert.equal(ids.includes('privateArtist'), false);
   await assertFails(getDocs(collection(anon, 'artists')));
   await assertFails(getDocs(query(collection(anon, 'artists'), where('deletedAt', '==', null))));
 });
@@ -369,21 +401,27 @@ test('owner can retitle or soft-delete a song and cannot change ownerId or cover
   await assertFails(updateDoc(doc(dbFor('bob'), 'songs/song1'), { isPublic: false }));
 });
 
-test('anyone can increment playCount by one and cannot set it', async () => {
+test('clients cannot write playCount, playsBySource, or playsBackground', async () => {
   await seedCatalog();
   const anon = dbFor(null);
-  await assertSucceeds(updateDoc(doc(anon, 'songs/song1'), { playCount: increment(1) }));
+  const alice = dbFor('alice');
+  await assertFails(updateDoc(doc(anon, 'songs/song1'), { playCount: increment(1) }));
   await assertFails(updateDoc(doc(anon, 'songs/song1'), { playCount: 100 }));
-  await assertFails(updateDoc(doc(anon, 'songs/song1'), { playCount: increment(1), title: 'Nope' }));
+  await assertFails(updateDoc(doc(alice, 'songs/song1'), { playCount: increment(1) }));
+  await assertFails(updateDoc(doc(alice, 'songs/song1'), { playCount: 4 }));
+  await assertFails(updateDoc(doc(alice, 'songs/song1'), { playsBySource: { web: 1 } }));
+  await assertFails(updateDoc(doc(alice, 'songs/song1'), { playsBackground: 1 }));
+  await assertSucceeds(updateDoc(doc(alice, 'songs/song1'), { title: 'Still Mine', updatedAt: now }));
 });
 
-test('missing playCount can be bumped from absent to 1', async () => {
+test('a missing playCount cannot be bumped by a client', async () => {
   await seed(async (db) => {
     const data = songData();
     delete data.playCount;
     await setDoc(doc(db, 'songs/song1'), data);
   });
-  await assertSucceeds(updateDoc(doc(dbFor(null), 'songs/song1'), { playCount: increment(1) }));
+  await assertFails(updateDoc(doc(dbFor(null), 'songs/song1'), { playCount: increment(1) }));
+  await assertFails(updateDoc(doc(dbFor('alice'), 'songs/song1'), { playCount: 1 }));
 });
 
 test('public song versions and generations are readable; private ones are owner-only', async () => {
@@ -444,7 +482,19 @@ test('owner can create a silent song version and a pending generation, not audio
     contentHash: null,
     output: { audioURL: 'https://cdn.example/audio.mp3', stems: null, metadata: {} },
   }));
-  await assertFails(updateDoc(doc(alice, 'generations/gen1'), { status: 'completed', completedAt: now }));
+  await assertSucceeds(updateDoc(doc(alice, 'generations/gen1'), { error: 'retry later' }));
+  await assertFails(updateDoc(doc(alice, 'generations/gen1'), {
+    output: { audioURL: 'https://cdn.example/audio.mp3', stems: null, metadata: {} },
+  }));
+  await assertFails(setDoc(doc(alice, 'generations/foreignOwner'), {
+    id: 'foreignOwner',
+    songId: 'song1',
+    status: 'pending',
+    completedAt: null,
+    contentHash: null,
+    ownerId: 'bob',
+    output: { audioURL: null, stems: null, metadata: {} },
+  }));
 });
 
 test('owner can change isPrimary and cannot write audioURL', async () => {
@@ -455,6 +505,10 @@ test('owner can change isPrimary and cannot write audioURL', async () => {
     audioURL: 'https://cdn.example/audio.mp3',
   }));
   await assertFails(updateDoc(doc(dbFor('bob'), 'songVersions/ver1'), { isPrimary: false }));
+  await assertFails(updateDoc(doc(alice, 'songVersions/ver1'), { createdBy: 'bob' }));
+  await assertFails(updateDoc(doc(alice, 'songVersions/ver1'), {
+    audioURL: 'https://cdn.example/other.mp3',
+  }));
 });
 
 test('config/mobile is world-readable and not client-writable', async () => {
@@ -489,9 +543,9 @@ test('user profile get and display-name search work; unbounded user list does no
   await assertFails(getDocs(collection(anon, 'users')));
 });
 
-test('users can create and update only their own profile, not their email', async () => {
+test('public user docs omit email and wallet; the private profile is owner-only', async () => {
   const bob = dbFor('bob');
-  await assertSucceeds(setDoc(doc(bob, 'users/bob'), {
+  await assertFails(setDoc(doc(bob, 'users/bob'), {
     email: 'bob@example.com',
     displayName: 'Bob',
     photoURL: null,
@@ -499,20 +553,47 @@ test('users can create and update only their own profile, not their email', asyn
     updatedAt: now,
     deletedAt: null,
   }));
+  await assertFails(setDoc(doc(bob, 'users/bob'), {
+    displayName: 'Bob',
+    solanaWalletAddress: 'Wallet1111111111111111111111111111111111',
+    deletedAt: null,
+  }));
+  await assertSucceeds(setDoc(doc(bob, 'users/bob'), {
+    displayName: 'Bob',
+    photoURL: null,
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+  }));
+  const created = await assertSucceeds(getDoc(doc(dbFor(null), 'users/bob')));
+  assert.equal(created.exists(), true);
+  assert.equal(Object.hasOwn(created.data(), 'email'), false);
+  assert.equal(Object.hasOwn(created.data(), 'solanaWalletAddress'), false);
   await assertSucceeds(updateDoc(doc(bob, 'users/bob'), {
     displayName: 'Bobby',
     updatedAt: now,
   }));
-  await assertSucceeds(updateDoc(doc(bob, 'users/bob'), {
-    solanaWalletAddress: 'Wallet1111111111111111111111111111111111',
-    updatedAt: now,
-  }));
   await assertFails(updateDoc(doc(bob, 'users/bob'), { email: 'eve@example.com' }));
+  await assertFails(updateDoc(doc(bob, 'users/bob'), {
+    solanaWalletAddress: 'Wallet1111111111111111111111111111111111',
+  }));
   await assertFails(setDoc(doc(bob, 'users/alice'), {
-    email: 'bob@example.com',
     displayName: 'Not Alice',
     deletedAt: null,
   }));
+
+  await assertSucceeds(setDoc(doc(bob, 'users/bob/private/profile'), {
+    email: 'bob@example.com',
+    solanaWalletAddress: 'Wallet1111111111111111111111111111111111',
+  }));
+  const own = await assertSucceeds(getDoc(doc(bob, 'users/bob/private/profile')));
+  assert.equal(own.data().email, 'bob@example.com');
+  await assertFails(getDoc(doc(dbFor(null), 'users/bob/private/profile')));
+  await assertFails(getDoc(doc(dbFor('alice'), 'users/bob/private/profile')));
+  await assertFails(setDoc(doc(dbFor('alice'), 'users/bob/private/profile'), {
+    email: 'alice@example.com',
+  }));
+  await assertFails(getDocs(collection(dbFor(null), 'users/bob/private')));
 });
 
 test('follows are public to read and only the follower can write', async () => {
@@ -797,6 +878,9 @@ test('artist versions follow the parent artist and only the owner can create the
     createdAt: now,
     parentVersionId: 'av1',
   }));
+  await assertSucceeds(updateDoc(doc(alice, 'artistVersions/av1'), { lore: 'Edited by owner' }));
+  await assertFails(updateDoc(doc(alice, 'artistVersions/av1'), { createdBy: 'bob' }));
+  await assertFails(updateDoc(doc(dbFor('bob'), 'artistVersions/av1'), { lore: 'hijack' }));
 });
 
 test('collaboration records are readable by source song and created only as yourself', async () => {
@@ -826,7 +910,7 @@ test('collaboration records are readable by source song and created only as your
   }));
 });
 
-test('launched-coin lookup by mint is allowed', async () => {
+test('launched-coin lookup by mint requires isPublic and hides private artists', async () => {
   await seed(async (db) => {
     await setDoc(doc(db, 'artists/artist1'), artistData({
       pumpFun: {
@@ -837,11 +921,96 @@ test('launched-coin lookup by mint is allowed', async () => {
         creatorWallet: 'Wallet1111111111111111111111111111111111',
       },
     }));
+    await setDoc(doc(db, 'artists/privateArtist'), artistData({
+      id: 'privateArtist',
+      isPublic: false,
+      pumpFun: {
+        mint: 'MintPrivate111',
+        url: 'https://pump.fun/private',
+        symbol: 'HIDE',
+        launchedAt: now,
+        creatorWallet: 'Wallet1111111111111111111111111111111111',
+      },
+    }));
   });
-  await assertSucceeds(getDocs(query(
+  await assertFails(getDocs(query(
     collection(dbFor(null), 'artists'),
-    where('pumpFun.mint', 'in', ['MintAddress111']),
+    where('pumpFun.mint', 'in', ['MintAddress111', 'MintPrivate111']),
   )));
+  const found = await assertSucceeds(getDocs(query(
+    collection(dbFor(null), 'artists'),
+    where('isPublic', '==', true),
+    where('pumpFun.mint', 'in', ['MintAddress111', 'MintPrivate111']),
+  )));
+  assert.deepEqual(found.docs.map(snapshot => snapshot.id), ['artist1']);
+});
+
+test('signed-out Heat and Discover queries read public songs and artists only', async () => {
+  await seedCatalog();
+  const anon = dbFor(null);
+  const heat = await assertSucceeds(getDocs(query(
+    collection(anon, 'songs'),
+    where('isPublic', '==', true),
+    where('deletedAt', '==', null),
+    orderBy('playCount', 'desc'),
+  )));
+  assert.deepEqual(heat.docs.map(snapshot => snapshot.id), ['song1']);
+
+  const discover = await assertSucceeds(getDocs(query(
+    collection(anon, 'songs'),
+    where('isPublic', '==', true),
+    orderBy('createdAt', 'desc'),
+  )));
+  assert.deepEqual(discover.docs.map(snapshot => snapshot.id), ['song1']);
+
+  const artists = await assertSucceeds(getDocs(query(
+    collection(anon, 'artists'),
+    where('isPublic', '==', true),
+    orderBy('createdAt', 'desc'),
+  )));
+  assert.deepEqual(artists.docs.map(snapshot => snapshot.id), ['artist1']);
+
+  const artistSongs = await assertSucceeds(getDocs(query(
+    collection(anon, 'songs'),
+    where('artistId', '==', 'artist1'),
+    where('isPublic', '==', true),
+    orderBy('createdAt', 'desc'),
+  )));
+  assert.deepEqual(artistSongs.docs.map(snapshot => snapshot.id), ['song1']);
+});
+
+test('a private song is owner-only for get', async () => {
+  await seedCatalog();
+  await assertFails(getDoc(doc(dbFor(null), 'songs/privateSong')));
+  await assertFails(getDoc(doc(dbFor('bob'), 'songs/privateSong')));
+  await assertSucceeds(getDoc(doc(dbFor('alice'), 'songs/privateSong')));
+  await assertFails(getDoc(doc(dbFor('bob'), 'artists/privateArtist')));
+  await assertSucceeds(getDoc(doc(dbFor('alice'), 'artists/privateArtist')));
+});
+
+test('every client operation on playRateLimits and coinMetadataUploads is denied', async () => {
+  await seedCatalog();
+  for (const uid of [null, 'alice', 'bob']) {
+    const db = dbFor(uid);
+    await assertFails(getDoc(doc(db, 'playRateLimits/limit1')));
+    await assertFails(getDocs(collection(db, 'playRateLimits')));
+    await assertFails(setDoc(doc(db, 'playRateLimits/limit2'), { count: 1 }));
+    await assertFails(updateDoc(doc(db, 'playRateLimits/limit1'), { count: 2 }));
+    await assertFails(deleteDoc(doc(db, 'playRateLimits/limit1')));
+    await assertFails(getDoc(doc(db, 'playRateLimits/limit1/nested/secret')));
+    await assertFails(setDoc(doc(db, 'playRateLimits/limit1/nested/secret'), { count: 1 }));
+
+    await assertFails(getDoc(doc(db, 'coinMetadataUploads/alice')));
+    await assertFails(getDocs(collection(db, 'coinMetadataUploads')));
+    await assertFails(setDoc(doc(db, 'coinMetadataUploads/bob'), { uid: 'bob' }));
+    await assertFails(updateDoc(doc(db, 'coinMetadataUploads/alice'), { uid: 'bob' }));
+    await assertFails(deleteDoc(doc(db, 'coinMetadataUploads/alice')));
+    await assertFails(getDoc(doc(db, 'coinMetadataUploads/alice/coinUploads/upload1')));
+    await assertFails(getDocs(collection(db, 'coinMetadataUploads/alice/coinUploads')));
+    await assertFails(setDoc(doc(db, 'coinMetadataUploads/alice/coinUploads/upload2'), { expireAt: now }));
+    await assertFails(updateDoc(doc(db, 'coinMetadataUploads/alice/coinUploads/upload1'), { expireAt: now }));
+    await assertFails(deleteDoc(doc(db, 'coinMetadataUploads/alice/coinUploads/upload1')));
+  }
 });
 
 test('catch-all denies unknown collections', async () => {
