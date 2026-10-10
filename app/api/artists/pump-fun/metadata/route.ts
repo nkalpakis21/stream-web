@@ -2,8 +2,9 @@
  * POST /api/artists/pump-fun/metadata
  *
  * Hosts pump.fun coin metadata JSON on Firebase Storage (image = locked look URL).
- * Returns a short Streamstar HTTPS URI (`/c/{id}`) for create_v2 — never a
- * firebasestorage.googleapis.com download URL (those exceed the 200-char cap).
+ * Returns a short Streamstar HTTPS URI (`/c/{id}`) and that `{id}` for
+ * create_v2 — never a firebasestorage.googleapis.com download URL (those
+ * exceed the 200-char cap). The confirm route stores `id` as coinMetadataId.
  * Never takes a wallet private key.
  */
 
@@ -12,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
 import { getAdminBucket } from '@/lib/firebase/admin';
+import { rememberCoinMetadataUpload } from '@/lib/services/coinMetadataPending';
 import {
   MAX_COIN_NAME_LENGTH,
   MAX_TICKER_LENGTH,
@@ -118,7 +120,13 @@ export async function POST(request: NextRequest) {
       throw err;
     }
 
-    return NextResponse.json({ uri });
+    try {
+      await rememberCoinMetadataUpload({ userId, id, symbol });
+    } catch (err) {
+      console.error('[pump.fun] could not remember coin metadata id', err);
+    }
+
+    return NextResponse.json({ uri, id });
   } catch (error) {
     return errorResponse(error);
   }

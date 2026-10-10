@@ -10,7 +10,10 @@ import { createArtist } from '@/lib/services/artists';
 import { startArtistXConnect } from '@/lib/x/startConnectClient';
 import { ArtistLookPicker } from '@/components/artists/ArtistLookPicker';
 import { getFreshIdToken } from '@/lib/api/clientAuth';
-import { resolvePumpFunForArtistCreate } from '@/lib/solana/launchArtistPumpFunCoin';
+import {
+  confirmArtistPumpFunLaunch,
+  resolvePumpFunForArtistCreate,
+} from '@/lib/solana/launchArtistPumpFunCoin';
 import type { StyleDNA } from '@/types/firestore';
 import { useToast, ToastContainer } from '@/components/ui/toast';
 
@@ -65,7 +68,7 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
           ? { publicKey, signTransaction, sendTransaction }
           : null;
 
-      const { pumpFun, launchNotice } = await resolvePumpFunForArtistCreate({
+      const { pumpFun, coinMetadataId, launchNotice } = await resolvePumpFunForArtistCreate({
         launchCoin: formData.launchCoin,
         coinName: formData.coinName.trim() || formData.name,
         ticker: formData.ticker,
@@ -85,6 +88,15 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
         isPublic: formData.isPublic,
         pumpFun,
       });
+
+      if (pumpFun.mint && coinMetadataId) {
+        try {
+          const token = await getFreshIdToken(user);
+          await confirmArtistPumpFunLaunch(artist.id, pumpFun, token, coinMetadataId);
+        } catch (error) {
+          console.error('Failed to store coin metadata id:', error);
+        }
+      }
 
       const shouldConnectX = formData.connectX;
 

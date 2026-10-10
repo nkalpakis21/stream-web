@@ -37,6 +37,7 @@ import {
   normalizeTicker,
   pumpFunCoinUrl,
 } from '@/lib/solana/pumpFun';
+import { coinMetadataIdFromUpload } from '@/lib/solana/coinMetadata';
 
 /**
  * Wallet surface from the Solana adapter used for create_v2.
@@ -66,7 +67,7 @@ export type ArtistPumpFunLaunchInput = {
 };
 
 export type ArtistPumpFunLaunchResult =
-  | { ok: true; coin: PumpFunCoin }
+  | { ok: true; coin: PumpFunCoin; coinMetadataId: string | null }
   | { ok: false; unavailable?: true; reason: string };
 
 function fail(reason: string): ArtistPumpFunLaunchResult {
@@ -248,7 +249,7 @@ export async function launchArtistPumpFunCoin(
     return fail(userFacingApiError(undefined, error, LAUNCH_NO_TOKEN_NOTICE));
   }
 
-  const metadataRes = await postJson<{ uri: string }>(
+  const metadataRes = await postJson<{ uri: string; id?: string }>(
     '/api/artists/pump-fun/metadata',
     token,
     {
@@ -270,6 +271,10 @@ export async function launchArtistPumpFunCoin(
   if (isMetadataUriTooLong(metadataUri)) {
     return fail(METADATA_URI_TOO_LONG_NOTICE);
   }
+  const coinMetadataId = coinMetadataIdFromUpload({
+    id: metadataRes.data.id,
+    uri: metadataUri,
+  });
 
   const mintKeypair = Keypair.generate();
   const mint = mintKeypair.publicKey.toBase58();
@@ -339,7 +344,46 @@ export async function launchArtistPumpFunCoin(
       launchedAt: Timestamp.now(),
       creatorWallet,
     },
+    coinMetadataId,
   };
+}
+
+/** Save a confirmed coin on the artist. Sends coinMetadataId when the upload returned one. */
+export async function confirmArtistPumpFunLaunch(
+  artistId: string,
+  coin: PumpFunCoin,
+  token: string,
+  coinMetadataId?: string | null
+): Promise<void> {
+  const body: Record<string, unknown> = {
+    mint: coin.mint,
+    url: coin.url,
+    symbol: coin.symbol,
+    launchedAt: coin.launchedAt?.toMillis?.() ?? Date.now(),
+    creatorWallet: coin.creatorWallet,
+  };
+  if (coinMetadataId) {
+    body.coinMetadataId = coinMetadataId;
+  }
+
+  const res = await fetch(`/api/artists/${artistId}/pump-fun`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      userFacingApiError(
+        res.status,
+        data?.error ?? data,
+        'Coin launched but saving it failed. Try again.'
+      )
+    );
+  }
 }
 
 export function pumpFunFromLaunchResult(
@@ -369,14 +413,19 @@ export type ResolvePumpFunForArtistCreateInput = {
  */
 export async function resolvePumpFunForArtistCreate(
   input: ResolvePumpFunForArtistCreateInput
-): Promise<{ pumpFun: PumpFunCoin; launchNotice: string | null }> {
+): Promise<{
+  pumpFun: PumpFunCoin;
+  coinMetadataId: string | null;
+  launchNotice: string | null;
+}> {
   if (!input.launchCoin) {
-    return { pumpFun: emptyPumpFunCoin(), launchNotice: null };
+    return { pumpFun: emptyPumpFunCoin(), coinMetadataId: null, launchNotice: null };
   }
 
   if (!input.wallet || !input.connection || !input.getIdToken) {
     return {
       pumpFun: emptyPumpFunCoin(),
+      coinMetadataId: null,
       launchNotice: `Connect your wallet in the nav, then try again next time. ${LAUNCH_FAILED_NOTICE}`,
     };
   }
@@ -393,6 +442,7 @@ export async function resolvePumpFunForArtistCreate(
 
   return {
     pumpFun: pumpFunFromLaunchResult(result),
+    coinMetadataId: result.ok ? result.coinMetadataId : null,
     launchNotice: result.ok ? null : result.reason,
   };
 }
@@ -404,10 +454,15 @@ export async function resolvePumpFunForArtistCreate(
  */
 export async function launchPumpFunForExistingArtist(
   input: Omit<ResolvePumpFunForArtistCreateInput, 'launchCoin'>
-): Promise<{ coin: PumpFunCoin | null; launchNotice: string | null }> {
+): Promise<{
+  coin: PumpFunCoin | null;
+  coinMetadataId: string | null;
+  launchNotice: string | null;
+}> {
   if (!input.wallet || !input.connection || !input.getIdToken) {
     return {
       coin: null,
+      coinMetadataId: null,
       launchNotice: `Connect your wallet in the nav, then try again next time. ${LAUNCH_NO_TOKEN_NOTICE}`,
     };
   }
@@ -423,8 +478,8 @@ export async function launchPumpFunForExistingArtist(
   });
 
   if (!result.ok) {
-    return { coin: null, launchNotice: result.reason };
+    return { coin: null, coinMetadataId: null, launchNotice: result.reason };
   }
 
-  return { coin: result.coin, launchNotice: null };
+  return { coin: result.coin, coinMetadataId: result.coinMetadataId, launchNotice: null };
 }
