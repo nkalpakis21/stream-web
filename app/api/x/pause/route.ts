@@ -1,27 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
+import { noStoreJson } from '@/lib/http/noStore';
+import { artistIsVisible } from '@/lib/artists/visibility';
 import { getArtist } from '@/lib/services/artists';
 import { isXConfigured, X_CLIENT_ID_MISSING_MESSAGE } from '@/lib/x/config';
 import { firestoreNow, getArtistAdmin, publicXConnection, updateArtistX } from '@/lib/x/artistStore';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
 
 /**
  * POST /api/x/pause
  * Body: { artistId: string, paused: boolean }
  * Pause or resume posting. Does not revoke tokens.
+ * Requires Authorization: Bearer. The ss_viewer cookie is ignored.
  */
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request);
     if (!isXConfigured()) {
-      return NextResponse.json(
+      return noStoreJson(
         { error: X_CLIENT_ID_MISSING_MESSAGE, available: false },
-        { status: 503 }
+        503
       );
     }
-
-    const userId = await requireUserId(request);
     const body = (await request.json().catch(() => ({}))) as {
       artistId?: string;
       paused?: boolean;
@@ -37,7 +41,7 @@ export async function POST(request: NextRequest) {
     } catch {
       artist = await getArtist(artistId);
     }
-    if (!artist || artist.deletedAt) {
+    if (!artistIsVisible(artist, userId)) {
       throw new HttpError(404, 'Artist not found');
     }
     if (artist.ownerId !== userId) {
@@ -63,7 +67,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
+    return noStoreJson({
       ok: true,
       status: body.paused ? 'paused' : 'connected',
     });

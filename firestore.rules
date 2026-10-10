@@ -690,8 +690,25 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    function isCommentTombstone() {
+      return resource.data.deleted == true
+        && resource.data.keys().hasOnly([
+          'deleted',
+          'parentCommentId',
+          'targetType',
+          'targetId',
+          'createdAt'
+        ]);
+    }
+
     match /comments/{commentId} {
-      allow read: if resource.data.deletedAt == null;
+      // List stays `deletedAt == null` so the existing comment queries are
+      // valid (rules are not filters). Get of a tombstone that still carries
+      // authorId, content, name, or avatar is denied. A proper tombstone has
+      // none of those fields.
+      allow get: if isCommentTombstone()
+        || (resource.data.deleted != true && resource.data.deletedAt == null);
+      allow list: if resource.data.deletedAt == null;
       allow create: if signedIn()
         && request.resource.data.id == commentId
         && request.resource.data.authorId == request.auth.uid
@@ -728,8 +745,12 @@ service cloud.firestore {
     match /artistXAuth/{artistId} {
       allow read, write: if false;
     }
+    // Song-live idempotency claims. Admin SDK only, including every subcollection.
     match /xSongPosts/{songId} {
       allow read, write: if false;
+      match /{document=**} {
+        allow read, write: if false;
+      }
     }
     // Pending coin metadata. TTL deletes coinUploads/{id} via expireAt.
     // Admin SDK only, including every nested coinUploads doc.

@@ -1,3 +1,5 @@
+const { VIEWER_CACHE_CONTROL, VIEWER_NO_STORE_SOURCES } = require('./lib/http/viewerNoStoreSources');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -14,6 +16,13 @@ const nextConfig = {
       '@coral-xyz/anchor',
       '@pump-fun/pump-swap-sdk',
     ],
+  },
+  async headers() {
+    const cacheControl = [{ key: 'Cache-Control', value: VIEWER_CACHE_CONTROL }];
+    return VIEWER_NO_STORE_SOURCES.map((source) => ({
+      source,
+      headers: cacheControl,
+    }));
   },
   async redirects() {
     return [

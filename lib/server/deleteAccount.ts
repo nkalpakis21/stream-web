@@ -6,6 +6,8 @@
  * coinMints docs for this uid are overwritten with `{ deletedAt }` so the
  * mint stays bound. uid and creatorWallet are removed. The doc is not
  * deleted. A retry matches no uid and writes nothing.
+ * Comments by this user are hard-deleted, or overwritten with a tombstone
+ * when other people have replied. A retry matches no authorId.
  */
 
 import * as admin from 'firebase-admin';
@@ -19,6 +21,7 @@ import {
 } from 'firebase-admin/firestore';
 import { getAdminBucket, getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
+import { deleteAuthoredComments } from '@/lib/server/commentDelete';
 import { COIN_METADATA_UPLOADS } from '@/lib/services/coinMetadataPending';
 import { fetchMetaplexMetadataUri } from '@/lib/solana/metaplexCoinMetadata';
 import { getSolanaRpcUrl } from '@/lib/solana/pumpFun';
@@ -1089,6 +1092,9 @@ export async function deleteAccount(
   try {
     // Seal mint bindings before the artist docs go away. A retry matches no uid.
     await tombstoneCoinMints(db, writer, uid);
+    // Comments are a top-level collection (no song/artist subcollection).
+    // Tombstones drop authorId, so a retry matches nothing.
+    await deleteAuthoredComments(db, writer, uid);
 
     // X tokens and post cache before artists. Song children before songs.
     await deleteDocIds(db, writer, COLLECTIONS.generations, generationIds);

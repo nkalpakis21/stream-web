@@ -1,15 +1,17 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { PlayableArt } from '@/components/songs/PlayableArt';
 import { ShareButton } from '@/components/songs/ShareButton';
 import { CoinBadge } from '@/components/songs/CoinBadge';
 import { SongCoinCluster } from '@/components/songs/SongCoinCluster';
+import { ArtistFace } from '@/components/artists/ArtistFace';
+import { MaybeArtistLink } from '@/components/songs/MaybeArtistLink';
 import { AiMark } from '@/components/brand/AiMark';
 import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { coverFieldsFromSong, playerCoverPayload, type CoverFields } from '@/lib/covers/resolve';
+import { artistFaceSources, songCoverCandidates } from '@/lib/images/artistFace';
 
 interface VersionOption {
   id: string;
@@ -23,6 +25,8 @@ interface SongStageProps {
   songTitle: string;
   artistId: string | null;
   artistName: string;
+  artistPhotoUrl?: string | null;
+  artistLinkable?: boolean;
   albumCoverUrl: string | null;
   cover?: CoverFields;
   audioUrl: string | null;
@@ -59,6 +63,8 @@ export function SongStage({
   songTitle,
   artistId,
   artistName,
+  artistPhotoUrl = null,
+  artistLinkable = false,
   albumCoverUrl,
   cover,
   audioUrl,
@@ -114,16 +120,26 @@ export function SongStage({
           <AiMark />
         </div>
         <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
-          {artistId ? (
-            <Link href={`/artists/${artistId}`} className="inline-block text-lg text-primary underline-offset-4 hover:underline" data-entity="artist">
-              {artistName}
-            </Link>
-          ) : (
-            <p className="text-lg text-muted-foreground" data-entity="artist">{artistName}</p>
-          )}
+          <ArtistFace
+            name={artistName}
+            sources={artistFaceSources(artistPhotoUrl, songCoverCandidates(coverFields))}
+            size="row"
+          />
+          <MaybeArtistLink
+            artistId={artistId}
+            linkable={artistLinkable}
+            className={
+              artistLinkable
+                ? 'inline-block text-lg text-primary underline-offset-4 hover:underline'
+                : 'inline-block text-lg text-muted-foreground'
+            }
+            dataEntity="artist"
+          >
+            {artistName}
+          </MaybeArtistLink>
           <CoinBadge ticker={ticker} iconSrc={coinIcon} />
         </div>
-        <SongCoinCluster artistId={artistId} quote={coin} buyUrl={buyUrl} />
+        <SongCoinCluster artistId={artistId} quote={coin} buyUrl={buyUrl} linkable={artistLinkable} />
         {pending && !currentAudio && (
           <div
             className="mt-6 rounded-xl border px-4 py-5"

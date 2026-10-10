@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getArtist } from '@/lib/services/artists';
-import { hasLaunchedCoin } from '@/lib/brand/coin';
+import { getArtistCardContext } from '@/lib/server/artistDisplay';
 import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
 
 export const revalidate = 120;
@@ -15,19 +14,23 @@ export async function GET(
 ) {
   const artistId = params.id?.trim();
   if (!artistId) {
-    return NextResponse.json({ quote: null });
+    return NextResponse.json({ quote: null, linkable: false });
   }
 
   try {
-    const artist = await getArtist(artistId);
-    const mint = artist?.pumpFun?.mint?.trim();
-    if (!artist || !hasLaunchedCoin(artist.pumpFun) || !mint) {
-      return NextResponse.json({ quote: null });
+    const { displays, coins } = await getArtistCardContext([artistId]);
+    const display = displays.get(artistId);
+    const mint = coins.get(artistId)?.mint?.trim();
+    if (!display || !mint) {
+      return NextResponse.json({ quote: null, linkable: display?.isPublic === true });
     }
 
     const quotes = await fetchCoinQuotes([mint]);
-    return NextResponse.json({ quote: quotes.get(mint) ?? null });
+    return NextResponse.json({
+      quote: quotes.get(mint) ?? null,
+      linkable: display.isPublic === true,
+    });
   } catch {
-    return NextResponse.json({ quote: null });
+    return NextResponse.json({ quote: null, linkable: false });
   }
 }

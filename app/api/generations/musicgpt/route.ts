@@ -1,6 +1,11 @@
 import { NextRequest } from 'next/server';
 import { postMusicGptGeneration } from '@/lib/server/musicgptGeneration';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+export const runtime = 'nodejs';
+
 /**
  * Server-side API route for initiating MusicGPT generation.
  * This ensures API keys are never exposed to the client.

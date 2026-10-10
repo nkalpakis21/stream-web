@@ -2,19 +2,24 @@
 
 import { useState } from 'react';
 import { getInitials } from '@/lib/utils/avatar';
+import './artist-card.css';
 
 export function ArtistFace({
   name,
   sources,
+  size = 'index',
 }: {
   name: string;
   sources: string[];
+  size?: 'index' | 'card' | 'row';
 }) {
   const [index, setIndex] = useState(0);
   const src = sources[index] ?? null;
+  const sizeClass =
+    size === 'card' ? 'artist-face-card' : size === 'row' ? 'artist-face-row' : '';
 
   return (
-    <span className="artist-index-face">
+    <span className={`artist-index-face ${sizeClass}`.trim()}>
       <span className="artist-index-face-initials" aria-hidden>
         {getInitials(name)}
       </span>

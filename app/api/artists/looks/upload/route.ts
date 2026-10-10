@@ -4,6 +4,8 @@ import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
 import { getAdminBucket } from '@/lib/firebase/admin';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
 
 const MAX_BYTES = 4 * 1024 * 1024;

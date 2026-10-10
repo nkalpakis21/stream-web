@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { formatCoinCluster, type ArtistCoinQuote } from '@/lib/brand/coinStats';
+import { MaybeArtistLink } from '@/components/songs/MaybeArtistLink';
 
 const EMPTY_PRICE = '$0';
 const EMPTY_CHANGE = '0%';
@@ -15,10 +15,12 @@ export function SongCoinCluster({
   artistId,
   quote,
   buyUrl,
+  linkable = true,
 }: {
   artistId: string | null;
   quote: ArtistCoinQuote | null;
   buyUrl?: string | null;
+  linkable?: boolean;
 }) {
   const live = quote ? formatCoinCluster(quote) : null;
   const hasLive = Boolean(live && live.price && live.change && live.mcap);
@@ -39,13 +41,13 @@ export function SongCoinCluster({
 
   return (
     <div className="song-stage-cluster">
-      {artistId ? (
-        <Link href={`/artists/${artistId}`} className="song-stage-cluster-meta">
-          {meta}
-        </Link>
-      ) : (
-        <span className="song-stage-cluster-meta">{meta}</span>
-      )}
+      <MaybeArtistLink
+        artistId={artistId}
+        linkable={linkable}
+        className="song-stage-cluster-meta"
+      >
+        {meta}
+      </MaybeArtistLink>
       {buyUrl ? (
         <a
           href={buyUrl}

@@ -169,6 +169,27 @@ export function SongPlayerProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** Test and static render. No router, no player chrome. */
+export function SongPlayerStaticProvider({ children }: { children: ReactNode }) {
+  const value = useMemo<SongPlayerContextType>(
+    () => ({
+      nowPlaying: null,
+      isPlaying: false,
+      canPrev: false,
+      canNext: false,
+      play: () => {},
+      pause: () => {},
+      togglePlayPause: () => {},
+      close: () => {},
+      playPrev: () => {},
+      playNext: () => {},
+      skipEnded: () => {},
+    }),
+    []
+  );
+  return <SongPlayerContext.Provider value={value}>{children}</SongPlayerContext.Provider>;
+}
+
 export function useSongPlayer() {
   const context = useContext(SongPlayerContext);
   if (context === undefined) {

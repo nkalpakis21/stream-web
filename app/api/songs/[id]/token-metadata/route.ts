@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSong } from '@/lib/services/songs';
-import { getArtist } from '@/lib/services/artists';
+import { getArtistCardContext } from '@/lib/server/artistDisplay';
 import { resolveCoverPoster } from '@/lib/covers/resolve';
 
 export async function GET(
@@ -22,7 +22,8 @@ export async function GET(
       return NextResponse.json({ error: 'Song not found' }, { status: 404 });
     }
 
-    const artist = await getArtist(song.artistId);
+    const { displays } = await getArtistCardContext([song.artistId]);
+    const artist = displays.get(song.artistId) ?? null;
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL || 'https://streamstar.xyz';
     const songUrl = `${baseUrl}/songs/${songId}`;

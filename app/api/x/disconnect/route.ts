@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
+import { noStoreJson } from '@/lib/http/noStore';
+import { artistIsVisible } from '@/lib/artists/visibility';
 import { getArtist } from '@/lib/services/artists';
 import { isXConfigured, X_CLIENT_ID_MISSING_MESSAGE } from '@/lib/x/config';
 import { emptyXConnection } from '@/types/firestore';
@@ -8,23 +10,25 @@ import { deleteXAuth, loadXAuth } from '@/lib/x/tokens';
 import { revokeToken } from '@/lib/x/oauth';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
 
 /**
  * POST /api/x/disconnect
  * Body: { artistId: string }
  * Revokes refresh token, deletes server-only credentials, resets public X state.
+ * Requires Authorization: Bearer. The ss_viewer cookie is ignored.
  */
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request);
     if (!isXConfigured()) {
-      return NextResponse.json(
+      return noStoreJson(
         { error: X_CLIENT_ID_MISSING_MESSAGE, available: false },
-        { status: 503 }
+        503
       );
     }
-
-    const userId = await requireUserId(request);
     const body = (await request.json().catch(() => ({}))) as { artistId?: string };
     const artistId = body.artistId?.trim();
     if (!artistId) {
@@ -37,7 +41,7 @@ export async function POST(request: NextRequest) {
     } catch {
       artist = await getArtist(artistId);
     }
-    if (!artist || artist.deletedAt) {
+    if (!artistIsVisible(artist, userId)) {
       throw new HttpError(404, 'Artist not found');
     }
     if (artist.ownerId !== userId) {
@@ -56,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     await updateArtistX(artistId, emptyXConnection());
 
-    return NextResponse.json({ ok: true, status: 'disconnected' });
+    return noStoreJson({ ok: true, status: 'disconnected' });
   } catch (error) {
     return errorResponse(error);
   }

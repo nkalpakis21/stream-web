@@ -3,18 +3,21 @@
 import Link from 'next/link';
 import { UserArtistsSection } from '@/components/profile/UserArtistsSection';
 import { UserSongsSection } from '@/components/profile/UserSongsSection';
+import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
 import type { SongDocument, AIArtistDocument } from '@/types/firestore';
 
 interface OverviewTabProps {
   songs: SongDocument[];
   artists: AIArtistDocument[];
   songArtistMap: Map<string, string>;
+  artistDisplays: Map<string, ArtistCardDisplay>;
 }
 
 export function OverviewTab({
   songs,
   artists,
   songArtistMap,
+  artistDisplays,
 }: OverviewTabProps) {
   const recentSongs = songs.slice(0, 3);
   const recentArtists = artists.slice(0, 2);
@@ -83,7 +86,11 @@ export function OverviewTab({
               View all →
             </Link>
           </div>
-          <UserSongsSection songs={recentSongs} songArtistMap={songArtistMap} />
+          <UserSongsSection
+            songs={recentSongs}
+            songArtistMap={songArtistMap}
+            artistDisplays={artistDisplays}
+          />
         </div>
       )}
 

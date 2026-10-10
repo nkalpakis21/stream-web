@@ -41,7 +41,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Search artists
-    const artists = await searchArtistsByName(query.trim(), excludeOwnerId, limitCount);
+    const artists = (await searchArtistsByName(query.trim(), excludeOwnerId, limitCount)).filter(
+      artist => artist.isPublic === true && !artist.deletedAt
+    );
 
     // Serialize Timestamps for client
     const serializedArtists = artists.map(artist => ({

@@ -6,7 +6,8 @@ import { collection, query, where, orderBy, limit, onSnapshot, Timestamp } from 
 import { db } from '@/lib/firebase/config';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import { SongCard } from '@/components/songs/SongCard';
-import { getArtistNamesForSongs } from '@/lib/services/songs';
+import { fetchArtistCardDisplays } from '@/lib/artists/fetchCardDisplay';
+import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
 import type { SongDocument } from '@/types/firestore';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { InfiniteScrollSentinel } from '@/components/discover/InfiniteScrollSentinel';
@@ -25,6 +26,7 @@ import {
   listenSecondaryClass,
 } from '@/components/states/BrandDeadEnd';
 import Link from 'next/link';
+import { getFreshIdToken } from '@/lib/api/clientAuth';
 
 interface PaginatedResponse {
   songs: Array<{
@@ -36,6 +38,7 @@ interface PaginatedResponse {
   }>;
   nextCursor: string | null;
   hasMore: boolean;
+  artists?: Record<string, ArtistCardDisplay>;
 }
 
 export function FeedPageClient() {
@@ -43,6 +46,7 @@ export function FeedPageClient() {
   const [songs, setSongs] = useState<SongDocument[]>([]);
   const [coinArtists, setCoinArtists] = useState<FeedCoinArtist[]>([]);
   const [artistNames, setArtistNames] = useState<Map<string, string>>(new Map());
+  const [artists, setArtists] = useState<Map<string, ArtistCardDisplay>>(new Map());
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -114,8 +118,13 @@ export function FeedPageClient() {
 
   const loadFollowedCoins = useCallback(async (userId: string) => {
     try {
+      const headers: HeadersInit = {};
+      if (user) {
+        headers.Authorization = `Bearer ${await getFreshIdToken(user)}`;
+      }
       const followedRes = await fetch(
-        `/api/artists/followed?userId=${encodeURIComponent(userId)}`
+        `/api/artists/followed?userId=${encodeURIComponent(userId)}`,
+        { headers, cache: 'no-store' }
       );
       if (!followedRes.ok) {
         return [] as FeedCoinArtist[];
@@ -143,7 +152,7 @@ export function FeedPageClient() {
     } catch {
       return [] as FeedCoinArtist[];
     }
-  }, []);
+  }, [user]);
 
   // Load initial songs + followed launched-coin rows
   const loadInitial = useCallback(async () => {
@@ -177,9 +186,17 @@ export function FeedPageClient() {
       setCursor(data.nextCursor);
       setHasMore(data.hasMore);
 
-      // Fetch artist names
-      const names = await getArtistNamesForSongs(deserializedSongs);
+      const fromApi = new Map<string, ArtistCardDisplay>();
+      Object.values(data.artists || {}).forEach(artist => {
+        if (artist?.id && artist.name) fromApi.set(artist.id, artist);
+      });
       if (currentUserIdRef.current === user.uid) {
+        setArtists(fromApi);
+        const names = new Map<string, string>();
+        deserializedSongs.forEach(song => {
+          const name = fromApi.get(song.artistId)?.name;
+          if (name) names.set(song.id, name);
+        });
         setArtistNames(names);
       }
     } catch (err) {
@@ -221,12 +238,18 @@ export function FeedPageClient() {
       setCursor(data.nextCursor);
       setHasMore(data.hasMore);
 
-      // Fetch artist names for new songs
-      const names = await getArtistNamesForSongs(deserializedSongs);
+      const fromApi = new Map<string, ArtistCardDisplay>();
+      Object.values(data.artists || {}).forEach(artist => {
+        if (artist?.id && artist.name) fromApi.set(artist.id, artist);
+      });
       if (currentUserIdRef.current === user.uid) {
+        setArtists(prev => new Map([...prev, ...fromApi]));
         setArtistNames(prev => {
           const updated = new Map(prev);
-          names.forEach((name, id) => updated.set(id, name));
+          deserializedSongs.forEach(song => {
+            const name = fromApi.get(song.artistId)?.name;
+            if (name) updated.set(song.id, name);
+          });
           return updated;
         });
       }
@@ -306,15 +329,17 @@ export function FeedPageClient() {
                 return [...newUnique, ...prev];
               });
 
-              // Fetch artist names for new songs
-              getArtistNamesForSongs(deserialized).then(names => {
-                if (currentUserIdRef.current === user.uid) {
-                  setArtistNames(prev => {
-                    const updated = new Map(prev);
-                    names.forEach((name, id) => updated.set(id, name));
-                    return updated;
+              fetchArtistCardDisplays(deserialized.map(song => song.artistId)).then(displays => {
+                if (currentUserIdRef.current !== user.uid) return;
+                setArtists(prev => new Map([...prev, ...displays]));
+                setArtistNames(prev => {
+                  const updated = new Map(prev);
+                  deserialized.forEach(song => {
+                    const name = displays.get(song.artistId)?.name;
+                    if (name) updated.set(song.id, name);
                   });
-                }
+                  return updated;
+                });
               });
             }
           }, (error) => {
@@ -411,7 +436,7 @@ export function FeedPageClient() {
 
   return (
     <div>
-      <FeedStream entries={entries} artistNames={artistNames} />
+      <FeedStream entries={entries} artistNames={artistNames} artists={artists} />
 
       {hasMore && !loadingMore && (
         <InfiniteScrollSentinel
@@ -434,9 +459,11 @@ export function FeedPageClient() {
 function FeedStream({
   entries,
   artistNames,
+  artists,
 }: {
   entries: FeedEntry[];
   artistNames: Map<string, string>;
+  artists: Map<string, ArtistCardDisplay>;
 }) {
   const blocks: Array<
     | { type: 'coin'; artist: FeedCoinArtist }
@@ -481,6 +508,7 @@ function FeedStream({
                 key={song.id}
                 song={song}
                 artistName={artistNames.get(song.id)}
+                artist={artists.get(song.artistId) ?? null}
               />
             ))}
           </div>

@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { CommentForm } from './CommentForm';
 import { CommentActions } from './CommentActions';
+import { DeletedCommentLine } from './DeletedCommentLine';
+import { CommentAuthor } from './CommentAuthor';
 import { getReplies } from '@/lib/services/comments';
+import type { CommentDeleteOutcome } from '@/lib/comments/live';
 import { useUserDisplayName, useUsersDisplayNames } from '@/hooks/useUserDisplayName';
 import type { CommentDocument } from '@/types/firestore';
 import { formatDistanceToNow } from 'date-fns';
@@ -21,8 +24,9 @@ interface CommentThreadProps {
   };
   targetType: 'artist' | 'song';
   targetId: string;
-  onCommentDeleted: (commentId: string) => void;
+  onCommentDeleted: (commentId: string, outcome: CommentDeleteOutcome) => void;
   onCommentUpdated: (comment: CommentThreadProps['comment']) => void;
+  onLiveCommentsChanged?: () => void;
 }
 
 type SerializedCommentDocument = CommentThreadProps['comment'];
@@ -33,22 +37,26 @@ export function CommentThread({
   targetId,
   onCommentDeleted,
   onCommentUpdated,
+  onLiveCommentsChanged,
 }: CommentThreadProps) {
   const { user } = useAuth();
   const pathname = usePathname();
   const [replies, setReplies] = useState<SerializedCommentDocument[]>([]);
   const [showReplyForm, setShowReplyForm] = useState(false);
-  const [loadingReplies, setLoadingReplies] = useState(false);
+  const [repliesLoaded, setRepliesLoaded] = useState(false);
+  const repliesLoadedRef = useRef(false);
   
-  // Fetch display names
-  const { displayName: authorDisplayName } = useUserDisplayName(comment.authorId);
-  const replyAuthorIds = replies.map(r => r.authorId);
-  const { displayNames: replyDisplayNames } = useUsersDisplayNames(replyAuthorIds);
+  // Fetch display names. Tombstones have no author.
+  const { displayName: authorDisplayName, loading: authorLoading } = useUserDisplayName(
+    comment.deleted ? null : comment.authorId
+  );
+  const replyAuthorIds = replies.map(r => (r.deleted ? null : r.authorId));
+  const { displayNames: replyDisplayNames, loading: replyNamesLoading } =
+    useUsersDisplayNames(replyAuthorIds);
 
-  const loadReplies = async () => {
-    if (replies.length > 0 || loadingReplies) return;
-    
-    setLoadingReplies(true);
+  const loadReplies = useCallback(async () => {
+    if (repliesLoadedRef.current) return;
+    repliesLoadedRef.current = true;
     try {
       const result = await getReplies(comment.id, 50, null);
       setReplies(
@@ -59,53 +67,77 @@ export function CommentThread({
           deletedAt: reply.deletedAt ? reply.deletedAt.toMillis() : null,
         }))
       );
+      setRepliesLoaded(true);
     } catch (error) {
+      repliesLoadedRef.current = false;
       console.error('Failed to load replies:', error);
-    } finally {
-      setLoadingReplies(false);
     }
-  };
+  }, [comment.id]);
+
+  useEffect(() => {
+    if (comment.deleted) {
+      void loadReplies();
+    }
+  }, [comment.deleted, loadReplies]);
 
   const handleReplyAdded = (newReply: SerializedCommentDocument) => {
     setReplies(prev => [...prev, newReply]);
     setShowReplyForm(false);
+    onLiveCommentsChanged?.();
   };
 
-  const handleReplyDeleted = (replyId: string) => {
-    setReplies(prev => prev.filter(r => r.id !== replyId));
+  const handleReplyDeleted = (replyId: string, outcome: CommentDeleteOutcome) => {
+    setReplies(prev => {
+      if (outcome === 'tombstone') {
+        return prev.map(reply =>
+          reply.id === replyId
+            ? { ...reply, deleted: true, authorId: '', content: '' }
+            : reply
+        );
+      }
+      return prev.filter(reply => reply.id !== replyId);
+    });
+    onLiveCommentsChanged?.();
   };
 
   const handleReplyUpdated = (updatedReply: SerializedCommentDocument) => {
     setReplies(prev => prev.map(r => r.id === updatedReply.id ? updatedReply : r));
   };
 
+  if (comment.deleted && repliesLoaded && replies.length === 0) {
+    return null;
+  }
+
   return (
     <div className="border-b border-border pb-6 last:border-b-0">
       <div className="flex gap-3">
         <div className="flex-1">
-          <div className="flex items-start justify-between mb-2">
-            <div>
-              <span className="font-medium text-sm">
-                {authorDisplayName || `User ${comment.authorId.substring(0, 8)}...`}
-              </span>
-              <span className="text-xs text-muted-foreground ml-2">
-                {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
-              </span>
-            </div>
-            {user && user.uid === comment.authorId && (
-              <CommentActions
-                comment={comment}
-                onCommentDeleted={onCommentDeleted}
-                onCommentUpdated={onCommentUpdated}
-              />
-            )}
-          </div>
-          
-          <p className="text-sm text-foreground whitespace-pre-wrap break-words mb-3">
-            {comment.content}
-          </p>
+          {comment.deleted ? (
+            <DeletedCommentLine />
+          ) : (
+            <>
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex min-w-0 items-center">
+                  <CommentAuthor displayName={authorDisplayName} loading={authorLoading} />
+                  <span className="text-xs text-muted-foreground ml-2">
+                    {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                  </span>
+                </div>
+                {user && user.uid === comment.authorId && (
+                  <CommentActions
+                    comment={comment}
+                    onCommentDeleted={onCommentDeleted}
+                    onCommentUpdated={onCommentUpdated}
+                  />
+                )}
+              </div>
+              <p className="text-sm text-foreground whitespace-pre-wrap break-words mb-3">
+                {comment.content}
+              </p>
+            </>
+          )}
 
-          {user ? (
+          {!comment.deleted && user ? (
             <div className="flex items-center gap-4">
               <button
                 onClick={() => {
@@ -128,7 +160,7 @@ export function CommentThread({
                 </button>
               )}
             </div>
-          ) : (
+          ) : !comment.deleted ? (
             <Link
               href={authHref('/signin', pathname)}
               className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -136,7 +168,7 @@ export function CommentThread({
               <Reply className="w-3 h-3" />
               Reply
             </Link>
-          )}
+          ) : null}
 
           {showReplyForm && (
             <div className="mt-4 ml-4 pl-4 border-l-2 border-border">
@@ -153,12 +185,23 @@ export function CommentThread({
           {replies.length > 0 && (
             <div className="mt-4 ml-4 pl-4 border-l-2 border-border space-y-4">
               {replies.map(reply => {
-                const replyAuthorName = replyDisplayNames.get(reply.authorId) || `User ${reply.authorId.substring(0, 8)}...`;
+                if (reply.deleted) {
+                  return (
+                    <div key={reply.id} className="pb-4 last:pb-0">
+                      <DeletedCommentLine />
+                    </div>
+                  );
+                }
+                const replyAuthorName = replyDisplayNames.get(reply.authorId) ?? null;
                 return (
                   <div key={reply.id} className="pb-4 last:pb-0">
                     <div className="flex items-start justify-between mb-1">
-                      <div>
-                        <span className="font-medium text-xs">{replyAuthorName}</span>
+                      <div className="flex min-w-0 items-center">
+                        <CommentAuthor
+                          displayName={replyAuthorName}
+                          loading={replyNamesLoading && !replyDisplayNames.has(reply.authorId)}
+                          nameClassName="font-medium text-xs"
+                        />
                         <span className="text-xs text-muted-foreground ml-2">
                           {formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}
                         </span>

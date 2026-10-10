@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { applyNoStore } from '@/lib/http/noStore';
 import {
   isFirebaseAdminConfigured,
   isFirebaseAdminInitError,
@@ -75,16 +76,20 @@ export async function requireUserId(
 
 export function errorResponse(error: unknown): NextResponse {
   if (error instanceof HttpError) {
-    return NextResponse.json({ error: error.message }, { status: error.status });
+    return applyNoStore(
+      NextResponse.json({ error: error.message }, { status: error.status })
+    );
   }
   if (isFirebaseAdminInitError(error)) {
     console.error('[auth] Firebase Admin is not initialized:', error);
-    return NextResponse.json(
-      { error: ADMIN_UNAVAILABLE_MESSAGE },
-      { status: 503 }
+    return applyNoStore(
+      NextResponse.json(
+        { error: ADMIN_UNAVAILABLE_MESSAGE },
+        { status: 503 }
+      )
     );
   }
   const message = error instanceof Error ? error.message : 'Internal error';
   console.error('[API]', error);
-  return NextResponse.json({ error: message }, { status: 500 });
+  return applyNoStore(NextResponse.json({ error: message }, { status: 500 }));
 }

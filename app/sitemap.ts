@@ -23,7 +23,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  const artistRoutes = artists.map(artist => ({
+  const artistRoutes = artists
+    .filter(artist => artist.isPublic === true && !artist.deletedAt)
+    .map(artist => ({
     url: publicUrl(`/artists/${artist.id}`),
     changeFrequency: 'weekly' as const,
     priority: 0.6,

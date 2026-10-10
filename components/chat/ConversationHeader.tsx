@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getConversation } from '@/lib/services/conversations';
-import { doc, getDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-import { getUserPath, getArtistPath } from '@/lib/firebase/collections';
-import type { ConversationDocument, UserDocument, AIArtistDocument } from '@/types/firestore';
+import { getUserPath } from '@/lib/firebase/collections';
+import { fetchArtistCardDisplays } from '@/lib/artists/fetchCardDisplay';
+import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
+import { ArtistFace } from '@/components/artists/ArtistFace';
+import type { ConversationDocument, UserDocument } from '@/types/firestore';
 import { Users, MessageCircle, Edit2, Check, X, Loader2 } from 'lucide-react';
-import Image from 'next/image';
-import { getAvatarGradient, getInitials } from '@/lib/utils/avatar';
 import { useToast, ToastContainer } from '@/components/ui/toast';
 import { getFreshIdToken } from '@/lib/api/clientAuth';
 
@@ -21,8 +22,8 @@ export function ConversationHeader({ conversationId }: ConversationHeaderProps) 
   const { user } = useAuth();
   const [conversation, setConversation] = useState<ConversationDocument | null>(null);
   const [participantNames, setParticipantNames] = useState<Map<string, string>>(new Map());
-  const [artist, setArtist] = useState<AIArtistDocument | null>(null);
-  const [groupArtists, setGroupArtists] = useState<AIArtistDocument[]>([]);
+  const [artist, setArtist] = useState<ArtistCardDisplay | null>(null);
+  const [groupArtists, setGroupArtists] = useState<ArtistCardDisplay[]>([]);
   const [title, setTitle] = useState<string>('');
   const [editingTitle, setEditingTitle] = useState(false);
   const [savingTitle, setSavingTitle] = useState(false);
@@ -37,34 +38,22 @@ export function ConversationHeader({ conversationId }: ConversationHeaderProps) 
         setConversation(conv);
         setTitle(conv.title || '');
 
-        // If conversation has artistId, load artist info (for direct chats)
-        if (conv.artistId) {
+        // Names and photos only. A private artist stays a display, not a document.
+        const displayIds = [
+          ...(conv.artistId ? [conv.artistId] : []),
+          ...(conv.artistIds ?? []),
+        ];
+        if (displayIds.length > 0) {
           try {
-            const artistRef = doc(db, getArtistPath(conv.artistId));
-            const artistDoc = await getDoc(artistRef);
-            if (artistDoc.exists()) {
-              const artistData = artistDoc.data() as AIArtistDocument;
-              setArtist(artistData);
-            }
+            const displays = await fetchArtistCardDisplays(displayIds);
+            setArtist(conv.artistId ? displays.get(conv.artistId) ?? null : null);
+            setGroupArtists(
+              (conv.artistIds ?? [])
+                .map(artistId => displays.get(artistId))
+                .filter((item): item is ArtistCardDisplay => Boolean(item))
+            );
           } catch (error) {
-            console.error('Failed to load artist:', error);
-          }
-        }
-
-        // If conversation has artistIds array, load all artists (for group chats)
-        if (conv.artistIds && conv.artistIds.length > 0) {
-          try {
-            const artistPromises = conv.artistIds.map(artistId => {
-              const artistRef = doc(db, getArtistPath(artistId));
-              return getDoc(artistRef);
-            });
-            const artistDocs = await Promise.all(artistPromises);
-            const artists = artistDocs
-              .filter(doc => doc.exists())
-              .map(doc => doc.data() as AIArtistDocument);
-            setGroupArtists(artists);
-          } catch (error) {
-            console.error('Failed to load group artists:', error);
+            console.error('Failed to load artists:', error);
           }
         }
 
@@ -124,28 +113,8 @@ export function ConversationHeader({ conversationId }: ConversationHeaderProps) 
   
   if (artist) {
     displayName = artist.name;
-    const avatarBg = getAvatarGradient(artist.name);
-    const initials = getInitials(artist.name);
-    
-    avatarElement = artist.avatarURL ? (
-      <div className="w-8 h-8 rounded-full overflow-hidden">
-        <Image
-          src={artist.avatarURL}
-          alt={artist.name}
-          width={32}
-          height={32}
-          className="object-cover"
-        />
-      </div>
-    ) : (
-      <div 
-        className="w-8 h-8 rounded-full flex items-center justify-center"
-        style={{ background: avatarBg }}
-      >
-        <span className="text-white font-semibold text-xs">
-          {initials}
-        </span>
-      </div>
+    avatarElement = (
+      <ArtistFace name={artist.name} sources={artist.photoUrl ? [artist.photoUrl] : []} size="row" />
     );
   } else if (conversation.type === 'direct') {
     displayName = participantNames.get(otherParticipants[0] || '') || 'Unknown User';

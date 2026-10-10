@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
+import { noStoreJson } from '@/lib/http/noStore';
+import { artistIsVisible } from '@/lib/artists/visibility';
 import { getArtist } from '@/lib/services/artists';
 import { isXConfigured, X_CLIENT_ID_MISSING_MESSAGE } from '@/lib/x/config';
 import { buildAuthorizeUrl } from '@/lib/x/oauth';
@@ -8,6 +10,8 @@ import { signOAuthSession } from '@/lib/x/pkce';
 import { getArtistAdmin } from '@/lib/x/artistStore';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
 
 const COOKIE = 'ss_x_oauth';
@@ -16,17 +20,17 @@ const COOKIE = 'ss_x_oauth';
  * POST /api/x/connect
  * Body: { artistId: string }
  * Starts OAuth 2.0 PKCE as that artist's X account (not a Streamstar company account).
+ * Requires Authorization: Bearer. The ss_viewer cookie is ignored.
  */
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request);
     if (!isXConfigured()) {
-      return NextResponse.json(
+      return noStoreJson(
         { error: X_CLIENT_ID_MISSING_MESSAGE, available: false },
-        { status: 503 }
+        503
       );
     }
-
-    const userId = await requireUserId(request);
     const body = (await request.json().catch(() => ({}))) as { artistId?: string };
     const artistId = body.artistId?.trim();
     if (!artistId) {
@@ -39,7 +43,7 @@ export async function POST(request: NextRequest) {
     } catch {
       artist = await getArtist(artistId);
     }
-    if (!artist || artist.deletedAt) {
+    if (!artistIsVisible(artist, userId)) {
       throw new HttpError(404, 'Artist not found');
     }
     if (artist.ownerId !== userId) {
@@ -61,7 +65,7 @@ export async function POST(request: NextRequest) {
       maxAge: 600,
     });
 
-    return NextResponse.json({ authorizeUrl: url, available: true });
+    return noStoreJson({ authorizeUrl: url, available: true });
   } catch (error) {
     return errorResponse(error);
   }

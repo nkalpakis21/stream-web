@@ -1,12 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { artistIsVisible } from '@/lib/artists/visibility';
+import { noStoreJson } from '@/lib/http/noStore';
 import { getFollowedArtists } from '@/lib/services/artists';
-import type { AIArtistDocument } from '@/types/firestore';
+import { verifiedViewerIdFromRequest } from '@/lib/server/viewer';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+export const runtime = 'nodejs';
 
 /**
  * GET /api/artists/followed
- * 
- * Get artists that the current user is following.
- * 
+ *
+ * Artists the user follows, filtered to ones this viewer may see.
+ * Reads may use Authorization or the ss_viewer cookie. Never cached.
+ *
  * Query params:
  * - userId: User ID (required)
  */
@@ -16,15 +24,14 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId');
 
     if (!userId) {
-      return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
-      );
+      return noStoreJson({ error: 'User ID is required' }, 400);
     }
 
-    const artists = await getFollowedArtists(userId);
+    const viewerId = await verifiedViewerIdFromRequest(request);
+    const artists = (await getFollowedArtists(userId)).filter(artist =>
+      artistIsVisible(artist, viewerId)
+    );
 
-    // Serialize Timestamps for client
     const serializedArtists = artists.map(artist => ({
       ...artist,
       createdAt: artist.createdAt.toMillis(),
@@ -32,22 +39,16 @@ export async function GET(request: NextRequest) {
       deletedAt: artist.deletedAt ? artist.deletedAt.toMillis() : null,
     }));
 
-    return NextResponse.json({
+    return noStoreJson({
       artists: serializedArtists,
     });
   } catch (error) {
     console.error('[API /artists/followed] Error:', error);
-    
+
     if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
+      return noStoreJson({ error: error.message }, 500);
     }
 
-    return NextResponse.json(
-      { error: 'Failed to fetch followed artists' },
-      { status: 500 }
-    );
+    return noStoreJson({ error: 'Failed to fetch followed artists' }, 500);
   }
 }

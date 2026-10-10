@@ -2,13 +2,15 @@
 
 import { useMemo, useState, type MouseEvent } from 'react';
 import { CoverMedia } from '@/components/media/CoverMedia';
-import Link from 'next/link';
+import { ArtistFace } from '@/components/artists/ArtistFace';
+import { MaybeArtistLink } from '@/components/songs/MaybeArtistLink';
 import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
 import { getSongVersions } from '@/lib/services/songs';
 import { createDebouncedPlayTracker } from '@/lib/utils/playTracking';
 import { formatCoinCluster, formatHeatCoinCluster, type ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { EmptyAction } from '@/components/states/EmptyAction';
 import { playerCoverPayload, type CoverFields } from '@/lib/covers/resolve';
+import { artistFaceSources, songCoverCandidates } from '@/lib/images/artistFace';
 import './heat.css';
 
 export interface HeatTrack {
@@ -16,6 +18,8 @@ export interface HeatTrack {
   title: string;
   artistName: string;
   artistId: string;
+  artistPhotoUrl?: string | null;
+  artistLinkable?: boolean;
   cover: CoverFields;
   coin: ArtistCoinQuote | null;
 }
@@ -42,15 +46,17 @@ function CoinClusterText({
 export function FeaturedCoinMeta({
   artistId,
   quote,
+  linkable = true,
 }: {
   artistId: string;
   quote: ArtistCoinQuote | null;
+  linkable?: boolean;
 }) {
   if (!quote) return null;
   return (
-    <Link href={`/artists/${artistId}`} className="heat-featured-meta">
+    <MaybeArtistLink artistId={artistId} linkable={linkable} className="heat-featured-meta">
       <CoinClusterText cluster={formatCoinCluster(quote)} />
-    </Link>
+    </MaybeArtistLink>
   );
 }
 
@@ -74,6 +80,7 @@ function HeatRow({ track, rank, queue }: { track: HeatTrack; rank: number; queue
   const showPause = Boolean(isCurrent && isPlaying);
   const quote = track.coin;
   const cluster = formatHeatCoinCluster(quote);
+  const linkable = track.artistLinkable === true;
   const rankClass = rank <= 3 ? ` r${rank}` : '';
 
   const startPlayback = async () => {
@@ -142,24 +149,47 @@ function HeatRow({ track, rank, queue }: { track: HeatTrack; rank: number; queue
           <p className="heat-track" data-entity="track">
             {track.title}
           </p>
-          <Link
-            href={`/artists/${track.artistId}`}
-            className="heat-artist"
-            data-entity="artist"
-            onClick={onArtistNav}
-          >
-            {track.artistName}
-          </Link>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <ArtistFace
+              name={track.artistName}
+              sources={artistFaceSources(track.artistPhotoUrl, songCoverCandidates(track.cover))}
+              size="card"
+            />
+            <MaybeArtistLink
+              artistId={track.artistId}
+              linkable={linkable}
+              className="heat-artist"
+              dataEntity="artist"
+              onClick={onArtistNav}
+            >
+              {track.artistName}
+            </MaybeArtistLink>
+          </span>
         </div>
-        <Link href={`/artists/${track.artistId}`} className="heat-price" onClick={onArtistNav}>
+        <MaybeArtistLink
+          artistId={track.artistId}
+          linkable={linkable}
+          className="heat-price"
+          onClick={onArtistNav}
+        >
           {cluster.price}
-        </Link>
-        <Link href={`/artists/${track.artistId}`} className={`heat-chg is-${cluster.tone}`} onClick={onArtistNav}>
+        </MaybeArtistLink>
+        <MaybeArtistLink
+          artistId={track.artistId}
+          linkable={linkable}
+          className={`heat-chg is-${cluster.tone}`}
+          onClick={onArtistNav}
+        >
           {cluster.change}
-        </Link>
-        <Link href={`/artists/${track.artistId}`} className="heat-mcap" onClick={onArtistNav}>
+        </MaybeArtistLink>
+        <MaybeArtistLink
+          artistId={track.artistId}
+          linkable={linkable}
+          className="heat-mcap"
+          onClick={onArtistNav}
+        >
           {cluster.mcap}
-        </Link>
+        </MaybeArtistLink>
         <button
           type="button"
           className="heat-play"

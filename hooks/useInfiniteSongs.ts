@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { AIArtistDocument, SongDocument } from '@/types/firestore';
+import type { SongDocument } from '@/types/firestore';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
-import { getArtistNamesForSongs } from '@/lib/services/songs';
-import { getArtistsData } from '@/lib/services/artists';
-import { coinBadgeFromArtist, hasLaunchedCoin, type CoinBadgeMeta } from '@/lib/brand/coin';
+import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
+import type { CoinBadgeMeta } from '@/lib/brand/coin';
 
 interface PaginatedResponse {
   songs: Array<Omit<SongDocument, 'createdAt' | 'updatedAt' | 'deletedAt'> & {
@@ -15,6 +14,8 @@ interface PaginatedResponse {
   }>;
   nextCursor: string | null;
   hasMore: boolean;
+  artists?: Record<string, ArtistCardDisplay>;
+  artistCoins?: Record<string, { ticker: string | null; coinIcon: string | null; quote: ArtistCoinQuote | null }>;
 }
 
 export type DiscoverSort = 'heat' | 'new';
@@ -28,6 +29,7 @@ interface UseInfiniteSongsOptions {
 interface UseInfiniteSongsReturn {
   songs: SongDocument[];
   artistNames: Map<string, string>;
+  artists: Map<string, ArtistCardDisplay>;
   coinBadgeBySong: Map<string, CoinBadgeMeta>;
   quoteBySong: Map<string, ArtistCoinQuote>;
   loading: boolean;
@@ -40,50 +42,6 @@ interface UseInfiniteSongsReturn {
 
 function requestKey(query: string, sort: DiscoverSort) {
   return `${query}::${sort}`;
-}
-
-async function fetchQuotesForArtists(
-  artists: Map<string, AIArtistDocument>,
-  cache: Map<string, ArtistCoinQuote>
-): Promise<Map<string, ArtistCoinQuote>> {
-  const needed: string[] = [];
-  artists.forEach(artist => {
-    const mint = artist.pumpFun?.mint?.trim();
-    if (mint && hasLaunchedCoin(artist.pumpFun) && !cache.has(mint)) {
-      needed.push(mint);
-    }
-  });
-
-  if (needed.length === 0) return cache;
-
-  try {
-    const params = new URLSearchParams({ mints: needed.join(',') });
-    const res = await fetch(`/api/coin-quotes?${params}`);
-    if (!res.ok) return cache;
-    const body = (await res.json()) as { quotes?: Record<string, ArtistCoinQuote> };
-    Object.entries(body.quotes || {}).forEach(([mint, quote]) => {
-      cache.set(mint, quote);
-    });
-  } catch {
-    return cache;
-  }
-
-  return cache;
-}
-
-function quotesForSongs(
-  songs: SongDocument[],
-  artists: Map<string, AIArtistDocument>,
-  cache: Map<string, ArtistCoinQuote>
-): Map<string, ArtistCoinQuote> {
-  const bySong = new Map<string, ArtistCoinQuote>();
-  songs.forEach(song => {
-    const mint = artists.get(song.artistId)?.pumpFun?.mint?.trim();
-    if (!mint) return;
-    const quote = cache.get(mint);
-    if (quote) bySong.set(song.id, quote);
-  });
-  return bySong;
 }
 
 /**
@@ -103,9 +61,9 @@ export function useInfiniteSongs(
   
   const [songs, setSongs] = useState<SongDocument[]>([]);
   const [artistNames, setArtistNames] = useState<Map<string, string>>(new Map());
+  const [artists, setArtists] = useState<Map<string, ArtistCardDisplay>>(new Map());
   const [coinBadgeBySong, setCoinBadgeBySong] = useState<Map<string, CoinBadgeMeta>>(new Map());
   const [quoteBySong, setQuoteBySong] = useState<Map<string, ArtistCoinQuote>>(new Map());
-  const quotesByMintRef = useRef<Map<string, ArtistCoinQuote>>(new Map());
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -182,50 +140,47 @@ export function useInfiniteSongs(
     }
   }, [query, sort, key, initialLimit]);
 
-  const attachArtistMeta = useCallback(async (
+  const attachArtistMeta = useCallback((
     deserializedSongs: SongDocument[],
+    payload: Pick<PaginatedResponse, 'artists' | 'artistCoins'>,
     merge: boolean
   ) => {
-    const [names, artists] = await Promise.all([
-      getArtistNamesForSongs(deserializedSongs),
-      getArtistsData(deserializedSongs.map(s => s.artistId)),
-    ]);
+    const nextArtists = new Map<string, ArtistCardDisplay>();
+    Object.values(payload.artists || {}).forEach(artist => {
+      if (artist?.id && artist.name) nextArtists.set(artist.id, artist);
+    });
+    const names = new Map<string, string>();
+    const badges = new Map<string, CoinBadgeMeta>();
+    const quotes = new Map<string, ArtistCoinQuote>();
+    deserializedSongs.forEach(song => {
+      const artist = nextArtists.get(song.artistId);
+      if (artist?.name) names.set(song.id, artist.name);
+      const coin = payload.artistCoins?.[song.artistId];
+      if (coin?.ticker) {
+        badges.set(song.id, { ticker: coin.ticker, iconSrc: coin.coinIcon });
+      }
+      if (coin?.quote) quotes.set(song.id, coin.quote);
+    });
     if (currentKeyRef.current !== key) return;
-
-    await fetchQuotesForArtists(artists, quotesByMintRef.current);
-    if (currentKeyRef.current !== key) return;
-
-    const quotes = quotesForSongs(deserializedSongs, artists, quotesByMintRef.current);
 
     if (merge) {
-      setArtistNames(prev => {
-        const updated = new Map(prev);
-        names.forEach((name, id) => updated.set(id, name));
-        return updated;
-      });
+      setArtists(prev => new Map([...prev, ...nextArtists]));
+      setArtistNames(prev => new Map([...prev, ...names]));
       setCoinBadgeBySong(prev => {
         const updated = new Map(prev);
         deserializedSongs.forEach(song => {
-          const badge = coinBadgeFromArtist(artists.get(song.artistId));
+          const badge = badges.get(song.id);
           if (badge) updated.set(song.id, badge);
           else updated.delete(song.id);
         });
         return updated;
       });
-      setQuoteBySong(prev => {
-        const updated = new Map(prev);
-        quotes.forEach((quote, id) => updated.set(id, quote));
-        return updated;
-      });
+      setQuoteBySong(prev => new Map([...prev, ...quotes]));
       return;
     }
 
+    setArtists(nextArtists);
     setArtistNames(names);
-    const badges = new Map<string, CoinBadgeMeta>();
-    deserializedSongs.forEach(song => {
-      const badge = coinBadgeFromArtist(artists.get(song.artistId));
-      if (badge) badges.set(song.id, badge);
-    });
     setCoinBadgeBySong(badges);
     setQuoteBySong(quotes);
   }, [key]);
@@ -235,9 +190,9 @@ export function useInfiniteSongs(
     setError(null);
     setSongs([]);
     setArtistNames(new Map());
+    setArtists(new Map());
     setCoinBadgeBySong(new Map());
     setQuoteBySong(new Map());
-    quotesByMintRef.current = new Map();
     setCursor(null);
     setHasMore(true);
     currentKeyRef.current = key;
@@ -253,7 +208,7 @@ export function useInfiniteSongs(
       setSongs(deserializedSongs);
       setCursor(data.nextCursor);
       setHasMore(data.hasMore);
-      await attachArtistMeta(deserializedSongs, false);
+      attachArtistMeta(deserializedSongs, data, false);
     } catch (err) {
       console.error('[useInfiniteSongs] Error loading initial songs:', err);
       if (currentKeyRef.current === key) {
@@ -289,7 +244,7 @@ export function useInfiniteSongs(
 
       setCursor(data.nextCursor);
       setHasMore(data.hasMore);
-      await attachArtistMeta(deserializedSongs, true);
+      attachArtistMeta(deserializedSongs, data, true);
     } catch (err) {
       if (currentKeyRef.current === key) {
         setError(err instanceof Error ? err : new Error('Failed to load more songs'));
@@ -304,9 +259,9 @@ export function useInfiniteSongs(
   const reset = useCallback(() => {
     setSongs([]);
     setArtistNames(new Map());
+    setArtists(new Map());
     setCoinBadgeBySong(new Map());
     setQuoteBySong(new Map());
-    quotesByMintRef.current = new Map();
     setCursor(null);
     setHasMore(true);
     setError(null);
@@ -326,6 +281,7 @@ export function useInfiniteSongs(
   return {
     songs,
     artistNames,
+    artists,
     coinBadgeBySong,
     quoteBySong,
     loading,

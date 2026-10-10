@@ -1,15 +1,21 @@
 'use client';
 
 import type { SongDocument } from '@/types/firestore';
+import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
 import { SongCard } from '@/components/songs/SongCard';
 import Link from 'next/link';
 
 interface UserSongsSectionProps {
   songs: SongDocument[];
   songArtistMap: Map<string, string>;
+  artistDisplays?: Map<string, ArtistCardDisplay>;
 }
 
-export function UserSongsSection({ songs, songArtistMap }: UserSongsSectionProps) {
+export function UserSongsSection({
+  songs,
+  songArtistMap,
+  artistDisplays,
+}: UserSongsSectionProps) {
   if (songs.length === 0) {
     return (
       <section className="mb-16">
@@ -57,6 +63,7 @@ export function UserSongsSection({ songs, songArtistMap }: UserSongsSectionProps
             key={song.id} 
             song={song} 
             artistName={songArtistMap.get(song.id)}
+            artist={artistDisplays?.get(song.artistId) ?? null}
           />
         ))}
       </div>

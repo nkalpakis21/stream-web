@@ -6,11 +6,16 @@ import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { PlayableArt } from '@/components/songs/PlayableArt';
 import { CoinBadge } from '@/components/songs/CoinBadge';
 import { DiscoverCoinRow } from '@/components/discover/DiscoverCoinRow';
+import { ArtistFace } from '@/components/artists/ArtistFace';
+import { MaybeArtistLink } from '@/components/songs/MaybeArtistLink';
 import { coverFieldsFromSong } from '@/lib/covers/resolve';
+import { artistFaceSources, songCoverCandidates } from '@/lib/images/artistFace';
+import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
 
 interface DiscoverSongCardProps {
   song: SongDocument;
   artistName?: string;
+  artist?: ArtistCardDisplay | null;
   coin?: ArtistCoinQuote | null;
   ticker?: string | null;
   coinIcon?: string | null;
@@ -19,17 +24,21 @@ interface DiscoverSongCardProps {
 export function DiscoverSongCard({
   song,
   artistName,
+  artist = null,
   coin = null,
   ticker = null,
   coinIcon = null,
 }: DiscoverSongCardProps) {
   const showTicker = Boolean(ticker?.trim());
+  const name = artist?.name || artistName;
+  const linkable = artist?.isPublic === true;
+  const photoUrl = artist?.photoUrl ?? null;
   return (
     <article className="block rounded-[12px] bg-card">
       <PlayableArt
         songId={song.id}
         title={song.title}
-        artistName={artistName || 'Artist'}
+        artistName={name || 'Artist'}
         artistId={song.artistId}
         cover={coverFieldsFromSong(song)}
         playback="visibility"
@@ -46,21 +55,30 @@ export function DiscoverSongCard({
             {song.title}
           </h3>
         </Link>
-        {artistName || showTicker ? (
+        {name || showTicker ? (
           <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
-            {artistName ? (
-              <p
-                className="min-w-0 truncate"
-                style={{ fontSize: 12, lineHeight: '16px', color: 'var(--mute)' }}
-                data-entity="artist"
-              >
-                {artistName}
-              </p>
+            {name ? (
+              <>
+                <ArtistFace
+                  name={name}
+                  sources={artistFaceSources(photoUrl, songCoverCandidates(song))}
+                  size="card"
+                />
+                <MaybeArtistLink
+                  artistId={song.artistId}
+                  linkable={linkable}
+                  className="min-w-0 truncate"
+                  style={{ fontSize: 12, lineHeight: '16px', color: 'var(--mute)' }}
+                  dataEntity="artist"
+                >
+                  {name}
+                </MaybeArtistLink>
+              </>
             ) : null}
             <CoinBadge ticker={ticker} iconSrc={coinIcon} />
           </div>
         ) : null}
-        <DiscoverCoinRow artistId={song.artistId} quote={coin} />
+        <DiscoverCoinRow artistId={song.artistId} quote={coin} linkable={linkable} />
       </div>
     </article>
   );

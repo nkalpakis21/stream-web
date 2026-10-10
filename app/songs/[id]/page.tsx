@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { getSong } from '@/lib/services/songs';
 import { getSongVersion } from '@/lib/services/songVersions';
 import { getSongGenerations } from '@/lib/services/generations';
-import { getArtist } from '@/lib/services/artists';
+import { getArtistCardContext } from '@/lib/server/artistDisplay';
 import { formatDistanceToNow } from 'date-fns';
 import { getSongVersions } from '@/lib/services/songs';
 import { VersionCards } from '@/components/songs/VersionCards';
@@ -15,7 +15,6 @@ import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
 import { SongStage } from '@/components/songs/SongStage';
 import { getLyricsForSong } from '@/lib/services/lyrics';
 import { CommentsSection } from '@/components/comments/CommentsSection';
-import { coinBadgeFromArtist, hasLaunchedCoin } from '@/lib/brand/coin';
 import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 
@@ -44,10 +43,11 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
                          versions.find(v => v.audioURL) ||
                          null;
   
-  const [songVersion, artist] = await Promise.all([
+  const [songVersion, artistContext] = await Promise.all([
     getSongVersion(primaryVersion?.id || song.currentVersionId),
-    getArtist(song.artistId),
+    getArtistCardContext([song.artistId]),
   ]);
+  const artist = artistContext.displays.get(song.artistId) ?? null;
 
   const ogImageUrl = shareImageUrl(resolveCoverPoster(song));
   const usingBrandOg = ogImageUrl === brandOgImageUrl();
@@ -95,11 +95,13 @@ export default async function SongPage({ params }: SongPageProps) {
   // Check if song is public or user has access
   // TODO: Add auth check for private songs
 
-  const [artist, allVersions, generations] = await Promise.all([
-    getArtist(song.artistId),
+  const [artistContext, allVersions, generations] = await Promise.all([
+    getArtistCardContext([song.artistId]),
     getSongVersions(song.id),
     getSongGenerations(song.id),
   ]);
+  const artist = artistContext.displays.get(song.artistId) ?? null;
+  const coinHint = artistContext.coins.get(song.artistId);
 
   // Find primary version for display - prioritize primary with audio, then currentVersionId, then any version
   const primaryVersion = allVersions.find(v => v.isPrimary && v.audioURL) || 
@@ -136,13 +138,12 @@ export default async function SongPage({ params }: SongPageProps) {
   // Get lyrics from generations
   const lyrics = getLyricsForSong(generations);
 
-  const launched = hasLaunchedCoin(artist?.pumpFun);
-  const mint = launched ? (artist?.pumpFun?.mint || '').trim() : '';
+  const mint = coinHint?.mint?.trim() || '';
   const quotes = mint ? await fetchCoinQuotes([mint]) : new Map<string, ArtistCoinQuote>();
   const coin = mint ? quotes.get(mint) ?? null : null;
-  const buyUrl = launched ? (artist?.pumpFun?.url?.trim() || null) : null;
-  const coinBadge = coinBadgeFromArtist(artist);
+  const buyUrl = coinHint?.buyUrl ?? null;
   const shareUrl = publicUrl(`/songs/${song.id}`);
+  const artistLinkable = artist?.isPublic === true;
 
   return (
     <div className="min-h-screen bg-background">
@@ -150,15 +151,17 @@ export default async function SongPage({ params }: SongPageProps) {
         <SongStage
           songId={song.id}
           songTitle={song.title}
-          artistId={artist?.id || null}
+          artistId={song.artistId}
+          artistLinkable={artistLinkable}
+          artistPhotoUrl={artist?.photoUrl ?? null}
           artistName={artist?.name || 'Unknown Artist'}
           albumCoverUrl={coverImageUrl}
           cover={cover}
           audioUrl={primaryAudioUrl}
           pending={hasPendingGeneration}
           durationSeconds={song.duration ?? null}
-          ticker={coinBadge?.ticker}
-          coinIcon={coinBadge?.iconSrc}
+          ticker={coinHint?.ticker}
+          coinIcon={coinHint?.coinIcon}
           coin={coin}
           buyUrl={buyUrl}
           shareUrl={shareUrl}
@@ -187,7 +190,7 @@ export default async function SongPage({ params }: SongPageProps) {
               songTitle={song.title}
               ownerId={song.ownerId}
             />
-            <ArtistCoinBuy url={artist?.pumpFun?.url} />
+            <ArtistCoinBuy url={buyUrl} />
             <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3">
               Created {timeAgo}
             </p>
