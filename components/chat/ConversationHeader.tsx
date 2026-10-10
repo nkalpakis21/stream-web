@@ -80,7 +80,10 @@ export function ConversationHeader({ conversationId }: ConversationHeaderProps) 
             const userDoc = await getDoc(userRef);
             if (userDoc.exists()) {
               const participant = userDoc.data() as UserDocument;
-              names.set(participantId, participant.displayName || participant.email);
+              names.set(
+                participantId,
+                participant.displayName || `User ${participantId.substring(0, 8)}...`
+              );
             } else {
               names.set(participantId, `User ${participantId.substring(0, 8)}...`);
             }

@@ -73,7 +73,7 @@ export function DisplayNameForm({ onUpdate }: DisplayNameFormProps) {
 
     setSaving(true);
     try {
-      await updateUserDisplayName(user.uid, trimmed);
+      await updateUserDisplayName(user.uid, trimmed, user.email || undefined);
       setCurrentDisplayName(trimmed);
       setEditing(false);
       showToast('Display name updated successfully', 'success');

@@ -69,29 +69,70 @@ service cloud.firestore {
         && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
     }
 
-    // Coins and X connection state are server-owned after create.
-    // Create may only store an unlaunched coin and a disconnected X profile.
-    function coinUnlaunched() {
+    // Follow-up: the next mobile build drops pumpFun from the client create
+    // and lets the confirm route own it. Until then, TF 15 writes the coin
+    // at create, so a user can attach an arbitrary mint to their own new artist.
+    // Absent, null, or exactly mint/url/symbol/launchedAt/creatorWallet.
+    function pumpFunOnCreate() {
       return !('pumpFun' in request.resource.data)
         || request.resource.data.pumpFun == null
         || (
-          request.resource.data.pumpFun.mint == null
-          && request.resource.data.pumpFun.url == null
-          && request.resource.data.pumpFun.symbol == null
-          && request.resource.data.pumpFun.creatorWallet == null
-          && request.resource.data.pumpFun.launchedAt == null
+          request.resource.data.pumpFun.keys().hasOnly([
+            'mint',
+            'url',
+            'symbol',
+            'launchedAt',
+            'creatorWallet'
+          ])
+          && (request.resource.data.pumpFun.mint == null || (
+            request.resource.data.pumpFun.mint is string
+            && request.resource.data.pumpFun.mint.size() <= 128
+          ))
+          && (request.resource.data.pumpFun.url == null || (
+            request.resource.data.pumpFun.url is string
+            && request.resource.data.pumpFun.url.size() <= 2048
+          ))
+          && (request.resource.data.pumpFun.symbol == null || (
+            request.resource.data.pumpFun.symbol is string
+            && request.resource.data.pumpFun.symbol.size() <= 32
+          ))
+          && (request.resource.data.pumpFun.launchedAt == null
+            || request.resource.data.pumpFun.launchedAt is timestamp)
+          && (request.resource.data.pumpFun.creatorWallet == null || (
+            request.resource.data.pumpFun.creatorWallet is string
+            && request.resource.data.pumpFun.creatorWallet.size() <= 128
+          ))
         );
     }
 
-    function xInactive() {
+    // Default disconnected shape from emptyXConnection(): status is not
+    // connected, and every other value is null or empty.
+    function xOnCreate() {
       return !('x' in request.resource.data)
         || request.resource.data.x == null
         || (
-          request.resource.data.x.status == 'disconnected'
+          request.resource.data.x.keys().hasOnly([
+            'status',
+            'username',
+            'userId',
+            'connectedAt',
+            'pausedAt',
+            'lastError',
+            'lastErrorAt',
+            'profileSyncedAt',
+            'recentPostTexts',
+            'posts'
+          ])
+          && request.resource.data.x.status == 'disconnected'
           && request.resource.data.x.username == null
           && request.resource.data.x.userId == null
-          && request.resource.data.x.posts.size() == 0
+          && request.resource.data.x.connectedAt == null
+          && request.resource.data.x.pausedAt == null
+          && request.resource.data.x.lastError == null
+          && request.resource.data.x.lastErrorAt == null
+          && request.resource.data.x.profileSyncedAt == null
           && request.resource.data.x.recentPostTexts.size() == 0
+          && request.resource.data.x.posts.size() == 0
         );
     }
 
@@ -257,6 +298,9 @@ service cloud.firestore {
         && request.resource.data.isPublic is bool;
     }
 
+    // Create may store playCount 0 and null cover fields (TF 15 setDoc).
+    // A non-zero play count or any non-null cover is denied. Updates cannot
+    // change these fields. Follow-up: reject them on create once mobile omits them.
     function songCreateClean() {
       return (!('playCount' in request.resource.data) || request.resource.data.playCount == 0)
         && !('playsBySource' in request.resource.data)
@@ -264,6 +308,9 @@ service cloud.firestore {
         && (!('coverPosterUrl' in request.resource.data) || request.resource.data.coverPosterUrl == null)
         && (!('coverVideoUrl' in request.resource.data) || request.resource.data.coverVideoUrl == null)
         && (!('coverMotionStatus' in request.resource.data) || request.resource.data.coverMotionStatus == null)
+        && (!('coverMotionError' in request.resource.data) || request.resource.data.coverMotionError == null)
+        && (!('coverUpdatedAt' in request.resource.data) || request.resource.data.coverUpdatedAt == null)
+        && (!('coverProvider' in request.resource.data) || request.resource.data.coverProvider == null)
         && (!('albumCoverPath' in request.resource.data) || request.resource.data.albumCoverPath == null)
         && (!('albumCoverThumbnail' in request.resource.data) || request.resource.data.albumCoverThumbnail == null)
         && (!('tokenMintAddress' in request.resource.data) || request.resource.data.tokenMintAddress == null)
@@ -276,16 +323,16 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      // Profile reads are public (display names on songs, comments, chat).
-      // email and solanaWalletAddress live on the same document; rules cannot hide them.
-      // Held: a later change may make this doc owner-only and move public fields
-      // to publicProfiles/{uid}. That design is not implemented.
+      // Public profile: display name and avatar. email and solanaWalletAddress
+      // live on users/{uid}/private/profile and are not readable here.
       allow get: if true;
       // Prefix search: where displayName >= q AND displayName <= q+\uf8ff.
       allow list: if resource.data.displayName is string;
 
       allow create: if isOwner(uid)
         && request.resource.data.deletedAt == null
+        && !('email' in request.resource.data)
+        && !('solanaWalletAddress' in request.resource.data)
         && (
           !('displayName' in request.resource.data)
           || request.resource.data.displayName == null
@@ -296,25 +343,42 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'displayName',
           'updatedAt',
-          'solanaWalletAddress',
           'photoURL'
         ])
         && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['displayName'])
           || isValidDisplayName(request.resource.data.displayName)
-        )
-        && (
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['solanaWalletAddress'])
-          || request.resource.data.solanaWalletAddress == null
-          || (
-            request.resource.data.solanaWalletAddress is string
-            && request.resource.data.solanaWalletAddress.size() >= 32
-            && request.resource.data.solanaWalletAddress.size() <= 44
-          )
         );
 
       // In-app account deletion (mobile). Web soft-deletes are not used on users.
+      // Client deleteDoc does not cascade into private/profile. Web account
+      // delete uses Admin recursiveDelete, which does.
       allow delete: if isOwner(uid);
+
+      match /private/{docId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && docId == 'profile'
+          && request.resource.data.keys().hasOnly(['email', 'solanaWalletAddress'])
+          && (
+            !('email' in request.resource.data)
+            || (
+              request.resource.data.email is string
+              && request.resource.data.email.size() > 0
+              && request.resource.data.email.size() <= 320
+            )
+          )
+          && (
+            !('solanaWalletAddress' in request.resource.data)
+            || request.resource.data.solanaWalletAddress == null
+            || (
+              request.resource.data.solanaWalletAddress is string
+              && request.resource.data.solanaWalletAddress.size() >= 32
+              && request.resource.data.solanaWalletAddress.size() <= 44
+            )
+          );
+        allow delete: if isOwner(uid);
+      }
     }
 
     match /artists/{artistId} {
@@ -331,8 +395,8 @@ service cloud.firestore {
         && request.resource.data.nameLowercase == request.resource.data.name.lower()
         && request.resource.data.deletedAt == null
         && request.resource.data.isPublic is bool
-        && coinUnlaunched()
-        && xInactive()
+        && pumpFunOnCreate()
+        && xOnCreate()
         && coinMetadataClean();
 
       allow update: if artistProfileUpdate();
@@ -401,8 +465,9 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // The browser may record a pending job for a song it owns.
-    // Output audio URLs are not client-writable. The song owner may update other fields.
+    // TF 15 creates a pending job with no ownerId or createdBy. The parent
+    // song's owner is the authority. Follow-up: the next mobile build adds ownerId.
+    // Clients cannot update or delete. Completion is an Admin write.
     match /generations/{generationId} {
       allow read: if canReadSong(resource.data.songId);
       allow create: if signedIn()
@@ -412,19 +477,14 @@ service cloud.firestore {
         && request.resource.data.completedAt == null
         && request.resource.data.contentHash == null
         && request.resource.data.output.audioURL == null
-        && request.resource.data.output.stems == null
-        && (!('ownerId' in request.resource.data) || request.resource.data.ownerId == request.auth.uid)
-        && (!('createdBy' in request.resource.data) || request.resource.data.createdBy == request.auth.uid)
+        && (
+          request.resource.data.output.stems == null
+          || request.resource.data.output.stems.size() == 0
+        )
+        && !('ownerId' in request.resource.data)
+        && !('createdBy' in request.resource.data)
         && isSongOwner(request.resource.data.songId);
-      // Song owner may update a job. Audio URLs on output stay server-owned.
-      allow update: if isSongOwner(resource.data.songId)
-        && request.resource.data.songId == resource.data.songId
-        && request.resource.data.id == resource.data.id
-        && fieldUnchanged('ownerId')
-        && fieldUnchanged('createdBy')
-        && request.resource.data.output.audioURL == resource.data.output.audioURL
-        && request.resource.data.output.stems == resource.data.output.stems;
-      allow delete: if false;
+      allow update, delete: if false;
     }
 
     match /collaborations/{collaborationId} {
