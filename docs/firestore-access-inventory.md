@@ -78,10 +78,11 @@ Rules reject client creates and updates that include `email` or `solanaWalletAdd
 | Collection | Locked on client create/update |
 | --- | --- |
 | `songs` | Updates cannot touch `ownerId`, covers, `playCount`, `playsBySource`, `playsBackground`, or legacy token fields. Create may write `playCount: 0` and null cover fields (TF 15). A non-zero count or a non-null cover is denied |
-| `artists` | Client updates cannot change `name`, `nameLowercase`, `ownerId`, `pumpFun`, `x`, `coinMetadataId`, or `coinImagePath`. Rename is `PATCH /api/artists/[id]/name` (Admin). Create may write `pumpFun` only as null or exactly `mint`, `url`, `symbol`, `launchedAt`, `creatorWallet`. `verifiedAt` is rejected. `x` is the disconnected default; `posts` and `recentPostTexts` may be absent or empty |
+| `artists` | Client updates cannot change `name`, `nameLowercase`, `ownerId`, `pumpFun`, `x`, `coinMetadataId`, `coinImagePath`, `mintSweepExemptAt`, or `mintFirstSeenAt`. The update `hasOnly` list omits those two stamps. Rename is `PATCH /api/artists/[id]/name` (Admin). Create may write `pumpFun` only as null or exactly `mint`, `url`, `symbol`, `launchedAt`, `creatorWallet`. `verifiedAt` is rejected. Create also rejects `mintSweepExemptAt` and `mintFirstSeenAt`. `x` is the disconnected default; `posts` and `recentPostTexts` may be absent or empty |
 | `songVersions` | Create requires `audioURL == null` and `providerOutputId == null`. Owner may still change `isPrimary` |
 | `generations` | Create requires a pending job, null audio, null or empty stems, and the parent song owned by the caller. `ownerId`, when present, must be the caller. `createdBy` is rejected. No client update or delete |
 | `artistVersions` | Create only. `name` must equal the parent artist's `name` (the artist is written first). Client update and delete are denied |
+| `coinMints/**` | All client reads and writes denied. Admin only (`lib/server/coinMints.ts`, written by create-tx) |
 | `playRateLimits/**` | All client reads and writes denied. Admin only (`lib/server/playRateLimit.ts`) |
 | `coinMetadataUploads/**` including `coinUploads` | All client reads and writes denied. Admin only |
 | `config/mobile` | Public read. Client write denied |
@@ -102,6 +103,9 @@ These replaced the old client-SDK server writes from the previous inventory:
 | Stub generation status | `lib/server/generationsAdmin.ts` |
 | Notifications created by the webhook | `lib/server/notificationsAdmin.ts` |
 | Coin launch `pumpFun`, `coinMetadataId`, `coinImagePath` | `lib/services/artistPumpFun.ts` (Admin) |
+| Mint binding `coinMints/{mint}` | `lib/server/coinMints.ts` (Admin, before create-tx returns) |
+| Legacy mint exemption `mintSweepExemptAt` | `scripts/mark-legacy-mints.ts` via `lib/server/markLegacyMints.ts` (Admin; idempotent, does not overwrite an existing stamp) |
+| First sighting `mintFirstSeenAt` | `lib/server/mintSweep.ts` (Admin cron) |
 | Account delete of `users/{uid}`, including `private/profile` | `lib/server/deleteAccount.ts` `recursiveDelete` |
 | X tokens and song-live posts | `lib/x/tokens.ts`, `lib/x/postSong.ts` |
 | Cover pipeline | `lib/covers/store.ts` |

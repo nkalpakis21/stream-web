@@ -61,6 +61,12 @@ export interface PumpFunCoin {
   symbol: string | null;
   launchedAt: Timestamp | null;
   creatorWallet: string | null;
+  /**
+   * Server-owned. Admin sets this after the bonding-curve creator matches
+   * coinMints.creatorWallet for this owner's create-tx binding. Absent until
+   * then. Clients cannot write it.
+   */
+  verifiedAt?: Timestamp | null;
 }
 
 export function emptyPumpFunCoin(): PumpFunCoin {
@@ -157,6 +163,18 @@ export interface AIArtistDocument {
    * not in our bucket. Artist document root. Never a client-supplied path.
    */
   coinImagePath?: string | null;
+  /**
+   * Server timestamp written by scripts/mark-legacy-mints.ts when absent.
+   * A later run of that script leaves an existing value unchanged.
+   * The mint cron skips an artist that has this set. Clients cannot write it.
+   */
+  mintSweepExemptAt?: Timestamp | null;
+  /**
+   * Server timestamp written the first time the mint cron sees pumpFun.mint
+   * on an artist that is not exempt. The 30-minute unbound clear uses this,
+   * not createdAt. Clients cannot write it.
+   */
+  mintFirstSeenAt?: Timestamp | null;
   /**
    * Optional public X account for this artist. Absent/undefined on older
    * documents is equivalent to disconnected. Tokens are never stored here.

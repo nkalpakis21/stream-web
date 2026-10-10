@@ -7,7 +7,10 @@ import type { AIGenerationRequest } from '@/lib/ai/types';
 import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
 import { adminGetArtist } from '@/lib/server/artistsAdmin';
 import { adminGetSong } from '@/lib/server/songsAdmin';
-import { saveMusicGptTaskBinding } from '@/lib/server/musicgptTaskBinding';
+import {
+  musicGptTaskLogId,
+  saveMusicGptTaskBinding,
+} from '@/lib/server/musicgptTaskBinding';
 import type { SongDocument } from '@/types/firestore';
 import {
   musicGptGenerationCallback,
@@ -148,12 +151,17 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
     if (conversionId1) conversionIds.push(conversionId1);
     if (conversionId2) conversionIds.push(conversionId2);
 
-    await (deps.saveTaskBinding ?? saveMusicGptTaskBinding)({
-      taskId,
-      uid: userId,
-      songId,
-      conversionIds,
-    });
+    try {
+      await (deps.saveTaskBinding ?? saveMusicGptTaskBinding)({
+        taskId,
+        uid: userId,
+        songId,
+        conversionIds,
+      });
+    } catch (bindingError) {
+      console.error(`musicgpt_task_binding_failed ${musicGptTaskLogId(taskId)}`);
+      throw bindingError;
+    }
 
     return NextResponse.json({
       taskId,

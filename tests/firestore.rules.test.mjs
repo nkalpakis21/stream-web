@@ -293,6 +293,16 @@ test('owner can create an artist, including a launched coin, and cannot seize an
     },
   })));
 
+  await assertFails(setDoc(doc(alice, 'artists/exempt'), artistData({
+    id: 'exempt',
+    mintSweepExemptAt: now,
+  })));
+
+  await assertFails(setDoc(doc(alice, 'artists/firstSeen'), artistData({
+    id: 'firstSeen',
+    mintFirstSeenAt: now,
+  })));
+
   await assertFails(setDoc(doc(alice, 'artists/verified'), artistData({
     id: 'verified',
     pumpFun: {
@@ -354,6 +364,8 @@ test('owner can update artist profile fields and cannot change ownerId, coin, or
     },
   }));
   await assertFails(updateDoc(ref, { 'pumpFun.verifiedAt': now }));
+  await assertFails(updateDoc(ref, { mintSweepExemptAt: now }));
+  await assertFails(updateDoc(ref, { mintFirstSeenAt: now }));
   await assertFails(updateDoc(ref, {
     x: {
       status: 'connected',
@@ -636,6 +648,23 @@ test('owner can change isPrimary and cannot write audioURL', async () => {
   await assertFails(updateDoc(doc(alice, 'songVersions/ver1'), {
     audioURL: 'https://cdn.example/other.mp3',
   }));
+});
+
+test('clients cannot read or write config/mintSweep, and config/mobile stays public', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'config/mintSweep'), { artistId: 'artist1' });
+    await setDoc(doc(db, 'config/mobile'), { coinsEnabled: true });
+  });
+  for (const uid of [null, 'alice']) {
+    const client = dbFor(uid);
+    await assertFails(getDoc(doc(client, 'config/mintSweep')));
+    await assertFails(getDocs(collection(client, 'config')));
+    await assertFails(setDoc(doc(client, 'config/mintSweep'), { artistId: 'other' }));
+    await assertFails(updateDoc(doc(client, 'config/mintSweep'), { artistId: 'other' }));
+    await assertFails(deleteDoc(doc(client, 'config/mintSweep')));
+  }
+  await assertSucceeds(getDoc(doc(dbFor(null), 'config/mobile')));
+  await assertSucceeds(getDoc(doc(dbFor('alice'), 'config/mobile')));
 });
 
 test('config/mobile is world-readable and not client-writable', async () => {
@@ -1256,6 +1285,30 @@ test('a private song is owner-only for get', async () => {
   await assertSucceeds(getDoc(doc(dbFor('alice'), 'songs/privateSong')));
   await assertFails(getDoc(doc(dbFor('bob'), 'artists/privateArtist')));
   await assertSucceeds(getDoc(doc(dbFor('alice'), 'artists/privateArtist')));
+});
+
+test('every client operation on coinMints is denied', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'coinMints/mint1'), {
+      uid: 'alice',
+      creatorWallet: 'Wallet1111111111111111111111111111111111',
+      createdAt: now,
+    });
+  });
+  for (const uid of [null, 'alice', 'bob']) {
+    const client = dbFor(uid);
+    await assertFails(getDoc(doc(client, 'coinMints/mint1')));
+    await assertFails(getDocs(collection(client, 'coinMints')));
+    await assertFails(setDoc(doc(client, 'coinMints/mint2'), {
+      uid: 'bob',
+      creatorWallet: 'Wallet1111111111111111111111111111111111',
+      createdAt: now,
+    }));
+    await assertFails(updateDoc(doc(client, 'coinMints/mint1'), { uid: 'bob' }));
+    await assertFails(deleteDoc(doc(client, 'coinMints/mint1')));
+    await assertFails(getDoc(doc(client, 'coinMints/mint1/nested/secret')));
+    await assertFails(setDoc(doc(client, 'coinMints/mint1/nested/secret'), { uid: 'bob' }));
+  }
 });
 
 test('every client operation on playRateLimits and coinMetadataUploads is denied', async () => {
