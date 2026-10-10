@@ -26,9 +26,12 @@ function badRequest(error: string) {
  * unknown fields on that path are rejected. A number `playCount` is never
  * accepted.
  *
- * Counted plays log `play_counted`. They do not write `playsBySource` or
- * `playsBackground`: PR #95's song key allowlist would reject later client
- * updates of a song that carried those fields.
+ * A counted play logs `play_counted` and, in the same Admin update as
+ * `playCount`, bumps `playsBySource.<source>` for `ios` | `android` | `web`
+ * and `playsBackground` when `background` is true. Admin writes skip rules.
+ * A source outside that enum still increments `playCount` and writes no
+ * source field. A non-boolean `background` is ignored. Rate-limited plays
+ * bump nothing.
  */
 export async function PATCH(
   request: NextRequest,
@@ -48,11 +51,12 @@ export async function PATCH(
     if (parsed.mode === 'increment') {
       const reservation = await reservePlayCount(request, songId);
       if (reservation !== 'limited') {
-        await adminIncrementPlayCount(songId);
+        const attribution = { source: parsed.source, background: parsed.background };
+        await adminIncrementPlayCount(songId, attribution);
         const line = countedPlayLogLine({
           songId,
-          source: parsed.source,
-          background: parsed.background,
+          source: attribution.source,
+          background: attribution.background,
           reservation,
         });
         if (line) console.log(line);

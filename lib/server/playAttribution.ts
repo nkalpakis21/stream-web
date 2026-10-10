@@ -1,36 +1,28 @@
 import type { PlayReservation } from '@/lib/server/playRateLimit';
 
 /**
- * Anonymous play attribution from mobile build 15 and later.
- *
- * `playsBySource` and `playsBackground` are not written on the song.
- * Draft PR #95 `songServerFieldsUnchanged()` requires
- * `request.resource.data.keys().hasOnly([...])` and that list has no
- * room for those fields. An Admin write would stick, then every later
- * client song update (owner edit or playCount bump) would fail the rules.
+ * Anonymous play attribution from mobile build 15.
+ * `source` is only the enum below. Anything else is dropped and is never
+ * used as a Firestore field path. There is no `other` bucket.
  */
 
 export const PLAY_SOURCES = ['ios', 'android', 'web'] as const;
-export type PlaySource = (typeof PLAY_SOURCES)[number] | 'other';
+export type PlaySource = (typeof PLAY_SOURCES)[number];
 
-const PLAY_SOURCE_MAX_LENGTH = 32;
-
-export function normalizePlaySource(value: unknown): PlaySource {
-  if (typeof value !== 'string') return 'other';
-  const trimmed = value.trim().toLowerCase();
-  if (!trimmed || trimmed.length > PLAY_SOURCE_MAX_LENGTH) return 'other';
-  if (trimmed === 'ios' || trimmed === 'android' || trimmed === 'web') return trimmed;
-  return 'other';
+export function parsePlaySource(value: unknown): PlaySource | null {
+  if (value === 'ios' || value === 'android' || value === 'web') return value;
+  return null;
 }
 
-/** Only a real boolean true counts as a background play. */
-export function normalizePlayBackground(value: unknown): boolean {
-  return value === true;
+/** A non-boolean is ignored. Only `true` bumps `playsBackground`. */
+export function parsePlayBackground(value: unknown): boolean | null {
+  if (typeof value !== 'boolean') return null;
+  return value;
 }
 
 export type SongPatch =
   | { mode: 'invalid'; error: string }
-  | { mode: 'increment'; source: PlaySource; background: boolean }
+  | { mode: 'increment'; source: PlaySource | null; background: boolean | null }
   | { mode: 'owner'; hasPlay: boolean; hasTitle: boolean; hasPublic: boolean };
 
 /**
@@ -53,11 +45,11 @@ export function songPatchMode(record: Record<string, unknown>): SongPatch {
     return {
       mode: 'increment',
       source: Object.prototype.hasOwnProperty.call(record, 'source')
-        ? normalizePlaySource(record.source)
-        : 'other',
+        ? parsePlaySource(record.source)
+        : null,
       background: Object.prototype.hasOwnProperty.call(record, 'background')
-        ? normalizePlayBackground(record.background)
-        : false,
+        ? parsePlayBackground(record.background)
+        : null,
     };
   }
 
@@ -67,14 +59,44 @@ export function songPatchMode(record: Record<string, unknown>): SongPatch {
   return { mode: 'owner', hasPlay, hasTitle, hasPublic };
 }
 
+export type PlayAttribution = {
+  source: PlaySource | null;
+  background: boolean | null;
+};
+
+/**
+ * Fields for one Admin `update`, using the same increment value as `playCount`.
+ * Rate-limited plays return null so nothing is bumped. A source outside the
+ * enum omits `playsBySource`. A non-boolean `background` omits `playsBackground`.
+ */
+export function countedPlayFieldUpdates(
+  attribution: PlayAttribution,
+  reservation: PlayReservation,
+  increment: unknown
+): Record<string, unknown> | null {
+  if (reservation === 'limited') return null;
+  const updates: Record<string, unknown> = { playCount: increment };
+  if (
+    attribution.source === 'ios' ||
+    attribution.source === 'android' ||
+    attribution.source === 'web'
+  ) {
+    updates[`playsBySource.${attribution.source}`] = increment;
+  }
+  if (attribution.background === true) {
+    updates.playsBackground = increment;
+  }
+  return updates;
+}
+
 /**
  * One log line for a play that increments `playCount`. Rate-limited plays
- * return null so nothing is recorded. The line has no IP and no uid.
+ * return null. The line has no IP, no uid, and no raw client string.
  */
 export function countedPlayLogLine(input: {
   songId: string;
-  source: PlaySource;
-  background: boolean;
+  source: PlaySource | null;
+  background: boolean | null;
   reservation: PlayReservation;
 }): string | null {
   if (input.reservation === 'limited') return null;

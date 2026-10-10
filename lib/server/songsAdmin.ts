@@ -3,6 +3,10 @@ import { getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import type { SongDocument, SongVersionDocument } from '@/types/firestore';
 import { isMissingIndexError } from '@/lib/server/indexError';
+import {
+  countedPlayFieldUpdates,
+  type PlayAttribution,
+} from '@/lib/server/playAttribution';
 
 export async function adminGetSong(songId: string): Promise<SongDocument | null> {
   const snap = await getAdminDb().collection(COLLECTIONS.songs).doc(songId).get();
@@ -27,13 +31,16 @@ export async function adminGetSongVersions(songId: string): Promise<SongVersionD
   }
 }
 
-export async function adminIncrementPlayCount(songId: string): Promise<void> {
+export async function adminIncrementPlayCount(
+  songId: string,
+  attribution: PlayAttribution = { source: null, background: null }
+): Promise<void> {
+  const increment = FieldValue.increment(1);
+  const updates = countedPlayFieldUpdates(attribution, 'counted', increment);
   await getAdminDb()
     .collection(COLLECTIONS.songs)
     .doc(songId)
-    .update({
-      playCount: FieldValue.increment(1),
-    });
+    .update(updates ?? { playCount: increment });
 }
 
 export async function adminUpdateSongOwnerFields(

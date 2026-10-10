@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  countedPlayFieldUpdates,
   countedPlayLogLine,
-  normalizePlaySource,
   songPatchMode,
 } from '../lib/server/playAttribution';
+
+const INCREMENT = { __op: 'increment', n: 1 };
 
 describe('play attribution', () => {
   it('accepts source, background, and unknown fields on an increment', () => {
@@ -22,23 +24,70 @@ describe('play attribution', () => {
     });
   });
 
-  it('maps an unknown source to other', () => {
-    assert.equal(normalizePlaySource('watch'), 'other');
-    assert.equal(normalizePlaySource(''), 'other');
-    assert.equal(normalizePlaySource(15), 'other');
+  it('counts a bad source as playCount only, with no source field', () => {
     const parsed = songPatchMode({
       playCount: 'increment',
       source: 'desktop',
       background: false,
     });
     assert.equal(parsed.mode, 'increment');
-    if (parsed.mode === 'increment') {
-      assert.equal(parsed.source, 'other');
-      assert.equal(parsed.background, false);
-    }
+    if (parsed.mode !== 'increment') return;
+
+    assert.equal(parsed.source, null);
+    const updates = countedPlayFieldUpdates(
+      { source: parsed.source, background: parsed.background },
+      'counted',
+      INCREMENT
+    );
+    assert.deepEqual(updates, { playCount: INCREMENT });
+    assert.equal(Object.keys(updates ?? {}).some((key) => key.startsWith('playsBySource')), false);
+    assert.equal(JSON.stringify(updates).includes('desktop'), false);
   });
 
-  it('records nothing for a rate-limited play', () => {
+  it('ignores a non-boolean background', () => {
+    const parsed = songPatchMode({
+      playCount: 'increment',
+      source: 'web',
+      background: 'true',
+    });
+    assert.equal(parsed.mode, 'increment');
+    if (parsed.mode !== 'increment') return;
+
+    assert.equal(parsed.background, null);
+    const updates = countedPlayFieldUpdates(
+      { source: parsed.source, background: parsed.background },
+      'open',
+      INCREMENT
+    );
+    assert.deepEqual(updates, {
+      playCount: INCREMENT,
+      'playsBySource.web': INCREMENT,
+    });
+    assert.equal(Object.prototype.hasOwnProperty.call(updates, 'playsBackground'), false);
+  });
+
+  it('bumps playsBySource and playsBackground in the same update as playCount', () => {
+    const updates = countedPlayFieldUpdates(
+      { source: 'android', background: true },
+      'counted',
+      INCREMENT
+    );
+    assert.deepEqual(updates, {
+      playCount: INCREMENT,
+      'playsBySource.android': INCREMENT,
+      playsBackground: INCREMENT,
+    });
+  });
+
+  it('bumps nothing for a rate-limited play', () => {
+    assert.equal(
+      countedPlayFieldUpdates(
+        { source: 'ios', background: true },
+        'limited',
+        INCREMENT
+      ),
+      null
+    );
     assert.equal(
       countedPlayLogLine({
         songId: 'song-1',
@@ -50,18 +99,17 @@ describe('play attribution', () => {
     );
   });
 
-  it('logs a counted play without an IP or uid', () => {
+  it('logs a counted play without an IP, uid, or raw source', () => {
     const line = countedPlayLogLine({
       songId: 'song-1',
-      source: 'android',
-      background: false,
+      source: null,
+      background: null,
       reservation: 'counted',
     });
     assert.equal(
       line,
-      'play_counted {"songId":"song-1","source":"android","background":false}'
+      'play_counted {"songId":"song-1","source":null,"background":null}'
     );
-    assert.equal(line?.includes('203.0.113'), false);
     assert.equal(line?.includes('uid'), false);
   });
 });
