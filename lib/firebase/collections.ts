@@ -39,6 +39,13 @@ export const COLLECTIONS = {
    * Admin SDK only. Firestore TTL on collection group `coinUploads`.
    */
   coinMetadataUploads: 'coinMetadataUploads',
+  /**
+   * Server-only binding from a MusicGPT task id to the uid that started it.
+   * Doc id is the provider task id. `songId` is null when the client did not
+   * send one (older mobile). Admin SDK only. `expireAt` is now + 7 days.
+   * Firestore TTL is the musicgptTasks field override in firestore.indexes.json.
+   */
+  musicgptTasks: 'musicgptTasks',
 } as const;
 
 export type CollectionName = typeof COLLECTIONS[keyof typeof COLLECTIONS];

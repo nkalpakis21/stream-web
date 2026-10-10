@@ -17,6 +17,10 @@ import {
   adminCreateArtistNewSongNotification,
   adminCreateSongReadyNotification,
 } from '@/lib/server/notificationsAdmin';
+import {
+  findAuthorizedMusicGptGeneration,
+  musicGptTaskLogId,
+} from '@/lib/server/musicgptTaskBinding';
 import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
 import { redactForLog } from '@/lib/webhooks/redactUrl';
 import { revalidateHomepage } from '@/lib/webhooks/revalidate';
@@ -55,12 +59,21 @@ async function tryPostSongLive(songId: string, reason: string): Promise<void> {
   }
 }
 
-async function findGenerationByTaskId(taskId: string) {
-  const snap = await getAdminDb()
-    .collection(COLLECTIONS.generations)
-    .where('providerTaskId', '==', taskId)
-    .get();
-  return snap.empty ? null : snap.docs[0];
+/**
+ * Generation this task is allowed to update. Unbound and mismatched task ids
+ * return null without writing. Missing generations log the existing warning.
+ */
+async function loadAuthorizedGeneration(taskId: string): Promise<GenerationDocument | null> {
+  const lookup = await findAuthorizedMusicGptGeneration(taskId);
+  if (!lookup.ok) {
+    if (lookup.reason === 'missing') {
+      console.warn(
+        `[MusicGPT Webhook] No generation found for task_id: ${musicGptTaskLogId(taskId)}`
+      );
+    }
+    return null;
+  }
+  return lookup.generation;
 }
 
 export async function processMusicGptWebhook(
@@ -88,16 +101,10 @@ export async function processMusicGptWebhook(
     }
 
     console.log(`[MusicGPT Webhook] Received album cover generation webhook for task ${body.task_id}`);
-    const generationDoc = await findGenerationByTaskId(body.task_id);
-    if (!generationDoc) {
-      console.warn(`[MusicGPT Webhook] No generation found for album cover: task_id=${body.task_id}`);
+    const generation = await loadAuthorizedGeneration(body.task_id);
+    if (!generation) {
       return NextResponse.json({ ok: true });
     }
-
-    const generation = {
-      ...(generationDoc.data() as GenerationDocument),
-      id: (generationDoc.data() as GenerationDocument).id || generationDoc.id,
-    };
     const song = await adminGetSong(generation.songId);
     if (!song) {
       console.warn(`[MusicGPT Webhook] Song not found for generation ${generation.id}`);
@@ -146,30 +153,12 @@ export async function processMusicGptWebhook(
   if (body.subtype === 'lyrics_timestamped' || body.subtype === 'lyrics') {
     console.log(`[MusicGPT Webhook] Received lyrics update webhook for conversion ${body.conversion_id}`);
 
-    let generationDoc = body.conversion_id
-      ? (
-          await db
-            .collection(COLLECTIONS.generations)
-            .where('providerConversionIds', 'array-contains', body.conversion_id)
-            .get()
-        ).docs[0]
-      : undefined;
-
-    if (!generationDoc) {
-      generationDoc = (await findGenerationByTaskId(body.task_id)) ?? undefined;
-    }
-
-    if (!generationDoc) {
-      console.warn(
-        `[MusicGPT Webhook] No generation found for lyrics update: task_id=${body.task_id}, conversion_id=${body.conversion_id}`
-      );
+    // Conversion ids are world-readable on public songs. Only the generation
+    // authorized for this task id may receive lyrics.
+    const generation = await loadAuthorizedGeneration(body.task_id);
+    if (!generation) {
       return NextResponse.json({ ok: true });
     }
-
-    const generation = {
-      ...(generationDoc.data() as GenerationDocument),
-      id: (generationDoc.data() as GenerationDocument).id || generationDoc.id,
-    };
     const lyricsMetadata: Record<string, unknown> = { updatedAt: Timestamp.now() };
     if (body.lyrics_timestamped !== undefined) {
       lyricsMetadata.lyrics_timestamped = body.lyrics_timestamped;
@@ -215,31 +204,13 @@ export async function processMusicGptWebhook(
     );
   }
 
-  let generationDoc = await findGenerationByTaskId(body.task_id);
-  if (!generationDoc) {
-    const pending = await db.collection(COLLECTIONS.generations).where('status', '==', 'pending').get();
-    const processing = await db
-      .collection(COLLECTIONS.generations)
-      .where('status', '==', 'processing')
-      .get();
-    const match = [...pending.docs, ...processing.docs].find((doc) => {
-      const gen = doc.data() as GenerationDocument;
-      return gen.providerConversionIds?.includes(body.conversion_id!);
-    });
-    generationDoc = match ?? null;
-  }
-
-  if (!generationDoc) {
-    console.warn(
-      `[MusicGPT Webhook] No generation found for task_id: ${body.task_id} or conversion_id: ${body.conversion_id}`
-    );
+  // Do not scan pending generations by conversion id. That id is copied the
+  // same way as providerTaskId. The binding (or one recent unbound
+  // generation) is the only accepted target.
+  const generation = await loadAuthorizedGeneration(body.task_id);
+  if (!generation) {
     return NextResponse.json({ ok: true });
   }
-
-  const generation = {
-    ...(generationDoc.data() as GenerationDocument),
-    id: (generationDoc.data() as GenerationDocument).id || generationDoc.id,
-  };
 
   if (generation.providerProcessedConversions?.includes(body.conversion_id)) {
     console.log(
@@ -429,9 +400,8 @@ export async function processMusicGptWebhook(
 }
 
 export async function songOwnerForMusicGptTask(taskId: string): Promise<string | null> {
-  const generationDoc = await findGenerationByTaskId(taskId);
-  if (!generationDoc) return null;
-  const generation = generationDoc.data() as GenerationDocument;
-  const song = await adminGetSong(generation.songId);
+  const lookup = await findAuthorizedMusicGptGeneration(taskId);
+  if (!lookup.ok) return null;
+  const song = await adminGetSong(lookup.generation.songId);
   return song?.ownerId ?? null;
 }
