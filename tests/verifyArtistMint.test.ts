@@ -655,6 +655,38 @@ describe('mint sweep cron', () => {
     ]);
   });
 
+  it('clears an artist that points at a tombstoned mint without waiting', async () => {
+    const { db, docs } = createDb();
+    seedArtist(docs, 'gone-owner', 1, MINT);
+    (docs.get('artists/gone-owner') as Stored).mintFirstSeenAt = NOW - 60 * 1000;
+    docs.set(`coinMints/${MINT}`, { deletedAt: NOW });
+    const logs = captureClears();
+    let lookedUp = false;
+
+    try {
+      const summary = await runMintSweep({
+        db,
+        nowMs: NOW,
+        lookupCreator: async () => {
+          lookedUp = true;
+          return { status: 'ok', creator: OWNER };
+        },
+      });
+      assert.equal(summary.cleared, 1);
+      assert.equal(summary.stamped, 0);
+      assert.equal(summary.unbound, 0);
+    } finally {
+      logs.restore();
+    }
+
+    assert.equal(lookedUp, false);
+    assert.deepEqual(pumpOf(docs, 'gone-owner'), emptyPump());
+    assert.equal((docs.get(`coinMints/${MINT}`) as Stored).uid, undefined);
+    assert.deepEqual(logs.entries, [
+      { event: 'coin_cleared_mismatch', payload: { artistId: 'gone-owner', mint: MINT } },
+    ]);
+  });
+
   it('leaves a missing curve unchanged until mintFirstSeenAt is 30 minutes old', async () => {
     const { db, docs } = createDb();
     seedArtist(docs, 'young', 1, MINT);
@@ -942,6 +974,40 @@ describe('pump.fun confirm route', () => {
     assert.equal(pumpOf(docs, 'artist-1').mint, null);
     assert.equal(pumpOf(docs, 'artist-2').mint, MINT);
   });
+
+  it('rejects a tombstoned mint on another user and does not write', async () => {
+    const { db, docs } = createDb();
+    seedArtist(docs, 'artist-1', ELIGIBLE_AT, null, 'user-2');
+    const deletedAt = { seconds: 10 };
+    docs.set(`coinMints/${MINT}`, { deletedAt });
+    const before = JSON.stringify(docs.get('artists/artist-1'));
+    let persisted = 0;
+    let verified = 0;
+
+    const response = await handlePumpFunConfirm(confirmRequest(), 'artist-1', {
+      requireUserId: async () => 'user-2',
+      persistArtistPumpFun: async input => {
+        persisted += 1;
+        return persistPump(db)(input);
+      },
+      verifyArtistMint: async () => {
+        verified += 1;
+        return { result: 'matched', creatorWallet: OWNER };
+      },
+      verifyDeps: { db },
+    });
+
+    assert.equal(response.status, 409);
+    const body = await response.json();
+    assert.equal(body.error, 'This mint is already bound to another account.');
+    assert.equal(body.pumpFun, undefined);
+    assert.equal(persisted, 0);
+    assert.equal(verified, 0);
+    assert.equal(JSON.stringify(docs.get('artists/artist-1')), before);
+    assert.equal(pumpOf(docs, 'artist-1').mint, null);
+    assert.equal((docs.get(`coinMints/${MINT}`) as Stored).deletedAt, deletedAt);
+    assert.equal((docs.get(`coinMints/${MINT}`) as Stored).uid, undefined);
+  });
 });
 
 describe('create-tx mint binding', () => {
@@ -1072,6 +1138,47 @@ describe('create-tx mint binding', () => {
     assert.equal(body.error, 'Could not bind this mint.');
     assert.equal(body.transaction, undefined);
     assert.deepEqual(built, ['tx']);
+  });
+
+  it('returns 409 when create-tx rebinds a tombstoned mint', async () => {
+    const { db, docs } = createDb();
+    const deletedAt = { seconds: 10 };
+    docs.set(`coinMints/${MINT}`, { deletedAt });
+    let built = 0;
+
+    const absent = await handlePumpFunCreateTx(createTxRequest(), {
+      requireUser: async () => 'user-2',
+      db,
+      mintAccount: async () => 'absent',
+      buildTx: async () => {
+        built += 1;
+        return fakeBuiltTx();
+      },
+    });
+    assert.equal(absent.status, 409);
+    const absentBody = await absent.json();
+    assert.equal(absentBody.error, 'This mint is already bound to another account.');
+    assert.equal(absentBody.transaction, undefined);
+
+    const exists = await handlePumpFunCreateTx(createTxRequest(), {
+      requireUser: async () => 'user-2',
+      db,
+      mintAccount: async () => 'exists',
+      buildTx: async () => {
+        built += 1;
+        return fakeBuiltTx();
+      },
+    });
+    assert.equal(exists.status, 409);
+    const existsBody = await exists.json();
+    assert.equal(existsBody.error, 'This mint already exists.');
+    assert.equal(existsBody.transaction, undefined);
+
+    const stored = docs.get(`coinMints/${MINT}`) as Stored;
+    assert.equal(stored.deletedAt, deletedAt);
+    assert.equal(stored.uid, undefined);
+    assert.equal(stored.creatorWallet, undefined);
+    assert.equal(built, 1);
   });
 });
 

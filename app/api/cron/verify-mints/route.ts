@@ -5,7 +5,8 @@
  * Skips artists stamped with mintSweepExemptAt. For every other artist
  * with pumpFun.mint and no verifiedAt, the first run writes mintFirstSeenAt
  * and stops. A missing coinMints binding is cleared only after that stamp
- * is more than 30 minutes old. createdAt is not used.
+ * is more than 30 minutes old. A tombstone is a mismatch and clears on
+ * the next run without that wait. createdAt is not used.
  *
  * This deploy does not include vercel.json, so the schedule is not
  * registered and this route cannot run on a timer before mark-legacy-mints.
