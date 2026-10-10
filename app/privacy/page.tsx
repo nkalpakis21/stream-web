@@ -13,7 +13,7 @@ export default function PrivacyPolicyPage() {
           <h1 className="listen-h1 mb-8">Privacy Policy</h1>
           
           <p className="text-muted-foreground mb-6">
-            <strong>Last updated:</strong> September 2, 2026
+            <strong>Last updated:</strong> October 10, 2026
           </p>
 
           <div className="space-y-8 text-foreground">
@@ -30,16 +30,19 @@ export default function PrivacyPolicyPage() {
                 <div>
                   <h3 className="text-xl font-medium mb-2 text-foreground">2.1 Information You Provide</h3>
                   <ul className="list-disc pl-6 space-y-2">
-                    <li>Account information (email address, username)</li>
+                    <li>Account: your name, your email, and a user ID from Firebase Authentication when you sign in with Google or with email and password.</li>
+                    <li>Content you create: artists, looks and photos you upload, songs, titles, and lyrics.</li>
+                    <li>Wallet: if you connect a Solana wallet, your public wallet address. We never see or store your private keys.</li>
+                    <li>Artist coins: if you launch one, its public details (mint address, symbol, creator wallet).</li>
+                    <li>X: if you connect X, your handle, your X user ID, recent post text, and access tokens, which are stored on our servers so your artist can post.</li>
                     <li>Profile information and preferences</li>
-                    <li>Content you create, including songs, artists, and collaborations</li>
                     <li>Communications with us</li>
                   </ul>
                 </div>
                 <div>
                   <h3 className="text-xl font-medium mb-2 text-foreground">2.2 Automatically Collected Information</h3>
                   <ul className="list-disc pl-6 space-y-2">
-                    <li>Usage data and analytics</li>
+                    <li>Usage: app analytics through Firebase Analytics, which helps us understand how features are used.</li>
                     <li>Device information and browser type</li>
                     <li>IP address and location data</li>
                     <li>Cookies and similar tracking technologies</li>
@@ -107,6 +110,10 @@ export default function PrivacyPolicyPage() {
               </ul>
               <p className="text-muted-foreground leading-relaxed mt-4">
                 To exercise these rights, please contact us using the information provided below.
+              </p>
+              <h3 className="text-xl font-medium mb-2 mt-6 text-foreground">Deleting your account</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                You can delete your account in the app under You, then Delete account. This permanently removes your account, profile, artists, and songs from Streamstar. Coins you launched, including their name, symbol, and image, stay public. We can&apos;t delete them, and they stay available to people who hold those coins. Your wallet and its keys live in your wallet app and aren&apos;t affected. You can also email privacy@streamstar.xyz to ask for deletion.
               </p>
             </section>
 

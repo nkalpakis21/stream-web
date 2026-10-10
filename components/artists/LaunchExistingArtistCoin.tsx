@@ -5,7 +5,10 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { LaunchCoinToggle } from '@/components/artists/LaunchCoinToggle';
 import { getFreshIdToken, userFacingApiError } from '@/lib/api/clientAuth';
-import { launchPumpFunForExistingArtist } from '@/lib/solana/launchArtistPumpFunCoin';
+import {
+  confirmArtistPumpFunLaunch,
+  launchPumpFunForExistingArtist,
+} from '@/lib/solana/launchArtistPumpFunCoin';
 import { LAUNCH_NO_TOKEN_NOTICE } from '@/lib/solana/pumpFun';
 import type { PumpFunCoin } from '@/types/firestore';
 import { useToast, ToastContainer } from '@/components/ui/toast';
@@ -43,31 +46,12 @@ export function LaunchExistingArtistCoin({
 
   const busy = Boolean(disabled || launching);
 
-  const persistCoin = async (coin: PumpFunCoin, token: string) => {
-    const res = await fetch(`/api/artists/${artistId}/pump-fun`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        mint: coin.mint,
-        url: coin.url,
-        symbol: coin.symbol,
-        launchedAt: coin.launchedAt?.toMillis?.() ?? Date.now(),
-        creatorWallet: coin.creatorWallet,
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(
-        userFacingApiError(
-          res.status,
-          data.error,
-          'Coin launched but saving it failed. Try again.'
-        )
-      );
-    }
+  const persistCoin = async (
+    coin: PumpFunCoin,
+    token: string,
+    coinMetadataId: string | null
+  ) => {
+    await confirmArtistPumpFunLaunch(artistId, coin, token, coinMetadataId);
   };
 
   const handleLaunch = async () => {
@@ -80,7 +64,7 @@ export function LaunchExistingArtistCoin({
           ? { publicKey, signTransaction, sendTransaction }
           : null;
 
-      const { coin, launchNotice } = await launchPumpFunForExistingArtist({
+      const { coin, coinMetadataId, launchNotice } = await launchPumpFunForExistingArtist({
         coinName: coinName.trim() || artistName,
         ticker,
         imageUrl: lookUrl,
@@ -97,10 +81,10 @@ export function LaunchExistingArtistCoin({
 
       const token = await getFreshIdToken(user);
       try {
-        await persistCoin(coin, token);
+        await persistCoin(coin, token, coinMetadataId);
       } catch (firstError) {
         try {
-          await persistCoin(coin, token);
+          await persistCoin(coin, token, coinMetadataId);
         } catch {
           throw firstError;
         }

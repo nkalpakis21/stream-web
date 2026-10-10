@@ -33,6 +33,12 @@ export const COLLECTIONS = {
    * Server-only. Enable a Firestore TTL policy on field `expireAt`.
    */
   playRateLimits: 'playRateLimits',
+  /**
+   * Parent for pump.fun metadata uploads. Each upload is
+   * coinMetadataUploads/{uid}/coinUploads/{id} with expireAt (now + 24h).
+   * Admin SDK only. Firestore TTL on collection group `coinUploads`.
+   */
+  coinMetadataUploads: 'coinMetadataUploads',
 } as const;
 
 export type CollectionName = typeof COLLECTIONS[keyof typeof COLLECTIONS];

@@ -34,6 +34,18 @@ import {
   type StyleDNA,
 } from '@/types/firestore';
 
+/** Client create never writes coin metadata fields. The confirm route does. */
+function pumpFunForClientCreate(coin?: PumpFunCoin | null): PumpFunCoin {
+  if (!coin) return emptyPumpFunCoin();
+  return {
+    mint: coin.mint,
+    url: coin.url,
+    symbol: coin.symbol,
+    launchedAt: coin.launchedAt,
+    creatorWallet: coin.creatorWallet,
+  };
+}
+
 /**
  * Create a new AI Artist
  */
@@ -75,6 +87,8 @@ export async function createArtist(
 
   // Create artist document. pumpFun is always written so new artists have
   // an explicit unlaunched coin (all-null) rather than a missing field.
+  // coinMetadataId and coinImagePath live on the artist document root and
+  // are written by the confirm route, not by this client create.
   const artist: AIArtistDocument = {
     id: artistId,
     ownerId,
@@ -89,7 +103,7 @@ export async function createArtist(
     updatedAt: now,
     deletedAt: null,
     currentVersionId: versionId,
-    pumpFun: data.pumpFun ?? emptyPumpFunCoin(),
+    pumpFun: pumpFunForClientCreate(data.pumpFun),
     x: emptyXConnection(),
   };
 
