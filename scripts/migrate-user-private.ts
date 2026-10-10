@@ -1,21 +1,39 @@
 #!/usr/bin/env tsx
 /**
- * One-time migration: move email and solanaWalletAddress off users/{uid}
- * onto users/{uid}/private/profile, then delete them from the public doc.
+ * Move email and solanaWalletAddress off users/{uid} onto
+ * users/{uid}/private/profile.
  *
- * Not invoked by the app, CI, or deploy. Run it by hand after the rules
- * that reject those public fields are ready.
+ * Not invoked by the app, CI, or deploy. Run the steps by hand, in order:
+ *   1. copy   (before the new rules)
+ *   2. deploy indexes, wait until they are built, promote, then
+ *   3. strip  (after promote, before the rules deploy)
+ *
+ * copy writes the public email and wallet onto private/profile and leaves
+ * the public doc untouched. strip re-copies first, then deletes email and
+ * solanaWalletAddress from the public doc.
+ *
+ * On strip, a private profile with no walletUpdatedAt takes the public
+ * wallet (a relink between copy and promote). A profile that already has
+ * walletUpdatedAt keeps its wallet (a link after promote). Email is copied
+ * only when private/profile does not already have one.
  *
  * Setup matches scripts/migrate-user-documents.ts (service account).
  *
  * Usage:
- *   Dry run: tsx scripts/migrate-user-private.ts --dry-run
- *   Execute: tsx scripts/migrate-user-private.ts
+ *   tsx scripts/migrate-user-private.ts copy --dry-run
+ *   tsx scripts/migrate-user-private.ts copy
+ *   tsx scripts/migrate-user-private.ts strip --dry-run
+ *   tsx scripts/migrate-user-private.ts strip
  */
 
 import * as admin from 'firebase-admin';
 import { existsSync } from 'fs';
 import { resolve } from 'path';
+import {
+  copyPayload,
+  publicDocHasPrivateFields,
+  stripRecopyPayload,
+} from '../lib/server/userPrivateMigration';
 
 const PRIVATE_FIELDS = ['email', 'solanaWalletAddress'] as const;
 
@@ -56,33 +74,21 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-function privatePayload(data: admin.firestore.DocumentData): Record<string, unknown> {
-  const payload: Record<string, unknown> = {};
-  if (typeof data.email === 'string') payload.email = data.email;
-  if (typeof data.solanaWalletAddress === 'string' || data.solanaWalletAddress === null) {
-    payload.solanaWalletAddress = data.solanaWalletAddress;
+type Step = 'copy' | 'strip';
+
+function deletionsFor(data: admin.firestore.DocumentData): Record<string, admin.firestore.FieldValue> {
+  const deletions: Record<string, admin.firestore.FieldValue> = {};
+  for (const field of PRIVATE_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(data, field)) {
+      deletions[field] = admin.firestore.FieldValue.delete();
+    }
   }
-  return payload;
+  return deletions;
 }
 
-export function publicDocHasPrivateFields(data: admin.firestore.DocumentData | undefined): boolean {
-  if (!data) return false;
-  return PRIVATE_FIELDS.some(field => Object.prototype.hasOwnProperty.call(data, field));
-}
-
-async function migrateUserPrivate(dryRun: boolean): Promise<void> {
-  console.log('='.repeat(60));
-  console.log('Move user email and wallet to private/profile');
-  console.log('='.repeat(60));
-  console.log(`Mode: ${dryRun ? 'DRY RUN (no changes will be made)' : 'LIVE (changes will be committed)'}`);
-  console.log(`Project: ${admin.app().options.projectId || 'unknown'}`);
-  console.log('');
-
-  let scanned = 0;
-  let moved = 0;
-  let skipped = 0;
-  let errors = 0;
-
+async function eachUser(
+  visit: (doc: admin.firestore.QueryDocumentSnapshot) => Promise<void>
+): Promise<void> {
   const pageSize = 200;
   let last: admin.firestore.QueryDocumentSnapshot | undefined;
 
@@ -93,49 +99,86 @@ async function migrateUserPrivate(dryRun: boolean): Promise<void> {
     if (page.empty) break;
 
     for (const doc of page.docs) {
-      scanned += 1;
-      const data = doc.data();
-      if (!publicDocHasPrivateFields(data)) {
-        skipped += 1;
-        continue;
-      }
-
-      const payload = privatePayload(data);
-      const deletions: Record<string, admin.firestore.FieldValue> = {};
-      for (const field of PRIVATE_FIELDS) {
-        if (Object.prototype.hasOwnProperty.call(data, field)) {
-          deletions[field] = admin.firestore.FieldValue.delete();
-        }
-      }
-
-      try {
-        if (!dryRun) {
-          if (Object.keys(payload).length > 0) {
-            await doc.ref.collection('private').doc('profile').set(payload, { merge: true });
-          }
-          await doc.ref.update(deletions);
-        }
-        moved += 1;
-        console.log(
-          `${dryRun ? 'Would move' : 'Moved'} ${doc.id}: ${Object.keys(payload).join(', ') || '(delete empty fields)'}`
-        );
-      } catch (error) {
-        errors += 1;
-        console.error(`Failed ${doc.id}:`, error);
-      }
+      await visit(doc);
     }
 
     last = page.docs[page.docs.length - 1];
     if (page.size < pageSize) break;
   }
+}
+
+async function migrateUserPrivate(step: Step, dryRun: boolean): Promise<void> {
+  console.log('='.repeat(60));
+  console.log(step === 'copy'
+    ? 'Copy user email and wallet to private/profile'
+    : 'Re-copy, then strip email and wallet from the public user doc');
+  console.log('='.repeat(60));
+  console.log(`Step: ${step}`);
+  console.log(`Mode: ${dryRun ? 'DRY RUN (no changes will be made)' : 'LIVE (changes will be committed)'}`);
+  console.log(`Project: ${admin.app().options.projectId || 'unknown'}`);
+  console.log('');
+
+  let scanned = 0;
+  let changed = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  await eachUser(async (doc) => {
+    scanned += 1;
+    const data = doc.data();
+    if (!publicDocHasPrivateFields(data)) {
+      skipped += 1;
+      return;
+    }
+
+    try {
+      const privateRef = doc.ref.collection('private').doc('profile');
+      let payload: Record<string, string | null>;
+      if (step === 'copy') {
+        payload = copyPayload(data);
+      } else {
+        const privateSnap = await privateRef.get();
+        payload = stripRecopyPayload(data, privateSnap.exists ? privateSnap.data() : null);
+      }
+      const deletions = step === 'strip' ? deletionsFor(data) : {};
+
+      if (!dryRun) {
+        if (Object.keys(payload).length > 0) {
+          await privateRef.set(payload, { merge: true });
+        }
+        if (Object.keys(deletions).length > 0) {
+          await doc.ref.update(deletions);
+        }
+      }
+
+      changed += 1;
+      const verb = dryRun ? 'Would' : 'Did';
+      const wrote = Object.keys(payload).join(', ') || '(no private write)';
+      const stripped = step === 'strip' ? `; strip ${Object.keys(deletions).join(', ')}` : '';
+      console.log(`${verb} ${step} ${doc.id}: ${wrote}${stripped}`);
+    } catch (error) {
+      errors += 1;
+      console.error(`Failed ${doc.id}:`, error);
+    }
+  });
 
   console.log('');
-  console.log(`Scanned ${scanned}. Moved ${moved}. Already clean ${skipped}. Errors ${errors}.`);
+  console.log(`Scanned ${scanned}. ${step === 'copy' ? 'Copied' : 'Stripped'} ${changed}. Already clean ${skipped}. Errors ${errors}.`);
   if (errors > 0) process.exitCode = 1;
 }
 
-const dryRun = process.argv.includes('--dry-run');
-migrateUserPrivate(dryRun).catch(error => {
+function parseArgs(argv: string[]): { step: Step; dryRun: boolean } {
+  const dryRun = argv.includes('--dry-run');
+  const step = argv.find((arg) => arg === 'copy' || arg === 'strip');
+  if (step !== 'copy' && step !== 'strip') {
+    console.error('Usage: tsx scripts/migrate-user-private.ts <copy|strip> [--dry-run]');
+    process.exit(1);
+  }
+  return { step, dryRun };
+}
+
+const { step, dryRun } = parseArgs(process.argv.slice(2));
+migrateUserPrivate(step, dryRun).catch((error) => {
   console.error(error);
   process.exit(1);
 });

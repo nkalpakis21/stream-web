@@ -131,8 +131,20 @@ service cloud.firestore {
           && request.resource.data.x.lastError == null
           && request.resource.data.x.lastErrorAt == null
           && request.resource.data.x.profileSyncedAt == null
-          && request.resource.data.x.recentPostTexts.size() == 0
-          && request.resource.data.x.posts.size() == 0
+          && (
+            !('recentPostTexts' in request.resource.data.x)
+            || (
+              request.resource.data.x.recentPostTexts is list
+              && request.resource.data.x.recentPostTexts.size() == 0
+            )
+          )
+          && (
+            !('posts' in request.resource.data.x)
+            || (
+              request.resource.data.x.posts is list
+              && request.resource.data.x.posts.size() == 0
+            )
+          )
         );
     }
 
@@ -167,51 +179,73 @@ service cloud.firestore {
         );
     }
 
+    // Null on both sides stays updatable. Maps must have the same keys, so a
+    // client cannot add a leaf. Scalar == is only used when the key exists.
+    function sameXField(field) {
+      return !(field in resource.data.x)
+        || request.resource.data.x[field] == resource.data.x[field];
+    }
+
+    function sameXList(field) {
+      return !(field in resource.data.x)
+        || (
+          resource.data.x[field] == null
+          && request.resource.data.x[field] == null
+        )
+        || (
+          resource.data.x[field] is list
+          && request.resource.data.x[field] is list
+          && request.resource.data.x[field].hasAll(resource.data.x[field])
+          && resource.data.x[field].hasAll(request.resource.data.x[field])
+        );
+    }
+
     function sameX() {
       return (!('x' in resource.data) && !('x' in request.resource.data))
         || (
           'x' in resource.data
           && 'x' in request.resource.data
-          && request.resource.data.x.status == resource.data.x.status
-          && request.resource.data.x.username == resource.data.x.username
-          && request.resource.data.x.userId == resource.data.x.userId
-          && request.resource.data.x.connectedAt == resource.data.x.connectedAt
-          && request.resource.data.x.pausedAt == resource.data.x.pausedAt
-          && request.resource.data.x.lastError == resource.data.x.lastError
-          && request.resource.data.x.lastErrorAt == resource.data.x.lastErrorAt
-          && request.resource.data.x.profileSyncedAt == resource.data.x.profileSyncedAt
-          && request.resource.data.x.posts.hasAll(resource.data.x.posts)
-          && resource.data.x.posts.hasAll(request.resource.data.x.posts)
-          && request.resource.data.x.recentPostTexts.hasAll(resource.data.x.recentPostTexts)
-          && resource.data.x.recentPostTexts.hasAll(request.resource.data.x.recentPostTexts)
+          && !(resource.data.x is map)
+          && !(request.resource.data.x is map)
+          && resource.data.x == null
+          && request.resource.data.x == null
+        )
+        || (
+          'x' in resource.data
+          && 'x' in request.resource.data
+          && resource.data.x is map
+          && request.resource.data.x is map
+          && request.resource.data.x.keys().hasOnly(resource.data.x.keys())
+          && resource.data.x.keys().hasOnly(request.resource.data.x.keys())
+          && sameXField('status')
+          && sameXField('username')
+          && sameXField('userId')
+          && sameXField('connectedAt')
+          && sameXField('pausedAt')
+          && sameXField('lastError')
+          && sameXField('lastErrorAt')
+          && sameXField('profileSyncedAt')
+          && sameXList('posts')
+          && sameXList('recentPostTexts')
         );
     }
 
-    function bothAbsentOrEqualTokenMint() {
-      return (!('tokenMintAddress' in resource.data) && !('tokenMintAddress' in request.resource.data))
-        || (
-          'tokenMintAddress' in resource.data
-          && 'tokenMintAddress' in request.resource.data
-          && request.resource.data.tokenMintAddress == resource.data.tokenMintAddress
-        );
+    // Missing is not null. Accept either, and reject any other value.
+    function absentOrNull(data, field) {
+      return !(field in data) || data[field] == null;
     }
 
-    function bothAbsentOrEqualTokenAt() {
-      return (!('tokenMintCreatedAt' in resource.data) && !('tokenMintCreatedAt' in request.resource.data))
-        || (
-          'tokenMintCreatedAt' in resource.data
-          && 'tokenMintCreatedAt' in request.resource.data
-          && request.resource.data.tokenMintCreatedAt == resource.data.tokenMintCreatedAt
-        );
+    function existingSongVersionMatches(versionId, parentSongId) {
+      return exists(/databases/$(database)/documents/songVersions/$(versionId))
+        && get(/databases/$(database)/documents/songVersions/$(versionId)).data.songId
+          == parentSongId;
     }
 
-    function bothAbsentOrEqualDuration() {
-      return (!('duration' in resource.data) && !('duration' in request.resource.data))
-        || (
-          'duration' in resource.data
-          && 'duration' in request.resource.data
-          && request.resource.data.duration == resource.data.duration
-        );
+    function artistVersionMatches(versionId, artistId) {
+      return versionId is string
+        && exists(/databases/$(database)/documents/artistVersions/$(versionId))
+        && get(/databases/$(database)/documents/artistVersions/$(versionId)).data.artistId
+          == artistId;
     }
 
     // Missing on both sides, or present on both and equal.
@@ -241,8 +275,8 @@ service cloud.firestore {
 
     function artistProfileUpdate() {
       return isOwner(resource.data.ownerId)
-        && isValidArtistName(request.resource.data.name)
-        && request.resource.data.nameLowercase == request.resource.data.name.lower()
+        && fieldUnchanged('name')
+        && fieldUnchanged('nameLowercase')
         && request.resource.data.ownerId == resource.data.ownerId
         && request.resource.data.id == resource.data.id
         && request.resource.data.createdAt == resource.data.createdAt
@@ -250,26 +284,36 @@ service cloud.firestore {
         && samePumpFun()
         && sameX()
         && fieldUnchanged('coinMetadataId')
-        && fieldUnchanged('coinImagePath');
+        && fieldUnchanged('coinImagePath')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name',
+          'nameLowercase',
+          'avatarURL',
+          'styleDNA',
+          'lore',
+          'vocalIdentity',
+          'currentVersionId',
+          'updatedAt'
+        ]);
     }
 
     function songServerFieldsUnchanged() {
-      return request.resource.data.ownerId == resource.data.ownerId
-        && request.resource.data.artistId == resource.data.artistId
-        && request.resource.data.id == resource.data.id
-        && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.parentSongId == resource.data.parentSongId
-        && request.resource.data.collaborationType == resource.data.collaborationType
-        && request.resource.data.albumCoverPath == resource.data.albumCoverPath
-        && request.resource.data.albumCoverThumbnail == resource.data.albumCoverThumbnail
-        && request.resource.data.coverPosterUrl == resource.data.coverPosterUrl
-        && request.resource.data.coverVideoUrl == resource.data.coverVideoUrl
-        && request.resource.data.coverMotionStatus == resource.data.coverMotionStatus
-        && request.resource.data.coverMotionError == resource.data.coverMotionError
-        && request.resource.data.coverUpdatedAt == resource.data.coverUpdatedAt
-        && bothAbsentOrEqualTokenMint()
-        && bothAbsentOrEqualTokenAt()
-        && bothAbsentOrEqualDuration()
+      return fieldUnchanged('ownerId')
+        && fieldUnchanged('artistId')
+        && fieldUnchanged('id')
+        && fieldUnchanged('createdAt')
+        && fieldUnchanged('parentSongId')
+        && fieldUnchanged('collaborationType')
+        && fieldUnchanged('albumCoverPath')
+        && fieldUnchanged('albumCoverThumbnail')
+        && fieldUnchanged('coverPosterUrl')
+        && fieldUnchanged('coverVideoUrl')
+        && fieldUnchanged('coverMotionStatus')
+        && fieldUnchanged('coverMotionError')
+        && fieldUnchanged('coverUpdatedAt')
+        && fieldUnchanged('tokenMintAddress')
+        && fieldUnchanged('tokenMintCreatedAt')
+        && fieldUnchanged('duration')
         && sameCoverProvider()
         && request.resource.data.keys().hasOnly([
           'id',
@@ -345,9 +389,14 @@ service cloud.firestore {
       allow list: if resource.data.displayName is string;
 
       allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly([
+          'displayName',
+          'photoURL',
+          'createdAt',
+          'updatedAt',
+          'deletedAt'
+        ])
         && request.resource.data.deletedAt == null
-        && !('email' in request.resource.data)
-        && !('solanaWalletAddress' in request.resource.data)
         && (
           !('displayName' in request.resource.data)
           || request.resource.data.displayName == null
@@ -355,11 +404,20 @@ service cloud.firestore {
         );
 
       allow update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly([
+          'displayName',
+          'photoURL',
+          'createdAt',
+          'updatedAt',
+          'deletedAt'
+        ])
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'displayName',
           'updatedAt',
           'photoURL'
         ])
+        && fieldUnchanged('createdAt')
+        && fieldUnchanged('deletedAt')
         && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['displayName'])
           || isValidDisplayName(request.resource.data.displayName)
@@ -372,27 +430,7 @@ service cloud.firestore {
 
       match /private/{docId} {
         allow read: if isOwner(uid);
-        allow create, update: if isOwner(uid)
-          && docId == 'profile'
-          && request.resource.data.keys().hasOnly(['email', 'solanaWalletAddress'])
-          && (
-            !('email' in request.resource.data)
-            || (
-              request.resource.data.email is string
-              && request.resource.data.email.size() > 0
-              && request.resource.data.email.size() <= 320
-            )
-          )
-          && (
-            !('solanaWalletAddress' in request.resource.data)
-            || request.resource.data.solanaWalletAddress == null
-            || (
-              request.resource.data.solanaWalletAddress is string
-              && request.resource.data.solanaWalletAddress.size() >= 32
-              && request.resource.data.solanaWalletAddress.size() <= 44
-            )
-          );
-        allow delete: if isOwner(uid);
+        allow write: if false;
       }
     }
 
@@ -451,10 +489,35 @@ service cloud.firestore {
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
         && request.resource.data.title.size() <= 300
-        && songCreateClean();
+        && songCreateClean()
+        && request.resource.data.currentVersionId is string
+        && (
+          !exists(/databases/$(database)/documents/songVersions/$(request.resource.data.currentVersionId))
+          || existingSongVersionMatches(request.resource.data.currentVersionId, songId)
+        )
+        && artistVersionMatches(
+          request.resource.data.artistVersionId,
+          request.resource.data.artistId
+        );
 
       // Plays are server-owned. Clients cannot bump playCount, playsBySource, or playsBackground.
-      allow update: if songOwnerUpdate();
+      // Version pointers are checked only when they change. Web writes the song
+      // before its version, so create cannot require the new version to exist.
+      allow update: if songOwnerUpdate()
+        && (
+          fieldUnchanged('currentVersionId')
+          || (
+            request.resource.data.currentVersionId is string
+            && existingSongVersionMatches(request.resource.data.currentVersionId, songId)
+          )
+        )
+        && (
+          fieldUnchanged('artistVersionId')
+          || artistVersionMatches(
+            request.resource.data.artistVersionId,
+            resource.data.artistId
+          )
+        );
 
       // Owner hard-delete for in-app account deletion.
       // Web deleteSong soft-deletes via update of deletedAt.
@@ -469,13 +532,14 @@ service cloud.firestore {
         && request.resource.data.id == versionId
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.songId is string
-        && request.resource.data.audioURL == null
-        && request.resource.data.providerOutputId == null
+        && absentOrNull(request.resource.data, 'audioURL')
+        && absentOrNull(request.resource.data, 'providerOutputId')
         && isSongOwner(request.resource.data.songId);
       allow update: if isSongOwner(resource.data.songId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isPrimary'])
         && request.resource.data.isPrimary is bool
-        && request.resource.data.audioURL == resource.data.audioURL
+        && fieldUnchanged('audioURL')
+        && fieldUnchanged('providerOutputId')
         && request.resource.data.createdBy == resource.data.createdBy;
       allow delete: if false;
     }
@@ -489,12 +553,17 @@ service cloud.firestore {
         && request.resource.data.id == generationId
         && request.resource.data.songId is string
         && request.resource.data.status == 'pending'
-        && request.resource.data.completedAt == null
-        && request.resource.data.contentHash == null
-        && request.resource.data.output.audioURL == null
+        && absentOrNull(request.resource.data, 'completedAt')
+        && absentOrNull(request.resource.data, 'contentHash')
+        && request.resource.data.output is map
+        && absentOrNull(request.resource.data.output, 'audioURL')
         && (
-          request.resource.data.output.stems == null
-          || request.resource.data.output.stems.size() == 0
+          !('stems' in request.resource.data.output)
+          || request.resource.data.output.stems == null
+          || (
+            request.resource.data.output.stems is list
+            && request.resource.data.output.stems.size() == 0
+          )
         )
         && (
           !('ownerId' in request.resource.data)

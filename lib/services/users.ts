@@ -80,8 +80,7 @@ export async function getUserPrivateProfile(
  */
 export async function updateUserDisplayName(
   userId: string,
-  displayName: string,
-  userEmail?: string
+  displayName: string
 ): Promise<void> {
   // Validate display name
   const trimmed = displayName.trim();
@@ -119,14 +118,6 @@ export async function updateUserDisplayName(
       updatedAt: now,
       deletedAt: null,
     });
-  }
-
-  if (userEmail) {
-    await setDoc(
-      doc(db, getUserPrivateProfilePath(userId)),
-      { email: userEmail },
-      { merge: true }
-    );
   }
 }
 

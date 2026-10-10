@@ -16,8 +16,13 @@ export async function adminUpdateUserSolanaWallet(
   const privateRef = userRef.collection('private').doc('profile');
   const userDoc = await userRef.get();
 
-  const privatePayload: { solanaWalletAddress: string | null; email?: string } = {
+  const privatePayload: {
+    solanaWalletAddress: string | null;
+    walletUpdatedAt: FieldValue;
+    email?: string;
+  } = {
     solanaWalletAddress,
+    walletUpdatedAt: FieldValue.serverTimestamp(),
   };
   if (userEmail) {
     privatePayload.email = userEmail;

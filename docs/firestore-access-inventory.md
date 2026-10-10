@@ -47,11 +47,11 @@ No other web client list on `songs` or `artists` needed a new constraint. They a
 
 ## Users
 
-TF 15 never reads `users/{uid}`. It reads email and display name from Firebase Auth and posts the device wallet to `POST /api/users/link-wallet`. The public doc stays world-readable and holds only public fields. `email` and `solanaWalletAddress` live on owner-only `users/{uid}/private/profile`. No other private field was on the profile. `scripts/migrate-user-private.ts` copies those two fields and is **not run**.
+TF 15 never reads `users/{uid}`. It reads email and display name from Firebase Auth and posts the device wallet to `POST /api/users/link-wallet`. The public doc stays world-readable and holds only public fields. `email` and `solanaWalletAddress` live on owner-only `users/{uid}/private/profile`. No other private field was on the profile. `scripts/migrate-user-private.ts` is **not run**. `copy` writes email and wallet onto `private/profile` and leaves the public doc. `strip` re-copies (public wallet wins unless `walletUpdatedAt` is set; email is copied only when missing), then deletes the public fields. Clients cannot write `private/profile`.
 
 Public fields (`UserDocument`): `displayName`, `photoURL`, `createdAt`, `updatedAt`, `deletedAt`.
 
-Private fields (`UserPrivateProfile`): `email`, `solanaWalletAddress`.
+Private fields (`UserPrivateProfile`): `email`, `solanaWalletAddress`, `walletUpdatedAt` (Admin link-wallet only).
 
 `toPublicUser` in `lib/services/users.ts` 28–37 drops anything else off a public-doc read. Chat (`ChatView.tsx` 271, `ConversationHeader.tsx` 85) uses `displayName` only. Search and followed-artist routes spread that public shape, so they no longer return email or wallet.
 
@@ -62,12 +62,12 @@ Private fields (`UserPrivateProfile`): `email`, `solanaWalletAddress`.
 | `getUsersData` 226 | Other senders, and the signed-in sender, in `ChatView.tsx` 69 | Public fields, including `photoURL` at `ChatView.tsx` 317 |
 | `searchUsersByDisplayName` 275 and `getUsersFromFollowedArtists` 388 | Other users | Public fields. Routes `app/api/users/search/route.ts` 44 and `app/api/users/followed/route.ts` 26 |
 | `getUserPrivateProfile` 61–74 | Own uid only. Rules deny everyone else. No web caller yet | `email`, `solanaWalletAddress` |
-| `updateUserDisplayName` 108–129 | Own | Public: `displayName`, `updatedAt` (create also `photoURL: null` and timestamps). If an email is passed, merge `private/profile.email` |
-| `ProfileHeader.tsx` 78 and `DisplayNameForm.tsx` 76 | Own | Pass Auth `user.email` into that update |
-| `lib/server/usersAdmin.ts` 16–37 | Own. Admin. `app/api/users/link-wallet/route.ts` 39 | Writes `solanaWalletAddress` and `email` on `private/profile`. Deletes those fields off the public doc if it already exists. Response body is unchanged |
+| `updateUserDisplayName` | Own | Public: `displayName`, `updatedAt` (create also `photoURL: null` and timestamps). Does not write `private/profile` |
+| `ProfileHeader.tsx` and `DisplayNameForm.tsx` | Own | Call that update. Email on screen is Firebase Auth |
+| `lib/server/usersAdmin.ts` | Own. Admin. `app/api/users/link-wallet/route.ts` | Writes `solanaWalletAddress`, `walletUpdatedAt`, and `email` on `private/profile`. Deletes those public fields if the user doc already exists. Response body is unchanged |
 | `lib/server/deleteAccount.ts` 945–955 and 805 | Own. Admin | Reads `email` from the public doc and from `private/profile`. `recursiveDelete` removes the subdoc |
 | `scripts/migrate-user-documents.ts` 280–288 | Own Auth uid. Admin. **Not run** | Public create without email; email goes to `private/profile` |
-| `scripts/migrate-user-private.ts` | Existing docs. Admin. **Not run** | Copy `email` and `solanaWalletAddress` onto `private/profile`, then delete them from the public doc |
+| `scripts/migrate-user-private.ts` | Existing docs. Admin. **Not run** | `copy` then later `strip`. Both accept `--dry-run` |
 
 Auth-only, not a Firestore read: `UserMenu.tsx` 25–26 and 188, `InvestingPageClient.tsx` 311, `ProfileHeader.tsx` 96–97 and 163, `DisplayNameForm.tsx` 169, `BagIdentity.tsx` 13.
 
@@ -78,7 +78,7 @@ Rules reject client creates and updates that include `email` or `solanaWalletAdd
 | Collection | Locked on client create/update |
 | --- | --- |
 | `songs` | Updates cannot touch `ownerId`, covers, `playCount`, `playsBySource`, `playsBackground`, or legacy token fields. Create may write `playCount: 0` and null cover fields (TF 15). A non-zero count or a non-null cover is denied |
-| `artists` | Updates cannot touch `ownerId`, `pumpFun`, `x`, `coinMetadataId`, or `coinImagePath`. Create may write `pumpFun` only as null or exactly `mint`, `url`, `symbol`, `launchedAt`, `creatorWallet` (a real mint is allowed). `verifiedAt` is rejected. `x` is allowed only in the disconnected default. `coinMetadataId` and `coinImagePath` are never client-writable |
+| `artists` | Client updates cannot change `name`, `nameLowercase`, `ownerId`, `pumpFun`, `x`, `coinMetadataId`, or `coinImagePath`. Rename is `PATCH /api/artists/[id]/name` (Admin). Create may write `pumpFun` only as null or exactly `mint`, `url`, `symbol`, `launchedAt`, `creatorWallet`. `verifiedAt` is rejected. `x` is the disconnected default; `posts` and `recentPostTexts` may be absent or empty |
 | `songVersions` | Create requires `audioURL == null` and `providerOutputId == null`. Owner may still change `isPrimary` |
 | `generations` | Create requires a pending job, null audio, null or empty stems, and the parent song owned by the caller. `ownerId`, when present, must be the caller. `createdBy` is rejected. No client update or delete |
 | `artistVersions` | `createdBy` and `artistId` cannot change. Owner may update the rest |
@@ -119,13 +119,19 @@ The file also records the song and artist composites the existing public and own
 
 - `songVersions`: `songId ASC`, `versionNumber ASC` (`getSongVersions`)
 - `generations`: `songId ASC`, `createdAt DESC` (`getSongGenerations`)
+- `generations`: `songVersionId ASC`, `createdAt DESC` (`getSongVersionGenerations` in `lib/services/generations.ts`. Nothing calls it. Rules still deny the query.)
+- `conversations`: `participants CONTAINS`, `updatedAt DESC` (`getUserConversations`, `ChatList`)
+- `messages`: `conversationId ASC`, `deletedAt ASC`, `createdAt DESC` (`getMessages`, `ChatView`, `adminGetMessages`)
+- `notifications`: `songId ASC`, `createdAt DESC` (`getNotificationsBySong`)
 
-It is **not** a full export of production indexes. Chat, comments, follows, notifications, and messages composites are not in the file. Do not deploy indexes from this file until those are reconciled, or a deploy would delete them.
+TTL field overrides, collection group, field `expireAt`: `coinUploads` and `playRateLimits`. Same policies as #96 and #98.
+
+Comments (`targetType` + `targetId` + `parentCommentId` + `deletedAt` + `createdAt`, and replies `parentCommentId` + `deletedAt` + `createdAt`), follows (`followerId`/`artistId` + `createdAt`), and unread notifications (`userId` + `read` + `createdAt`) are still queried and are not in this file. A prod index export was not available here. Do not deploy indexes until those are reconciled.
 
 ## Holes rules do not close
 
 - **Test-mode prod rules** stay in force until this file is deployed. This change does not deploy.
-- **Unmigrated user documents** still return `email` and `solanaWalletAddress` on a direct client `get`, because rules cannot hide fields. Web service reads strip them. Run `scripts/migrate-user-private.ts` (not run here) before treating a raw client get as safe. A client `deleteDoc` of `users/{uid}` does not delete `private/profile`. Web `DELETE /api/account` uses `recursiveDelete` and does.
+- **Unmigrated user documents** still return `email` and `solanaWalletAddress` on a direct client `get`, because rules cannot hide fields. Web service reads strip them. Run `copy`, then later `strip` (`scripts/migrate-user-private.ts`, not run here) before treating a raw client get as safe. A client `deleteDoc` of `users/{uid}` does not delete `private/profile`. Web `DELETE /api/account` uses `recursiveDelete` and does. Clients cannot write `private/profile`.
 - **Artist create may store a launched `pumpFun`.** The map may contain only `mint`, `url`, `symbol`, `launchedAt`, and `creatorWallet`. `verifiedAt` is rejected on create, and updates cannot change `pumpFun`. Follow-up: the next mobile build drops `pumpFun` and `x` from the client create and lets the confirm route own them. Until then a user can attach an arbitrary mint to their own new artist. `coinMetadataId` and `coinImagePath` stay server-only.
 - **TF 15 generation create still omits `ownerId`.** Web sends it. Follow-up: the next mobile build adds `ownerId`. The parent song owner stays required, and clients cannot update or delete the job.
 - **Song create may write `playCount: 0` and null cover fields.** Follow-up: reject those fields on create once mobile omits them. Updates already cannot change them.

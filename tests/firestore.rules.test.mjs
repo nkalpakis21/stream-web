@@ -144,6 +144,19 @@ function versionData(overrides = {}) {
 async function seedCatalog() {
   await seed(async (db) => {
     await setDoc(doc(db, 'artists/artist1'), artistData());
+    await setDoc(doc(db, 'artistVersions/av1'), {
+      id: 'av1',
+      artistId: 'artist1',
+      versionNumber: 1,
+      name: 'Nova',
+      avatarURL: null,
+      styleDNA: { genres: ['pop'], moods: ['bright'], tempoRange: { min: 90, max: 120 }, influences: [] },
+      lore: 'A public artist',
+      vocalIdentity: null,
+      createdBy: 'alice',
+      createdAt: now,
+      parentVersionId: null,
+    });
     await setDoc(doc(db, 'artists/privateArtist'), artistData({
       id: 'privateArtist',
       name: 'Nova',
@@ -319,9 +332,14 @@ test('owner can update artist profile fields and cannot change ownerId, coin, or
   await seedCatalog();
   const alice = dbFor('alice');
   const ref = doc(alice, 'artists/artist1');
-  await assertSucceeds(updateDoc(ref, {
+  await assertFails(updateDoc(ref, {
     name: 'Nova Two',
     nameLowercase: 'nova two',
+    updatedAt: now,
+  }));
+  await assertSucceeds(updateDoc(ref, {
+    name: 'Nova',
+    nameLowercase: 'nova',
     lore: 'Updated bio',
     updatedAt: now,
   }));
@@ -351,8 +369,38 @@ test('owner can update artist profile fields and cannot change ownerId, coin, or
     },
   }));
   await assertFails(updateDoc(doc(dbFor('bob'), 'artists/artist1'), { lore: 'hijack' }));
+  await assertFails(updateDoc(ref, {
+    x: {
+      status: 'disconnected',
+      username: null,
+      userId: null,
+      connectedAt: null,
+      pausedAt: null,
+      lastError: null,
+      lastErrorAt: null,
+      profileSyncedAt: null,
+      recentPostTexts: [],
+      posts: [],
+      extra: true,
+    },
+  }));
   await assertFails(updateDoc(ref, { coinMetadataId: 'meta-id' }));
   await assertFails(updateDoc(ref, { coinImagePath: 'artist-looks/alice/original.jpg' }));
+});
+
+test('an artist created with x null can still be updated', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'artists/nullX'), artistData({
+      id: 'nullX',
+      name: 'Null X',
+      nameLowercase: 'null x',
+      x: null,
+    }));
+  });
+  await assertSucceeds(updateDoc(doc(dbFor('alice'), 'artists/nullX'), {
+    lore: 'Still editable',
+    updatedAt: now,
+  }));
 });
 
 test('name search returns only public artists and an unbounded list is denied', async () => {
@@ -385,7 +433,20 @@ test('name search returns only public artists and an unbounded list is denied', 
 test('owner can create a song for their artist only, with no cover or token fields set', async () => {
   await seedCatalog();
   const alice = dbFor('alice');
-  await assertSucceeds(setDoc(doc(alice, 'songs/song2'), songData({ id: 'song2', title: 'Second' })));
+  await assertSucceeds(setDoc(doc(alice, 'songs/song2'), songData({
+    id: 'song2',
+    title: 'Second',
+    currentVersionId: 'song2ver',
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/songTakenVersion'), songData({
+    id: 'songTakenVersion',
+    currentVersionId: 'ver1',
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/songWrongArtistVersion'), songData({
+    id: 'songWrongArtistVersion',
+    currentVersionId: 'songWrongVer',
+    artistVersionId: 'missingAv',
+  })));
   await assertFails(setDoc(doc(dbFor('bob'), 'songs/song3'), songData({
     id: 'song3',
     ownerId: 'bob',
@@ -405,6 +466,29 @@ test('owner can retitle or soft-delete a song and cannot change ownerId or cover
   const alice = dbFor('alice');
   const ref = doc(alice, 'songs/song1');
   await assertSucceeds(updateDoc(ref, { title: 'Renamed', updatedAt: now }));
+  await assertSucceeds(setDoc(doc(alice, 'songVersions/verMoved'), versionData({
+    id: 'verMoved',
+    songId: 'song1',
+    versionNumber: 9,
+  })));
+  await assertSucceeds(updateDoc(ref, { currentVersionId: 'verMoved', updatedAt: now }));
+  await assertFails(updateDoc(ref, { currentVersionId: 'privateVer', updatedAt: now }));
+  await assertFails(updateDoc(ref, { currentVersionId: 'missingVer', updatedAt: now }));
+  await assertSucceeds(setDoc(doc(alice, 'artistVersions/avMoved'), {
+    id: 'avMoved',
+    artistId: 'artist1',
+    versionNumber: 2,
+    name: 'Nova',
+    avatarURL: null,
+    styleDNA: { genres: ['pop'], moods: ['bright'], tempoRange: { min: 90, max: 120 }, influences: [] },
+    lore: 'A public artist',
+    vocalIdentity: null,
+    createdBy: 'alice',
+    createdAt: now,
+    parentVersionId: 'av1',
+  }));
+  await assertSucceeds(updateDoc(ref, { artistVersionId: 'avMoved', updatedAt: now }));
+  await assertFails(updateDoc(ref, { artistVersionId: 'missingAv', updatedAt: now }));
   await assertSucceeds(updateDoc(ref, { deletedAt: now, updatedAt: now }));
   await assertFails(updateDoc(ref, { ownerId: 'bob' }));
   await assertFails(updateDoc(ref, { coverPosterUrl: 'https://cdn.example/cover.jpg' }));
@@ -425,6 +509,35 @@ test('clients cannot write playCount, playsBySource, or playsBackground', async 
   await assertFails(updateDoc(doc(alice, 'songs/song1'), { playsBySource: { web: 1 } }));
   await assertFails(updateDoc(doc(alice, 'songs/song1'), { playsBackground: 1 }));
   await assertSucceeds(updateDoc(doc(alice, 'songs/song1'), { title: 'Still Mine', updatedAt: now }));
+});
+
+test('a legacy song missing server fields can still be retitled', async () => {
+  const data = songData({ id: 'legacy' });
+  for (const field of [
+    'playCount',
+    'playsBySource',
+    'playsBackground',
+    'albumCoverPath',
+    'albumCoverThumbnail',
+    'coverPosterUrl',
+    'coverVideoUrl',
+    'coverMotionStatus',
+    'coverMotionError',
+    'coverUpdatedAt',
+    'coverProvider',
+    'duration',
+    'tokenMintAddress',
+    'tokenMintCreatedAt',
+  ]) {
+    delete data[field];
+  }
+  await seed(async (db) => {
+    await setDoc(doc(db, 'songs/legacy'), data);
+  });
+  await assertSucceeds(updateDoc(doc(dbFor('alice'), 'songs/legacy'), {
+    title: 'Still here',
+    updatedAt: now,
+  }));
 });
 
 test('a missing playCount cannot be bumped by a client', async () => {
@@ -596,12 +709,21 @@ test('public user docs omit email and wallet; the private profile is owner-only'
     deletedAt: null,
   }));
 
-  await assertSucceeds(setDoc(doc(bob, 'users/bob/private/profile'), {
+  await assertFails(setDoc(doc(bob, 'users/bob/private/profile'), {
     email: 'bob@example.com',
     solanaWalletAddress: 'Wallet1111111111111111111111111111111111',
   }));
-  const own = await assertSucceeds(getDoc(doc(bob, 'users/bob/private/profile')));
-  assert.equal(own.data().email, 'bob@example.com');
+  await seed(async (db) => {
+    await setDoc(doc(db, 'users/alice/private/profile'), {
+      email: 'alice@example.com',
+      solanaWalletAddress: 'Wallet1111111111111111111111111111111111',
+    });
+  });
+  await assertFails(updateDoc(doc(dbFor('alice'), 'users/alice/private/profile'), {
+    email: 'alice-changed@example.com',
+  }));
+  const own = await assertSucceeds(getDoc(doc(dbFor('alice'), 'users/alice/private/profile')));
+  assert.equal(own.data().email, 'alice@example.com');
   await assertFails(getDoc(doc(dbFor(null), 'users/bob/private/profile')));
   await assertFails(getDoc(doc(dbFor('alice'), 'users/bob/private/profile')));
   await assertFails(setDoc(doc(dbFor('alice'), 'users/bob/private/profile'), {
@@ -1034,6 +1156,7 @@ test('TF 15 create payloads pass and the abusive variants are denied', async () 
 
   await assertSucceeds(setDoc(doc(alice, 'songs/tfSong'), songData({
     id: 'tfSong',
+    currentVersionId: 'tfSongVer',
     playCount: 0,
     albumCoverPath: null,
     albumCoverThumbnail: null,
@@ -1061,6 +1184,21 @@ test('TF 15 create payloads pass and the abusive variants are denied', async () 
     audioURL: null,
     providerOutputId: null,
   })));
+  const versionOmitted = versionData({
+    id: 'tfVerOmit',
+    songId: 'song1',
+    versionNumber: 3,
+    createdBy: 'alice',
+  });
+  delete versionOmitted.audioURL;
+  delete versionOmitted.providerOutputId;
+  await assertSucceeds(setDoc(doc(alice, 'songVersions/tfVerOmit'), versionOmitted));
+  await assertFails(setDoc(doc(alice, 'songVersions/tfVerAudio'), versionData({
+    id: 'tfVerAudio',
+    songId: 'song1',
+    versionNumber: 4,
+    audioURL: 'https://cdn.example/audio.mp3',
+  })));
 
   await assertSucceeds(setDoc(doc(alice, 'artists/tfArtist'), artistData({
     id: 'tfArtist',
@@ -1085,6 +1223,22 @@ test('TF 15 create payloads pass and the abusive variants are denied', async () 
       posts: [],
     },
   })));
+  const xOmitted = artistData({
+    id: 'tfArtistX',
+    name: 'Nova X',
+    nameLowercase: 'nova x',
+    x: {
+      status: 'disconnected',
+      username: null,
+      userId: null,
+      connectedAt: null,
+      pausedAt: null,
+      lastError: null,
+      lastErrorAt: null,
+      profileSyncedAt: null,
+    },
+  });
+  await assertSucceeds(setDoc(doc(alice, 'artists/tfArtistX'), xOmitted));
   await assertFails(setDoc(doc(alice, 'artists/tfMeta'), artistData({
     id: 'tfMeta',
     coinMetadataId: 'meta-id',
@@ -1144,6 +1298,29 @@ test('TF 15 create payloads pass and the abusive variants are denied', async () 
     createdAt: now,
     completedAt: null,
     contentHash: null,
+  }));
+  const generationOmitted = {
+    id: 'tfGenOmit',
+    songId: 'song1',
+    artistVersionId: 'av1',
+    songVersionId: null,
+    prompt: { structured: {}, freeText: 'tf' },
+    parameters: {},
+    provider: 'musicgpt',
+    status: 'pending',
+    providerTaskId: null,
+    providerConversionIds: null,
+    providerProcessedConversions: [],
+    output: { metadata: {} },
+    error: null,
+    createdAt: now,
+  };
+  await assertSucceeds(setDoc(doc(alice, 'generations/tfGenOmit'), generationOmitted));
+  await assertFails(setDoc(doc(alice, 'generations/tfGenDone'), {
+    ...generationOmitted,
+    id: 'tfGenDone',
+    completedAt: now,
+    output: { audioURL: 'https://cdn.example/out.mp3', stems: ['https://cdn.example/stem.mp3'], metadata: {} },
   }));
   await assertFails(setDoc(doc(dbFor('bob'), 'generations/stolen'), {
     id: 'stolen',
@@ -1205,7 +1382,7 @@ test('TF 15 create payloads pass and the abusive variants are denied', async () 
     where('songId', '==', 'song1'),
     orderBy('versionNumber', 'asc'),
   )));
-  assert.deepEqual(versions.docs.map(snapshot => snapshot.id), ['ver1', 'tfVer']);
+  assert.deepEqual(versions.docs.map(snapshot => snapshot.id), ['ver1', 'tfVer', 'tfVerOmit']);
 
   const generations = await assertSucceeds(getDocs(query(
     collection(anon, 'generations'),

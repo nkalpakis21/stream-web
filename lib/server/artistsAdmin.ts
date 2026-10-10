@@ -1,4 +1,9 @@
-import { FieldValue, Timestamp, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
+import {
+  FieldValue,
+  Timestamp,
+  type Firestore,
+  type QueryDocumentSnapshot,
+} from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import { MAX_ARTIST_BIO_LENGTH } from '@/lib/brand/bio';
@@ -6,20 +11,29 @@ import type { AIArtistDocument, AIArtistVersionDocument } from '@/types/firestor
 import { isMissingIndexError } from '@/lib/server/indexError';
 
 export async function adminGetArtist(artistId: string): Promise<AIArtistDocument | null> {
-  const snap = await getAdminDb().collection(COLLECTIONS.artists).doc(artistId).get();
+  return adminGetArtistFrom(getAdminDb(), artistId);
+}
+
+async function adminGetArtistFrom(
+  db: Firestore,
+  artistId: string
+): Promise<AIArtistDocument | null> {
+  const snap = await db.collection(COLLECTIONS.artists).doc(artistId).get();
   if (!snap.exists) return null;
   return snap.data() as AIArtistDocument;
 }
 
 async function adminGetArtistVersion(
+  db: Firestore,
   versionId: string
 ): Promise<AIArtistVersionDocument | null> {
-  const snap = await getAdminDb().collection(COLLECTIONS.artistVersions).doc(versionId).get();
+  const snap = await db.collection(COLLECTIONS.artistVersions).doc(versionId).get();
   if (!snap.exists) return null;
   return snap.data() as AIArtistVersionDocument;
 }
 
 async function adminCheckArtistNameAvailable(
+  db: Firestore,
   name: string,
   excludeArtistId?: string
 ): Promise<boolean> {
@@ -27,7 +41,7 @@ async function adminCheckArtistNameAvailable(
   if (normalizedName.length < 2 || normalizedName.length > 50) return false;
   if (!/^[a-zA-Z0-9\s\-_]+$/.test(name.trim())) return false;
 
-  const collection = getAdminDb().collection(COLLECTIONS.artists);
+  const collection = db.collection(COLLECTIONS.artists);
   const conflictsOf = (docs: QueryDocumentSnapshot[]) =>
     docs
       .map((doc) => doc.data() as AIArtistDocument)
@@ -57,18 +71,18 @@ async function adminCheckArtistNameAvailable(
 }
 
 async function adminCreateArtistVersion(
+  db: Firestore,
   artistId: string,
   userId: string,
   updates: { name?: string; lore?: string }
 ): Promise<void> {
-  const db = getAdminDb();
-  const artist = await adminGetArtist(artistId);
+  const artist = await adminGetArtistFrom(db, artistId);
   if (!artist) throw new Error(`Artist ${artistId} not found`);
   if (artist.ownerId !== userId) {
     throw new Error('Only the owner can create new versions');
   }
 
-  const currentVersion = await adminGetArtistVersion(artist.currentVersionId);
+  const currentVersion = await adminGetArtistVersion(db, artist.currentVersionId);
   if (!currentVersion) throw new Error('Current version not found');
 
   const versionRef = db.collection(COLLECTIONS.artistVersions).doc();
@@ -105,7 +119,8 @@ async function adminCreateArtistVersion(
 export async function adminUpdateArtistName(
   artistId: string,
   userId: string,
-  newName: string
+  newName: string,
+  db: Firestore = getAdminDb()
 ): Promise<AIArtistDocument> {
   const trimmedName = newName.trim();
   if (trimmedName.length < 2) {
@@ -120,17 +135,17 @@ export async function adminUpdateArtistName(
     );
   }
 
-  const artist = await adminGetArtist(artistId);
+  const artist = await adminGetArtistFrom(db, artistId);
   if (!artist) throw new Error('Artist not found');
   if (artist.ownerId !== userId) {
     throw new Error('Only the owner can update the artist name');
   }
 
-  const isAvailable = await adminCheckArtistNameAvailable(trimmedName, artistId);
+  const isAvailable = await adminCheckArtistNameAvailable(db, trimmedName, artistId);
   if (!isAvailable) throw new Error('This artist name is already taken');
 
-  await adminCreateArtistVersion(artistId, userId, { name: trimmedName });
-  const updated = await adminGetArtist(artistId);
+  await adminCreateArtistVersion(db, artistId, userId, { name: trimmedName });
+  const updated = await adminGetArtistFrom(db, artistId);
   if (!updated) throw new Error('Failed to retrieve updated artist');
   return updated;
 }
@@ -145,15 +160,16 @@ export async function adminUpdateArtistLore(
     throw new Error(`Bio must be ${MAX_ARTIST_BIO_LENGTH} characters or less`);
   }
 
-  const artist = await adminGetArtist(artistId);
+  const db = getAdminDb();
+  const artist = await adminGetArtistFrom(db, artistId);
   if (!artist) throw new Error('Artist not found');
   if (artist.ownerId !== userId) {
     throw new Error('Only the owner can update the artist bio');
   }
   if (artist.lore === trimmed) return artist;
 
-  await adminCreateArtistVersion(artistId, userId, { lore: trimmed });
-  const updated = await adminGetArtist(artistId);
+  await adminCreateArtistVersion(db, artistId, userId, { lore: trimmed });
+  const updated = await adminGetArtistFrom(db, artistId);
   if (!updated) throw new Error('Failed to retrieve updated artist');
   return updated;
 }

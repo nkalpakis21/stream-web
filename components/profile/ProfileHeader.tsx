@@ -75,7 +75,7 @@ export function ProfileHeader({ user, stats }: ProfileHeaderProps) {
 
     setSaving(true);
     try {
-      await updateUserDisplayName(user.uid, trimmed, user.email || undefined);
+      await updateUserDisplayName(user.uid, trimmed);
       setDisplayName(trimmed);
       setEditingDisplayName(false);
       showToast('Display name updated successfully', 'success');

@@ -29,6 +29,11 @@ export interface UserPrivateProfile {
   email?: string;
   /** Linked Solana wallet address (base58). Set when the user connects and links a wallet. */
   solanaWalletAddress?: string | null;
+  /**
+   * Server timestamp written by Admin link-wallet. Strip uses it to keep this
+   * wallet when the public doc still has an older copy.
+   */
+  walletUpdatedAt?: Timestamp;
 }
 
 // ============================================================================

@@ -10,7 +10,6 @@ import {
   getDoc,
   getDocs,
   setDoc,
-  updateDoc,
   query,
   where,
   orderBy,
@@ -154,22 +153,6 @@ export async function getSong(songId: string): Promise<SongDocument | null> {
     return null;
   }
   return snapshot.data() as SongDocument;
-}
-
-/**
- * Update song with token mint address after minting.
- */
-export async function updateSongTokenFields(
-  songId: string,
-  tokenMintAddress: string
-): Promise<void> {
-  const songRef = doc(db, getSongPath(songId));
-  const now = Timestamp.now();
-  await updateDoc(songRef, {
-    tokenMintAddress,
-    tokenMintCreatedAt: now,
-    updatedAt: now,
-  });
 }
 
 /**

@@ -355,60 +355,6 @@ export async function checkArtistNameAvailable(
 }
 
 /**
- * Update artist name with uniqueness validation
- */
-export async function updateArtistName(
-  artistId: string,
-  userId: string,
-  newName: string
-): Promise<AIArtistDocument> {
-  // Validate name format
-  const trimmedName = newName.trim();
-  
-  if (trimmedName.length < 2) {
-    throw new Error('Artist name must be at least 2 characters');
-  }
-  
-  if (trimmedName.length > 50) {
-    throw new Error('Artist name must be 50 characters or less');
-  }
-
-  const allowedPattern = /^[a-zA-Z0-9\s\-_]+$/;
-  if (!allowedPattern.test(trimmedName)) {
-    throw new Error('Artist name can only contain letters, numbers, spaces, hyphens, and underscores');
-  }
-
-  // Get artist and validate ownership
-  const artist = await getArtist(artistId);
-  if (!artist) {
-    throw new Error('Artist not found');
-  }
-
-  if (artist.ownerId !== userId) {
-    throw new Error('Only the owner can update the artist name');
-  }
-
-  // Check if name is available (excluding current artist)
-  const isAvailable = await checkArtistNameAvailable(trimmedName, artistId);
-  if (!isAvailable) {
-    throw new Error('This artist name is already taken');
-  }
-
-  // Create new version with updated name
-  const updatedVersion = await createArtistVersion(artistId, userId, {
-    name: trimmedName,
-  });
-
-  // Return updated artist
-  const updatedArtist = await getArtist(artistId);
-  if (!updatedArtist) {
-    throw new Error('Failed to retrieve updated artist');
-  }
-
-  return updatedArtist;
-}
-
-/**
  * Owner-only bio (`lore`) update from the artist page. Empty is allowed.
  */
 export async function updateArtistLore(
