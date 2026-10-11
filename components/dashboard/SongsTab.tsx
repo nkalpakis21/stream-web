@@ -6,15 +6,23 @@ import { SongCard } from '@/components/songs/SongCard';
 import { CreateSongCard } from '@/components/dashboard/CreateSongCard';
 import { CreativeSongForm } from '@/components/dashboard/CreativeSongForm';
 import type { SongDocument } from '@/types/firestore';
+import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
 
 interface SongsTabProps {
   songs: SongDocument[];
   songArtistMap: Map<string, string>;
+  artistDisplays?: Map<string, ArtistCardDisplay>;
   preselectedArtistId?: string;
   onSongCreated?: () => void;
 }
 
-export function SongsTab({ songs, songArtistMap, preselectedArtistId, onSongCreated }: SongsTabProps) {
+export function SongsTab({
+  songs,
+  songArtistMap,
+  artistDisplays,
+  preselectedArtistId,
+  onSongCreated,
+}: SongsTabProps) {
   const searchParams = useSearchParams();
   const [showForm, setShowForm] = useState(
     Boolean(preselectedArtistId) || searchParams.get('new') === '1'
@@ -47,6 +55,7 @@ export function SongsTab({ songs, songArtistMap, preselectedArtistId, onSongCrea
               key={song.id}
               song={song}
               artistName={songArtistMap.get(song.id)}
+              artist={artistDisplays?.get(song.artistId) ?? null}
             />
           ))}
         </div>

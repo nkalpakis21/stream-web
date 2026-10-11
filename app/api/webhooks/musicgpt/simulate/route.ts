@@ -9,6 +9,9 @@ import {
 import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
 import { redactForLog } from '@/lib/webhooks/redactUrl';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 

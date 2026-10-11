@@ -3,18 +3,25 @@
  * Idempotent: a retry after a partial failure deletes whatever is left.
  * coinMetadataUploads/{uid} and its coinUploads/{id} docs are removed
  * before the Auth user. A missing coin-metadata doc is success.
+ * coinMints docs for this uid are overwritten with `{ deletedAt }` so the
+ * mint stays bound. uid and creatorWallet are removed. The doc is not
+ * deleted. A retry matches no uid and writes nothing.
+ * Comments by this user are hard-deleted, or overwritten with a tombstone
+ * when other people have replied. A retry matches no authorId.
  */
 
 import * as admin from 'firebase-admin';
-import type {
-  BulkWriter,
-  DocumentReference,
-  Firestore,
-  Query,
-  QueryDocumentSnapshot,
+import {
+  FieldValue,
+  type BulkWriter,
+  type DocumentReference,
+  type Firestore,
+  type Query,
+  type QueryDocumentSnapshot,
 } from 'firebase-admin/firestore';
 import { getAdminBucket, getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
+import { deleteAuthoredComments } from '@/lib/server/commentDelete';
 import { COIN_METADATA_UPLOADS } from '@/lib/services/coinMetadataPending';
 import { fetchMetaplexMetadataUri } from '@/lib/solana/metaplexCoinMetadata';
 import { getSolanaRpcUrl } from '@/lib/solana/pumpFun';
@@ -732,6 +739,8 @@ async function deleteAccountStorage(input: {
  * before flush() deadlocks when a batch has fewer than 20 writes: those
  * promises resolve only once the batch is sent.
  * Promise.all stays. A failed write rejects its own promise. close() does not.
+ *
+ * Tombstones use the same order: `ops = ...; await writer.flush(); await Promise.all(ops)`.
  */
 export async function commitBulkDeletes<T>(
   writer: {
@@ -787,6 +796,31 @@ export async function deleteCoinMetadataUploads(db: Firestore, uid: string): Pro
     await closeWriter().catch(() => undefined);
     if (isFirestoreNotFound(err)) return;
     throw err;
+  }
+}
+
+/**
+ * Overwrite every `coinMints` doc whose uid is this user with `{ deletedAt }`.
+ * That drops uid and creatorWallet. The doc stays, so the mint cannot be
+ * bound again. Equality on `uid` uses Firestore's automatic single-field
+ * index. No composite index is required.
+ * A second call matches nothing and does not write.
+ */
+export async function tombstoneCoinMints(
+  db: Firestore,
+  writer: BulkWriter,
+  uid: string
+): Promise<void> {
+  const ids = await collectIds(db, COLLECTIONS.coinMints, 'uid', uid);
+  for (let i = 0; i < ids.length; i += PAGE_SIZE) {
+    const refs = ids
+      .slice(i, i + PAGE_SIZE)
+      .map(id => db.collection(COLLECTIONS.coinMints).doc(id));
+    const ops = refs.map(ref =>
+      writer.set(ref, { deletedAt: FieldValue.serverTimestamp() })
+    );
+    await writer.flush();
+    await Promise.all(ops);
   }
 }
 
@@ -1056,6 +1090,12 @@ export async function deleteAccount(
   };
 
   try {
+    // Seal mint bindings before the artist docs go away. A retry matches no uid.
+    await tombstoneCoinMints(db, writer, uid);
+    // Comments are a top-level collection (no song/artist subcollection).
+    // Tombstones drop authorId, so a retry matches nothing.
+    await deleteAuthoredComments(db, writer, uid);
+
     // X tokens and post cache before artists. Song children before songs.
     await deleteDocIds(db, writer, COLLECTIONS.generations, generationIds);
     await deleteDocIds(db, writer, COLLECTIONS.songVersions, songVersionIds);

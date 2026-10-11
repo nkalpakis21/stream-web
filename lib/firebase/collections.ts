@@ -49,6 +49,8 @@ export const COLLECTIONS = {
   /**
    * Mint bound to the uid that asked create-tx to build it.
    * Admin SDK only. Clients cannot read or write this collection.
+   * Account delete overwrites this user's docs with `{ deletedAt }` and
+   * removes uid and creatorWallet. The doc is not deleted.
    */
   coinMints: 'coinMints',
 } as const;

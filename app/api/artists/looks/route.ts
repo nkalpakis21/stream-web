@@ -12,6 +12,9 @@ import {
  * Unset = generate is disabled (503). Artist create still works with no avatar.
  */
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 export const maxDuration = 60;
 
 const generateBodySchema = z.object({

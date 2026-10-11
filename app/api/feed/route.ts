@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFollowedArtistsSongs } from '@/lib/services/feed';
+import { displaysRecord, getArtistCardContext } from '@/lib/server/artistDisplay';
 import type { SongDocument } from '@/types/firestore';
 
 /**
@@ -45,10 +46,13 @@ export async function GET(request: NextRequest) {
       deletedAt: song.deletedAt ? song.deletedAt.toMillis() : null,
     }));
 
+    const { displays } = await getArtistCardContext(result.songs.map(song => song.artistId));
+
     return NextResponse.json({
       songs: serializedSongs,
       nextCursor: result.nextCursor,
       hasMore: result.hasMore,
+      artists: displaysRecord(displays),
     });
   } catch (error) {
     console.error('[API /feed] Error:', error);

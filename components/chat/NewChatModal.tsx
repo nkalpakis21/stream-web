@@ -6,6 +6,7 @@ import { X, Search, UserPlus, Loader2, Check, Users } from 'lucide-react';
 import { getAvatarGradient, getInitials } from '@/lib/utils/avatar';
 import type { AIArtistDocument } from '@/types/firestore';
 import Image from 'next/image';
+import { getFreshIdToken } from '@/lib/api/clientAuth';
 
 interface NewChatModalProps {
   isOpen: boolean;
@@ -48,7 +49,11 @@ export function NewChatModal({ isOpen, onClose, onStartChat }: NewChatModalProps
           userId: user.uid,
         });
 
-        const response = await fetch(`/api/artists/followed?${params.toString()}`);
+        const token = await getFreshIdToken(user);
+        const response = await fetch(`/api/artists/followed?${params.toString()}`, {
+          cache: 'no-store',
+          headers: { Authorization: `Bearer ${token}` },
+        });
         
         if (!response.ok) {
           const data = await response.json();

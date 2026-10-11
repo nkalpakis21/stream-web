@@ -30,9 +30,14 @@ function ChatPageContent() {
       }
 
       // Fetch artists to get their ownerIds
+      const token = await getFreshIdToken(user);
       const artistsResponse = await fetch('/api/artists/batch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ artistIds }),
       });
 
@@ -61,7 +66,6 @@ function ChatPageContent() {
       const conversationType = uniqueParticipants.length === 2 && artistIds.length === 1 ? 'direct' : 'group';
       const artistId = artistIds.length === 1 ? artistIds[0] : undefined;
 
-      const token = await getFreshIdToken(user);
       const conversationResponse = await fetch('/api/conversations', {
         method: 'POST',
         headers: { 

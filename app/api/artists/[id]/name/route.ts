@@ -1,15 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { artistIsVisible } from '@/lib/artists/visibility';
+import { noStoreJson } from '@/lib/http/noStore';
 import { adminGetArtist, adminUpdateArtistName } from '@/lib/server/artistsAdmin';
 import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
 
 /**
  * PATCH /api/artists/[id]/name
  *
  * Update an artist's name.
- * Requires a verified Firebase ID token (Authorization: Bearer) and ownership.
+ * Requires Authorization: Bearer and ownership. The ss_viewer cookie is ignored.
  */
 export async function PATCH(
   request: NextRequest,
@@ -26,7 +30,7 @@ export async function PATCH(
     }
 
     const artist = await adminGetArtist(artistId);
-    if (!artist) {
+    if (!artistIsVisible(artist, userId)) {
       throw new HttpError(404, 'Artist not found');
     }
 
@@ -43,7 +47,7 @@ export async function PATCH(
       deletedAt: updatedArtist.deletedAt ? updatedArtist.deletedAt.toMillis() : null,
     };
 
-    return NextResponse.json({
+    return noStoreJson({
       artist: serialized,
     });
   } catch (error) {
@@ -55,14 +59,14 @@ export async function PATCH(
 
     if (error instanceof Error) {
       if (error.message.includes('already taken')) {
-        return NextResponse.json({ error: error.message }, { status: 409 });
+        return noStoreJson({ error: error.message }, 409);
       }
       if (error.message.includes('must be') || error.message.includes('can only contain')) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
+        return noStoreJson({ error: error.message }, 400);
       }
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return noStoreJson({ error: error.message }, 500);
     }
 
-    return NextResponse.json({ error: 'Failed to update artist name' }, { status: 500 });
+    return noStoreJson({ error: 'Failed to update artist name' }, 500);
   }
 }

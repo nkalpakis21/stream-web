@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getPublicSongs, getArtistNamesForSongs } from '@/lib/services/songs';
+import { getPublicSongs } from '@/lib/services/songs';
+import { displaysRecord, getArtistCardContext } from '@/lib/server/artistDisplay';
 
 /**
  * API route to fetch public songs
@@ -14,10 +15,14 @@ export async function GET(request: Request) {
     // Fetch songs
     const songs = await getPublicSongs(limit, { excludeDeleted: !includeDeleted });
 
-    // Fetch artist names for songs
-    const songArtistMap = songs.length > 0 
-      ? await getArtistNamesForSongs(songs)
-      : new Map<string, string>();
+    const { displays } = songs.length > 0
+      ? await getArtistCardContext(songs.map(song => song.artistId))
+      : { displays: new Map() };
+    const songArtistMap = new Map<string, string>();
+    songs.forEach(song => {
+      const name = displays.get(song.artistId)?.name;
+      if (name) songArtistMap.set(song.id, name);
+    });
 
     // Serialize Firestore Timestamps to numbers for client consumption
     const serializedSongs = songs.map(song => ({
@@ -30,6 +35,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       songs: serializedSongs,
       songArtistMap: Object.fromEntries(songArtistMap),
+      artists: displaysRecord(displays),
     });
   } catch (error) {
     console.error('[API /songs/public] Error:', error);

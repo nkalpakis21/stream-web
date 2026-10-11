@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { CoverImage } from '@/components/media/CoverImage';
+import { ArtistFace } from '@/components/artists/ArtistFace';
 import { formatHeatCoinCluster, type ArtistCoinQuote } from '@/lib/brand/coinStats';
 
 export function FeedCoinRow({
@@ -27,14 +27,7 @@ export function FeedCoinRow({
         href={`/artists/${artistId}`}
         className="flex min-w-0 flex-1 items-center gap-3"
       >
-        <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full">
-          <CoverImage
-            src={avatarURL}
-            title={name}
-            sizes="40px"
-            rounded="rounded-full"
-          />
-        </span>
+        <ArtistFace name={name} sources={avatarURL ? [avatarURL] : []} size="row" />
         <span className="min-w-0 flex-1">
           <span
             className="block truncate text-sm font-medium"

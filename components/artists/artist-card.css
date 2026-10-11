@@ -56,6 +56,25 @@
   object-fit: cover;
 }
 
+.artist-face-card {
+  width: 24px;
+  height: 24px;
+  border-width: 1px;
+}
+
+.artist-face-card .artist-index-face-initials {
+  font-size: 10px;
+}
+
+.artist-face-row {
+  width: 40px;
+  height: 40px;
+}
+
+.artist-face-row .artist-index-face-initials {
+  font-size: 14px;
+}
+
 .artist-index-face-initials {
   display: flex;
   width: 100%;

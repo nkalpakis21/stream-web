@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPaginatedPublicSongs, searchSongsByPromptPaginated } from '@/lib/services/discovery';
 import { getTopSongs } from '@/lib/services/songs';
+import { displaysRecord, getArtistCardContext } from '@/lib/server/artistDisplay';
+import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
+import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
+import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import type { SongDocument } from '@/types/firestore';
 
 /**
@@ -53,10 +57,31 @@ export async function GET(request: NextRequest) {
       deletedAt: song.deletedAt ? song.deletedAt.toMillis() : null,
     }));
 
+    const { displays, coins } = await getArtistCardContext(result.songs.map(song => song.artistId));
+    const mints = [...coins.values()]
+      .map(coin => coin.mint)
+      .filter((mint): mint is string => Boolean(mint));
+    const quotes = await fetchCoinQuotes(mints);
+    const artists: Record<string, ArtistCardDisplay> = displaysRecord(displays);
+    const artistCoins: Record<
+      string,
+      { ticker: string | null; coinIcon: string | null; quote: ArtistCoinQuote | null }
+    > = {};
+    displays.forEach((_display, id) => {
+      const coin = coins.get(id);
+      artistCoins[id] = {
+        ticker: coin?.ticker ?? null,
+        coinIcon: coin?.coinIcon ?? null,
+        quote: coin?.mint ? quotes.get(coin.mint) ?? null : null,
+      };
+    });
+
     return NextResponse.json({
       songs: serializedSongs,
       nextCursor: result.nextCursor,
       hasMore: result.hasMore,
+      artists,
+      artistCoins,
     });
   } catch (error) {
     console.error('[API] Error fetching paginated songs:', error);

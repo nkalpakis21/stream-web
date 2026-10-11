@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { updateComment, deleteComment } from '@/lib/services/comments';
+import type { CommentDeleteOutcome } from '@/lib/comments/live';
 import { useToast } from '@/components/ui/toast';
 import { Edit2, Trash2, X, Check } from 'lucide-react';
 
@@ -18,7 +19,7 @@ interface CommentActionsProps {
     updatedAt: number;
     deletedAt: number | null;
   };
-  onCommentDeleted: (commentId: string) => void;
+  onCommentDeleted: (commentId: string, outcome: CommentDeleteOutcome) => void;
   onCommentUpdated: (comment: CommentActionsProps['comment']) => void;
 }
 
@@ -65,8 +66,8 @@ export function CommentActions({
 
     setDeleting(true);
     try {
-      await deleteComment(comment.id, user.uid);
-      onCommentDeleted(comment.id);
+      const outcome = await deleteComment(comment.id, user.uid);
+      onCommentDeleted(comment.id, outcome);
       showToast('Comment deleted', 'success');
     } catch (error) {
       console.error('Failed to delete comment:', error);

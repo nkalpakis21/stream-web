@@ -20,6 +20,7 @@ import {
   getDoc,
   getDocs,
   increment,
+  limit,
   orderBy,
   query,
   setDoc,
@@ -233,11 +234,50 @@ test('signed-out users can read public artists and songs', async () => {
   await assertSucceeds(getDocs(query(collection(anon, 'songs'), where('isPublic', '==', true))));
 });
 
+test('client get of a private artist is denied for signed-out and non-owner', async () => {
+  await seedCatalog();
+  await assertFails(getDoc(doc(dbFor(null), 'artists/privateArtist')));
+  await assertFails(getDoc(doc(dbFor('bob'), 'artists/privateArtist')));
+  await assertSucceeds(getDoc(doc(dbFor('alice'), 'artists/privateArtist')));
+});
+
 test('signed-out users cannot read private artists or songs', async () => {
   await seedCatalog();
   const anon = dbFor(null);
   await assertFails(getDoc(doc(anon, 'artists/privateArtist')));
   await assertFails(getDoc(doc(anon, 'songs/privateSong')));
+});
+
+test('a public song by a private artist is readable and the artist doc is not', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'artists/privateArtist'), artistData({
+      id: 'privateArtist',
+      ownerId: 'alice',
+      name: 'Hidden',
+      nameLowercase: 'hidden',
+      isPublic: false,
+    }));
+    await setDoc(doc(db, 'songs/publicByPrivate'), songData({
+      id: 'publicByPrivate',
+      artistId: 'privateArtist',
+      title: 'Still Public',
+      isPublic: true,
+      ownerId: 'alice',
+    }));
+  });
+  for (const uid of [null, 'bob']) {
+    const client = dbFor(uid);
+    const song = await assertSucceeds(getDoc(doc(client, 'songs/publicByPrivate')));
+    assert.equal(song.data().title, 'Still Public');
+    assert.equal(song.data().artistId, 'privateArtist');
+    await assertFails(getDoc(doc(client, 'artists/privateArtist')));
+    const listed = await assertSucceeds(getDocs(query(
+      collection(client, 'songs'),
+      where('isPublic', '==', true),
+    )));
+    assert.equal(listed.docs.some(snapshot => snapshot.id === 'publicByPrivate'), true);
+  }
+  await assertSucceeds(getDoc(doc(dbFor('alice'), 'artists/privateArtist')));
 });
 
 test('owner can read and list their own private catalog', async () => {
@@ -688,15 +728,80 @@ test('X tokens and song-post claims are unreadable and unwritable', async () => 
   }
 });
 
-test('user profile get and display-name search work; unbounded user list does not', async () => {
+test('clients cannot read or write xSongPosts or any subcollection', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'xSongPosts/song1'), {
+      songId: 'song1',
+      artistId: 'artist1',
+      status: 'posted',
+      accessToken: 'secret',
+    });
+    await setDoc(doc(db, 'xSongPosts/song1/attempts/a1'), {
+      body: 'secret post',
+    });
+  });
+  for (const uid of [null, 'alice', 'bob']) {
+    const client = dbFor(uid);
+    await assertFails(getDoc(doc(client, 'xSongPosts/song1')));
+    await assertFails(getDocs(collection(client, 'xSongPosts')));
+    await assertFails(getDoc(doc(client, 'xSongPosts/song1/attempts/a1')));
+    await assertFails(getDocs(collection(client, 'xSongPosts/song1/attempts')));
+    await assertFails(setDoc(doc(client, 'xSongPosts/song2'), { songId: 'song2', status: 'pending' }));
+    await assertFails(updateDoc(doc(client, 'xSongPosts/song1'), { status: 'stolen' }));
+    await assertFails(deleteDoc(doc(client, 'xSongPosts/song1')));
+    await assertFails(setDoc(doc(client, 'xSongPosts/song1/attempts/a2'), { body: 'nope' }));
+    await assertFails(updateDoc(doc(client, 'xSongPosts/song1/attempts/a1'), { body: 'nope' }));
+    await assertFails(deleteDoc(doc(client, 'xSongPosts/song1/attempts/a1')));
+  }
+});
+
+test('user profile get and display-name prefix search are public', async () => {
   await seedCatalog();
+  await seed(async (db) => {
+    await setDoc(doc(db, 'users/bob'), {
+      displayName: 'Bob',
+      photoURL: null,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    });
+    await setDoc(doc(db, 'users/gone'), {
+      displayName: 'AliceOld',
+      photoURL: null,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: now,
+    });
+  });
   const anon = dbFor(null);
   await assertSucceeds(getDoc(doc(anon, 'users/alice')));
   await assertSucceeds(getDocs(query(
     collection(anon, 'users'),
     where('displayName', '==', 'Alice'),
   )));
-  await assertFails(getDocs(collection(anon, 'users')));
+  // Public docs are displayName, photoURL, and timestamps only.
+  await assertSucceeds(getDocs(collection(anon, 'users')));
+
+  const prefix = 'Ali';
+  const limitValue = 10;
+  // searchUsersByDisplayName primary: displayName range, deletedAt, limit.
+  const primary = await assertSucceeds(getDocs(query(
+    collection(anon, 'users'),
+    where('displayName', '>=', prefix),
+    where('displayName', '<=', prefix + '\uf8ff'),
+    where('deletedAt', '==', null),
+    limit(limitValue * 2),
+  )));
+  assert.deepEqual(primary.docs.map(snapshot => snapshot.id), ['alice']);
+
+  // Fallback drops deletedAt when the composite index is missing.
+  const fallback = await assertSucceeds(getDocs(query(
+    collection(anon, 'users'),
+    where('displayName', '>=', prefix),
+    where('displayName', '<=', prefix + '\uf8ff'),
+    limit(limitValue * 2),
+  )));
+  assert.deepEqual(fallback.docs.map(snapshot => snapshot.id).sort(), ['alice', 'gone']);
 });
 
 test('public user docs omit email and wallet; the private profile is owner-only', async () => {
@@ -759,6 +864,9 @@ test('public user docs omit email and wallet; the private profile is owner-only'
     email: 'alice@example.com',
   }));
   await assertFails(getDocs(collection(dbFor(null), 'users/bob/private')));
+  await assertFails(getDoc(doc(dbFor('bob'), 'users/alice/private/profile')));
+  await assertFails(getDocs(collection(dbFor('bob'), 'users/alice/private')));
+  await assertFails(getDocs(collection(dbFor('alice'), 'users/bob/private')));
 });
 
 test('follows are public to read and only the follower can write', async () => {
@@ -831,6 +939,70 @@ test('comments are publicly readable and only the author can write', async () =>
   await assertSucceeds(updateDoc(doc(alice, 'comments/c1'), { content: 'edited', updatedAt: now }));
   await assertFails(updateDoc(doc(dbFor('bob'), 'comments/c1'), { content: 'nope' }));
   await assertSucceeds(updateDoc(doc(alice, 'comments/c1'), { deletedAt: now }));
+});
+
+const TOMBSTONE_KEYS = ['createdAt', 'deleted', 'parentCommentId', 'targetId', 'targetType'];
+
+test('a comment tombstone get returns no author, body, name, or avatar', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'comments/tomb'), {
+      deleted: true,
+      parentCommentId: null,
+      targetType: 'song',
+      targetId: 'song1',
+      createdAt: now,
+    });
+  });
+  for (const uid of [null, 'bob', 'alice']) {
+    const snap = await assertSucceeds(getDoc(doc(dbFor(uid), 'comments/tomb')));
+    const data = snap.data();
+    assert.deepEqual(Object.keys(data).sort(), TOMBSTONE_KEYS);
+    assert.equal(data.deleted, true);
+    assert.equal(data.authorId, undefined);
+    assert.equal(data.content, undefined);
+    assert.equal(data.body, undefined);
+    assert.equal(data.name, undefined);
+    assert.equal(data.authorName, undefined);
+    assert.equal(data.avatar, undefined);
+    assert.equal(data.avatarURL, undefined);
+    assert.equal(data.photoURL, undefined);
+  }
+  // The live comment list requires deletedAt == null. A tombstone has no
+  // deletedAt, so that query cannot return its fields.
+  const liveList = await assertSucceeds(getDocs(query(
+    collection(dbFor(null), 'comments'),
+    where('targetType', '==', 'song'),
+    where('targetId', '==', 'song1'),
+    where('parentCommentId', '==', null),
+    where('deletedAt', '==', null),
+  )));
+  assert.deepEqual(liveList.docs.map(snapshot => snapshot.id), []);
+  await assertFails(getDocs(query(
+    collection(dbFor('bob'), 'comments'),
+    where('deleted', '==', true),
+  )));
+});
+
+test('a tombstone that still carries author, body, name, or avatar cannot be read', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'comments/dirty'), {
+      deleted: true,
+      parentCommentId: null,
+      targetType: 'song',
+      targetId: 'song1',
+      createdAt: now,
+      authorId: 'alice',
+      content: 'secret body',
+      body: 'secret body',
+      authorName: 'Alice',
+      name: 'Alice',
+      avatar: 'https://cdn.example/alice.png',
+      avatarURL: 'https://cdn.example/alice.png',
+    });
+  });
+  for (const uid of [null, 'bob', 'alice']) {
+    await assertFails(getDoc(doc(dbFor(uid), 'comments/dirty')));
+  }
 });
 
 test('conversations and messages stay inside the participant set', async () => {
@@ -1886,6 +2058,370 @@ test('web client create payloads pass, and a missing or foreign owner is denied'
     contentHash: null,
     output: { audioURL: null, stems: null, metadata: {} },
   }));
+});
+
+test('client list queries are allowed only for the principal the rules expect', async () => {
+  await seedCatalog();
+  await seed(async (db) => {
+    await setDoc(doc(db, 'conversations/c1'), {
+      id: 'c1',
+      type: 'direct',
+      participants: ['alice', 'bob'],
+      artistId: 'artist1',
+      createdBy: 'alice',
+      createdAt: now,
+      updatedAt: now,
+      lastMessageAt: null,
+      lastMessagePreview: null,
+    });
+    await setDoc(doc(db, 'messages/m1'), {
+      id: 'm1',
+      conversationId: 'c1',
+      senderId: 'alice',
+      content: 'hey',
+      createdAt: now,
+      readBy: ['alice'],
+      deletedAt: null,
+    });
+    await setDoc(doc(db, 'comments/c1'), {
+      id: 'c1',
+      targetType: 'song',
+      targetId: 'song1',
+      authorId: 'alice',
+      content: 'hello',
+      parentCommentId: null,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    });
+    await setDoc(doc(db, 'comments/reply1'), {
+      id: 'reply1',
+      targetType: 'song',
+      targetId: 'song1',
+      authorId: 'bob',
+      content: 'reply',
+      parentCommentId: 'c1',
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    });
+    await setDoc(doc(db, 'follows/f1'), {
+      id: 'f1',
+      followerId: 'bob',
+      artistId: 'artist1',
+      createdAt: now,
+    });
+    await setDoc(doc(db, 'notifications/n1'), {
+      id: 'n1',
+      userId: 'alice',
+      type: 'song_ready',
+      songId: 'song1',
+      generationId: 'gen1',
+      read: false,
+      createdAt: now,
+      deletedAt: null,
+    });
+    await setDoc(doc(db, 'collaborations/col1'), {
+      id: 'col1',
+      type: 'fork',
+      sourceSongId: 'song1',
+      targetSongId: 'song2',
+      collaboratorId: 'alice',
+      notes: null,
+      createdAt: now,
+    });
+  });
+
+  const anon = dbFor(null);
+  const alice = dbFor('alice');
+  const bob = dbFor('bob');
+  const carol = dbFor('carol');
+
+  // findDirectConversation and findDirectConversationByArtist fallbacks.
+  const participantFallback = await assertSucceeds(getDocs(query(
+    collection(alice, 'conversations'),
+    where('participants', 'array-contains', 'alice'),
+  )));
+  assert.deepEqual(participantFallback.docs.map(snapshot => snapshot.id), ['c1']);
+  await assertFails(getDocs(query(
+    collection(carol, 'conversations'),
+    where('participants', 'array-contains', 'alice'),
+  )));
+
+  // findDirectConversation primary.
+  const direct = await assertSucceeds(getDocs(query(
+    collection(alice, 'conversations'),
+    where('type', '==', 'direct'),
+    where('participants', 'array-contains', 'alice'),
+  )));
+  assert.deepEqual(direct.docs.map(snapshot => snapshot.id), ['c1']);
+  await assertFails(getDocs(query(
+    collection(carol, 'conversations'),
+    where('type', '==', 'direct'),
+    where('participants', 'array-contains', 'alice'),
+  )));
+
+  // findDirectConversationByArtist primary.
+  const byArtist = await assertSucceeds(getDocs(query(
+    collection(alice, 'conversations'),
+    where('type', '==', 'direct'),
+    where('artistId', '==', 'artist1'),
+    where('participants', 'array-contains', 'alice'),
+  )));
+  assert.deepEqual(byArtist.docs.map(snapshot => snapshot.id), ['c1']);
+  await assertFails(getDocs(query(
+    collection(carol, 'conversations'),
+    where('type', '==', 'direct'),
+    where('artistId', '==', 'artist1'),
+    where('participants', 'array-contains', 'alice'),
+  )));
+
+  // getUserConversations and ChatList.
+  const inbox = await assertSucceeds(getDocs(query(
+    collection(alice, 'conversations'),
+    where('participants', 'array-contains', 'alice'),
+    orderBy('updatedAt', 'desc'),
+    limit(50),
+  )));
+  assert.deepEqual(inbox.docs.map(snapshot => snapshot.id), ['c1']);
+  const chatList = await assertSucceeds(getDocs(query(
+    collection(alice, 'conversations'),
+    where('participants', 'array-contains', 'alice'),
+    orderBy('updatedAt', 'desc'),
+  )));
+  assert.deepEqual(chatList.docs.map(snapshot => snapshot.id), ['c1']);
+  await assertFails(getDocs(query(
+    collection(carol, 'conversations'),
+    where('participants', 'array-contains', 'alice'),
+    orderBy('updatedAt', 'desc'),
+  )));
+
+  // getMessages and ChatView, including the no-orderBy fallback.
+  const messages = await assertSucceeds(getDocs(query(
+    collection(bob, 'messages'),
+    where('conversationId', '==', 'c1'),
+    where('deletedAt', '==', null),
+    orderBy('createdAt', 'desc'),
+    limit(51),
+  )));
+  assert.deepEqual(messages.docs.map(snapshot => snapshot.id), ['m1']);
+  const chatView = await assertSucceeds(getDocs(query(
+    collection(alice, 'messages'),
+    where('conversationId', '==', 'c1'),
+    where('deletedAt', '==', null),
+    orderBy('createdAt', 'desc'),
+    limit(50),
+  )));
+  assert.deepEqual(chatView.docs.map(snapshot => snapshot.id), ['m1']);
+  const messageFallback = await assertSucceeds(getDocs(query(
+    collection(alice, 'messages'),
+    where('conversationId', '==', 'c1'),
+    where('deletedAt', '==', null),
+    limit(50),
+  )));
+  assert.deepEqual(messageFallback.docs.map(snapshot => snapshot.id), ['m1']);
+  await assertFails(getDocs(query(
+    collection(carol, 'messages'),
+    where('conversationId', '==', 'c1'),
+    where('deletedAt', '==', null),
+    orderBy('createdAt', 'desc'),
+    limit(50),
+  )));
+  await assertFails(getDocs(query(
+    collection(carol, 'messages'),
+    where('conversationId', '==', 'c1'),
+    where('deletedAt', '==', null),
+  )));
+
+  // getComments, getReplies, getCommentCount.
+  const comments = await assertSucceeds(getDocs(query(
+    collection(anon, 'comments'),
+    where('targetType', '==', 'song'),
+    where('targetId', '==', 'song1'),
+    where('parentCommentId', '==', null),
+    where('deletedAt', '==', null),
+    orderBy('createdAt', 'desc'),
+    limit(51),
+  )));
+  assert.deepEqual(comments.docs.map(snapshot => snapshot.id), ['c1']);
+  const commentsFallback = await assertSucceeds(getDocs(query(
+    collection(anon, 'comments'),
+    where('targetType', '==', 'song'),
+    where('targetId', '==', 'song1'),
+    where('parentCommentId', '==', null),
+    where('deletedAt', '==', null),
+  )));
+  assert.deepEqual(commentsFallback.docs.map(snapshot => snapshot.id), ['c1']);
+  const replies = await assertSucceeds(getDocs(query(
+    collection(anon, 'comments'),
+    where('parentCommentId', '==', 'c1'),
+    where('deletedAt', '==', null),
+    orderBy('createdAt', 'asc'),
+    limit(51),
+  )));
+  assert.deepEqual(replies.docs.map(snapshot => snapshot.id), ['reply1']);
+  const repliesFallback = await assertSucceeds(getDocs(query(
+    collection(anon, 'comments'),
+    where('parentCommentId', '==', 'c1'),
+    where('deletedAt', '==', null),
+  )));
+  assert.deepEqual(repliesFallback.docs.map(snapshot => snapshot.id), ['reply1']);
+  const commentCount = await assertSucceeds(getDocs(query(
+    collection(anon, 'comments'),
+    where('targetType', '==', 'song'),
+    where('targetId', '==', 'song1'),
+    where('deletedAt', '==', null),
+  )));
+  assert.equal(commentCount.size, 2);
+
+  // unfollow / isFollowing, getFollowing, getFollowers.
+  const pair = await assertSucceeds(getDocs(query(
+    collection(anon, 'follows'),
+    where('followerId', '==', 'bob'),
+    where('artistId', '==', 'artist1'),
+  )));
+  assert.deepEqual(pair.docs.map(snapshot => snapshot.id), ['f1']);
+  const following = await assertSucceeds(getDocs(query(
+    collection(anon, 'follows'),
+    where('followerId', '==', 'bob'),
+    orderBy('createdAt', 'desc'),
+    limit(100),
+  )));
+  assert.deepEqual(following.docs.map(snapshot => snapshot.id), ['f1']);
+  const followingFallback = await assertSucceeds(getDocs(query(
+    collection(anon, 'follows'),
+    where('followerId', '==', 'bob'),
+  )));
+  assert.deepEqual(followingFallback.docs.map(snapshot => snapshot.id), ['f1']);
+  const followers = await assertSucceeds(getDocs(query(
+    collection(anon, 'follows'),
+    where('artistId', '==', 'artist1'),
+    orderBy('createdAt', 'desc'),
+    limit(100),
+  )));
+  assert.deepEqual(followers.docs.map(snapshot => snapshot.id), ['f1']);
+
+  // UserMenu and getUnreadNotifications, plus the song-owner list.
+  const unread = await assertSucceeds(getDocs(query(
+    collection(alice, 'notifications'),
+    where('userId', '==', 'alice'),
+    where('read', '==', false),
+    orderBy('createdAt', 'desc'),
+  )));
+  assert.deepEqual(unread.docs.map(snapshot => snapshot.id), ['n1']);
+  const unreadFallback = await assertSucceeds(getDocs(query(
+    collection(alice, 'notifications'),
+    where('userId', '==', 'alice'),
+    where('read', '==', false),
+  )));
+  assert.deepEqual(unreadFallback.docs.map(snapshot => snapshot.id), ['n1']);
+  await assertFails(getDocs(query(
+    collection(bob, 'notifications'),
+    where('userId', '==', 'alice'),
+    where('read', '==', false),
+  )));
+  const bySong = await assertSucceeds(getDocs(query(
+    collection(alice, 'notifications'),
+    where('songId', '==', 'song1'),
+    orderBy('createdAt', 'desc'),
+  )));
+  assert.deepEqual(bySong.docs.map(snapshot => snapshot.id), ['n1']);
+  await assertFails(getDocs(query(
+    collection(carol, 'notifications'),
+    where('songId', '==', 'song1'),
+    orderBy('createdAt', 'desc'),
+  )));
+  const idempotent = await assertSucceeds(getDocs(query(
+    collection(alice, 'notifications'),
+    where('userId', '==', 'alice'),
+    where('songId', '==', 'song1'),
+    where('generationId', '==', 'gen1'),
+  )));
+  assert.deepEqual(idempotent.docs.map(snapshot => snapshot.id), ['n1']);
+  const ownerLookup = await assertSucceeds(getDocs(query(
+    collection(alice, 'notifications'),
+    where('userId', '==', 'bob'),
+    where('songId', '==', 'song1'),
+    where('generationId', '==', 'gen1'),
+  )));
+  assert.equal(ownerLookup.size, 0);
+  await assertFails(getDocs(query(
+    collection(bob, 'notifications'),
+    where('userId', '==', 'alice'),
+    where('songId', '==', 'song1'),
+    where('generationId', '==', 'gen1'),
+  )));
+
+  // getUserSongs.
+  const ownedSongs = await assertSucceeds(getDocs(query(
+    collection(alice, 'songs'),
+    where('ownerId', '==', 'alice'),
+    orderBy('createdAt', 'desc'),
+    limit(100),
+  )));
+  assert.ok(ownedSongs.docs.some(snapshot => snapshot.id === 'song1'));
+  assert.ok(ownedSongs.docs.some(snapshot => snapshot.id === 'privateSong'));
+  await assertFails(getDocs(query(
+    collection(bob, 'songs'),
+    where('ownerId', '==', 'alice'),
+    orderBy('createdAt', 'desc'),
+    limit(100),
+  )));
+
+  // getArtistVersions.
+  const artistVersions = await assertSucceeds(getDocs(query(
+    collection(anon, 'artistVersions'),
+    where('artistId', '==', 'artist1'),
+    orderBy('versionNumber', 'asc'),
+  )));
+  assert.deepEqual(artistVersions.docs.map(snapshot => snapshot.id), ['av1']);
+  await assertFails(getDocs(query(
+    collection(anon, 'artistVersions'),
+    where('artistId', '==', 'privateArtist'),
+    orderBy('versionNumber', 'asc'),
+  )));
+
+  // checkArtistNameAvailable primary. privateArtist shares the name and is excluded.
+  const names = await assertSucceeds(getDocs(query(
+    collection(anon, 'artists'),
+    where('isPublic', '==', true),
+    where('deletedAt', '==', null),
+    where('nameLowercase', '==', 'nova'),
+    limit(10),
+  )));
+  assert.deepEqual(names.docs.map(snapshot => snapshot.id), ['artist1']);
+
+  // getSongsFromArtists and FeedPageClient.
+  const feed = await assertSucceeds(getDocs(query(
+    collection(anon, 'songs'),
+    where('artistId', 'in', ['artist1']),
+    where('isPublic', '==', true),
+    where('deletedAt', '==', null),
+    orderBy('createdAt', 'desc'),
+    limit(10),
+  )));
+  assert.deepEqual(feed.docs.map(snapshot => snapshot.id), ['song1']);
+
+  // getSongCollaborations.
+  const collabs = await assertSucceeds(getDocs(query(
+    collection(anon, 'collaborations'),
+    where('sourceSongId', '==', 'song1'),
+    orderBy('createdAt', 'desc'),
+  )));
+  assert.deepEqual(collabs.docs.map(snapshot => snapshot.id), ['col1']);
+
+  // getSongVersionGenerations used to list on songVersionId. That shape is denied.
+  // The client now lists by songId, which is the getSongGenerations shape.
+  await assertFails(getDocs(query(
+    collection(alice, 'generations'),
+    where('songVersionId', '==', 'ver1'),
+    orderBy('createdAt', 'desc'),
+  )));
+  await assertFails(getDocs(query(
+    collection(anon, 'generations'),
+    where('songVersionId', '==', 'ver1'),
+    orderBy('createdAt', 'desc'),
+  )));
 });
 
 test('catch-all denies unknown collections', async () => {

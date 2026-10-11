@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import {
   User,
-  onAuthStateChanged,
+  onIdTokenChanged,
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -12,6 +12,18 @@ import {
   GoogleAuthProvider,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
+
+async function publishViewerCookie(token: string | null): Promise<void> {
+  if (!token) {
+    await fetch('/api/auth/viewer', { method: 'DELETE', cache: 'no-store' });
+    return;
+  }
+  await fetch('/api/auth/viewer', {
+    method: 'POST',
+    cache: 'no-store',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
 
 interface AuthContextType {
   user: User | null;
@@ -30,9 +42,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, user => {
+    const unsubscribe = onIdTokenChanged(auth, user => {
       setUser(user);
       setLoading(false);
+      if (!user) {
+        void publishViewerCookie(null).catch(() => {});
+        return;
+      }
+      void user
+        .getIdToken()
+        .then(token => publishViewerCookie(token))
+        .catch(() => publishViewerCookie(null).catch(() => {}));
     });
 
     return unsubscribe;
@@ -56,6 +76,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const handleSignOut = async () => {
+    try {
+      await publishViewerCookie(null);
+    } catch {
+      // The token listener clears the cookie again once the user is null.
+    }
     await signOut(auth);
   };
 

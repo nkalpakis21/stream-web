@@ -52,6 +52,7 @@ function DiscoverPageInner() {
   const {
     songs,
     artistNames,
+    artists,
     coinBadgeBySong,
     quoteBySong,
     loading,
@@ -196,6 +197,7 @@ function DiscoverPageInner() {
                   <DiscoverSongCard
                     song={song}
                     artistName={artistNames.get(song.id)}
+                    artist={artists.get(song.artistId) ?? null}
                     coin={quoteBySong.get(song.id) ?? null}
                     ticker={coinBadgeBySong.get(song.id)?.ticker}
                     coinIcon={coinBadgeBySong.get(song.id)?.iconSrc}

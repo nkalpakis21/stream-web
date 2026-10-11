@@ -8,22 +8,37 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
   setDoc,
   updateDoc,
-  query,
-  where,
-  orderBy,
-  limit,
   Timestamp,
   serverTimestamp,
+  type DocumentData,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { auth, db } from '@/lib/firebase/config';
+import { getFreshIdToken } from '@/lib/api/clientAuth';
 import {
   COLLECTIONS,
   getCommentPath,
 } from '@/lib/firebase/collections';
+import { isLiveCommentData, type CommentDeleteOutcome } from '@/lib/comments/live';
 import type { CommentDocument } from '@/types/firestore';
+
+function commentFromSnapshot(id: string, data: DocumentData): CommentDocument {
+  const createdAt = data.createdAt as Timestamp;
+  const deleted = data.deleted === true;
+  return {
+    id,
+    targetType: data.targetType === 'artist' ? 'artist' : 'song',
+    targetId: typeof data.targetId === 'string' ? data.targetId : '',
+    authorId: typeof data.authorId === 'string' ? data.authorId : '',
+    content: typeof data.content === 'string' ? data.content : '',
+    parentCommentId: typeof data.parentCommentId === 'string' ? data.parentCommentId : null,
+    createdAt,
+    updatedAt: (data.updatedAt as Timestamp) || createdAt,
+    deletedAt: (data.deletedAt as Timestamp) || null,
+    deleted,
+  };
+}
 
 /**
  * Create a comment or reply
@@ -88,16 +103,35 @@ export async function getComment(commentId: string): Promise<CommentDocument | n
     return null;
   }
 
-  const data = docSnapshot.data() as CommentDocument;
-  if (data.deletedAt) {
-    return null; // Treat soft-deleted comments as not found
+  const data = commentFromSnapshot(commentId, docSnapshot.data() as DocumentData);
+  if (!isLiveCommentData(data)) {
+    return null;
   }
 
   return data;
 }
 
+function commentFromApi(raw: DocumentData): CommentDocument {
+  const createdAt = Timestamp.fromMillis(typeof raw.createdAt === 'number' ? raw.createdAt : 0);
+  const updatedAt = Timestamp.fromMillis(
+    typeof raw.updatedAt === 'number' ? raw.updatedAt : createdAt.toMillis()
+  );
+  return {
+    id: typeof raw.id === 'string' ? raw.id : '',
+    targetType: raw.targetType === 'artist' ? 'artist' : 'song',
+    targetId: typeof raw.targetId === 'string' ? raw.targetId : '',
+    authorId: typeof raw.authorId === 'string' ? raw.authorId : '',
+    content: typeof raw.content === 'string' ? raw.content : '',
+    parentCommentId: typeof raw.parentCommentId === 'string' ? raw.parentCommentId : null,
+    createdAt,
+    updatedAt,
+    deletedAt: typeof raw.deletedAt === 'number' ? Timestamp.fromMillis(raw.deletedAt) : null,
+    deleted: raw.deleted === true,
+  };
+}
+
 /**
- * Get paginated top-level comments for a target
+ * Top-level comments, including tombstones. Admin strips author, body, name, and avatar.
  */
 export async function getComments(
   targetType: 'artist' | 'song',
@@ -108,99 +142,30 @@ export async function getComments(
   comments: CommentDocument[];
   nextCursor: string | null;
   hasMore: boolean;
+  liveCount?: number;
 }> {
-  try {
-    let q = query(
-      collection(db, COLLECTIONS.comments),
-      where('targetType', '==', targetType),
-      where('targetId', '==', targetId),
-      where('parentCommentId', '==', null),
-      where('deletedAt', '==', null),
-      orderBy('createdAt', 'desc'),
-      limit(limitCount + 1) // Fetch one extra to check if there are more
-    );
-
-    // Add cursor if provided
-    if (cursor) {
-      try {
-        const cursorDoc = await getDoc(doc(db, getCommentPath(cursor)));
-        if (!cursorDoc.exists()) {
-          // Invalid cursor, start from beginning
-        }
-      } catch (error) {
-        console.warn('[getComments] Invalid cursor, starting from beginning:', error);
-      }
-    }
-
-    const snapshot = await getDocs(q);
-    const docs = snapshot.docs;
-
-    // Filter by cursor in memory if needed
-    let filteredDocs = docs;
-    if (cursor) {
-      const cursorIndex = docs.findIndex(d => d.id === cursor);
-      if (cursorIndex >= 0) {
-        filteredDocs = docs.slice(cursorIndex + 1);
-      }
-    }
-
-    // Check if there are more results
-    const hasMore = filteredDocs.length > limitCount;
-    const comments = filteredDocs
-      .slice(0, limitCount)
-      .map(doc => doc.data() as CommentDocument);
-
-    // Get next cursor (last comment ID)
-    const nextCursor = hasMore && comments.length > 0 ? comments[comments.length - 1].id : null;
-
-    return {
-      comments,
-      nextCursor,
-      hasMore,
-    };
-  } catch (error: any) {
-    // Fallback if composite index doesn't exist
-    if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
-      console.warn('[getComments] Composite index missing, using fallback');
-      
-      const fallbackQuery = query(
-        collection(db, COLLECTIONS.comments),
-        where('targetType', '==', targetType),
-        where('targetId', '==', targetId),
-        where('parentCommentId', '==', null),
-        where('deletedAt', '==', null)
-      );
-      
-      const snapshot = await getDocs(fallbackQuery);
-      const allComments = snapshot.docs
-        .map(doc => doc.data() as CommentDocument)
-        .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
-
-      // Apply cursor
-      let filteredComments = allComments;
-      if (cursor) {
-        const cursorIndex = allComments.findIndex(comment => comment.id === cursor);
-        if (cursorIndex >= 0) {
-          filteredComments = allComments.slice(cursorIndex + 1);
-        }
-      }
-
-      const hasMore = filteredComments.length > limitCount;
-      const comments = filteredComments.slice(0, limitCount);
-      const nextCursor = hasMore && comments.length > 0 ? comments[comments.length - 1].id : null;
-
-      return {
-        comments,
-        nextCursor,
-        hasMore,
-      };
-    }
-    throw error;
+  const params = new URLSearchParams({
+    targetType,
+    targetId,
+    limit: String(limitCount),
+  });
+  if (cursor) params.set('cursor', cursor);
+  const response = await fetch(`/api/comments?${params}`);
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(typeof body.error === 'string' ? body.error : 'Failed to load comments');
   }
+  const comments = Array.isArray(body.comments) ? body.comments.map(commentFromApi) : [];
+  return {
+    comments,
+    nextCursor: typeof body.nextCursor === 'string' ? body.nextCursor : null,
+    hasMore: body.hasMore === true,
+    ...(typeof body.liveCount === 'number' ? { liveCount: body.liveCount } : {}),
+  };
 }
 
 /**
- * Get replies to a comment
+ * Replies under a comment, including tombstones. Admin strips author, body, name, and avatar.
  */
 export async function getReplies(
   commentId: string,
@@ -211,76 +176,24 @@ export async function getReplies(
   nextCursor: string | null;
   hasMore: boolean;
 }> {
-  try {
-    let q = query(
-      collection(db, COLLECTIONS.comments),
-      where('parentCommentId', '==', commentId),
-      where('deletedAt', '==', null),
-      orderBy('createdAt', 'asc'), // Replies shown chronologically
-      limit(limitCount + 1)
-    );
-
-    const snapshot = await getDocs(q);
-    const docs = snapshot.docs;
-
-    // Filter by cursor in memory if needed
-    let filteredDocs = docs;
-    if (cursor) {
-      const cursorIndex = docs.findIndex(d => d.id === cursor);
-      if (cursorIndex >= 0) {
-        filteredDocs = docs.slice(cursorIndex + 1);
-      }
-    }
-
-    const hasMore = filteredDocs.length > limitCount;
-    const replies = filteredDocs
-      .slice(0, limitCount)
-      .map(doc => doc.data() as CommentDocument);
-
-    const nextCursor = hasMore && replies.length > 0 ? replies[replies.length - 1].id : null;
-
-    return {
-      replies,
-      nextCursor,
-      hasMore,
-    };
-  } catch (error: any) {
-    // Fallback if composite index doesn't exist
-    if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
-      console.warn('[getReplies] Composite index missing, using fallback');
-      
-      const fallbackQuery = query(
-        collection(db, COLLECTIONS.comments),
-        where('parentCommentId', '==', commentId),
-        where('deletedAt', '==', null)
-      );
-      
-      const snapshot = await getDocs(fallbackQuery);
-      const allReplies = snapshot.docs
-        .map(doc => doc.data() as CommentDocument)
-        .sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis());
-
-      // Apply cursor
-      let filteredReplies = allReplies;
-      if (cursor) {
-        const cursorIndex = allReplies.findIndex(reply => reply.id === cursor);
-        if (cursorIndex >= 0) {
-          filteredReplies = allReplies.slice(cursorIndex + 1);
-        }
-      }
-
-      const hasMore = filteredReplies.length > limitCount;
-      const replies = filteredReplies.slice(0, limitCount);
-      const nextCursor = hasMore && replies.length > 0 ? replies[replies.length - 1].id : null;
-
-      return {
-        replies,
-        nextCursor,
-        hasMore,
-      };
-    }
-    throw error;
+  const params = new URLSearchParams({
+    targetType: 'song',
+    targetId: commentId,
+    parentCommentId: commentId,
+    limit: String(limitCount),
+  });
+  if (cursor) params.set('cursor', cursor);
+  const response = await fetch(`/api/comments?${params}`);
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(typeof body.error === 'string' ? body.error : 'Failed to load replies');
   }
+  const replies = Array.isArray(body.comments) ? body.comments.map(commentFromApi) : [];
+  return {
+    replies,
+    nextCursor: typeof body.nextCursor === 'string' ? body.nextCursor : null,
+    hasMore: body.hasMore === true,
+  };
 }
 
 /**
@@ -317,41 +230,48 @@ export async function updateComment(
 }
 
 /**
- * Soft delete a comment
+ * Delete a comment through Admin. Replies keep a tombstone; otherwise the doc is removed.
  */
 export async function deleteComment(
   commentId: string,
   authorId: string
-): Promise<void> {
-  const comment = await getComment(commentId);
-  if (!comment) {
-    throw new Error('Comment not found');
-  }
-
-  if (comment.authorId !== authorId) {
+): Promise<CommentDeleteOutcome> {
+  const user = auth.currentUser;
+  if (!user || user.uid !== authorId) {
     throw new Error('You can only delete your own comments');
   }
-
-  const commentRef = doc(db, getCommentPath(commentId));
-  await updateDoc(commentRef, {
-    deletedAt: serverTimestamp(),
+  const token = await getFreshIdToken(user);
+  const response = await fetch('/api/comments', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ commentId }),
   });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(typeof data.error === 'string' ? data.error : 'Failed to delete comment');
+  }
+  return data.outcome === 'tombstone' ? 'tombstone' : 'removed';
 }
 
 /**
- * Get total comment count for a target (including replies)
+ * Live comments on a target, replies included. Tombstones are not counted.
  */
 export async function getCommentCount(
   targetType: 'artist' | 'song',
   targetId: string
 ): Promise<number> {
-  const q = query(
-    collection(db, COLLECTIONS.comments),
-    where('targetType', '==', targetType),
-    where('targetId', '==', targetId),
-    where('deletedAt', '==', null)
-  );
-
-  const snapshot = await getDocs(q);
-  return snapshot.size;
+  const params = new URLSearchParams({
+    targetType,
+    targetId,
+    count: '1',
+  });
+  const response = await fetch(`/api/comments?${params}`);
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(typeof body.error === 'string' ? body.error : 'Failed to count comments');
+  }
+  return typeof body.liveCount === 'number' ? body.liveCount : 0;
 }
