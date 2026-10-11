@@ -144,11 +144,15 @@ describe('studio face and follower line', () => {
           name: 'Gunna',
           avatarURL: null,
         } as AIArtistDocument,
-        song: {
-          coverPosterUrl: 'https://cdn.example/gunna.jpg',
-          albumCoverThumbnail: null,
-          albumCoverPath: null,
-        },
+        songs: [
+          {
+            artistId: 'X3zu8PahLmbYxdbb87qK',
+            isPublic: true,
+            coverPosterUrl: 'https://cdn.example/gunna.jpg',
+            albumCoverThumbnail: null,
+            albumCoverPath: null,
+          },
+        ],
       })
     );
     assert.match(html, /artist-face-hero/);

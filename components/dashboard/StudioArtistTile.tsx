@@ -8,17 +8,10 @@ import type { AIArtistDocument, SongDocument } from '@/types/firestore';
 export function StudioArtistTile({
   artist,
   photoUrl = null,
-  song = null,
   songs = null,
 }: {
   artist: AIArtistDocument;
   photoUrl?: string | null;
-  song?: {
-    isPublic?: unknown;
-    coverPosterUrl?: string | null;
-    albumCoverPath?: string | null;
-    albumCoverThumbnail?: string | null;
-  } | null;
   songs?: readonly {
     isPublic?: unknown;
     artistId?: string;
@@ -28,9 +21,7 @@ export function StudioArtistTile({
     albumCoverThumbnail?: string | null;
   }[] | null;
 }) {
-  const list =
-    songs?.filter(item => item.artistId === artist.id && !item.deletedAt) ??
-    (song ? [song] : []);
+  const list = songs?.filter(item => item.artistId === artist.id && !item.deletedAt) ?? [];
   const sources = artistHeroFaceSources({
     lockedLookUrl: photoUrl,
     avatarURL: artist.avatarURL,
