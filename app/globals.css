@@ -540,3 +540,35 @@ select:-webkit-autofill:focus {
   box-shadow: 0 0 0 1000px var(--surface-2, #1c1c28) inset;
   transition: background-color 9999s ease-out 0s;
 }
+
+/* Signed-out 404s stay on the copy. A pre-paint hint hides it for a signed-in check. */
+.ss-not-found-pending {
+  display: none;
+  min-height: 60vh;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a10;
+}
+
+html[data-ss-signed-in]:not([data-ss-recover-settled]) .ss-not-found-copy {
+  display: none;
+}
+
+html[data-ss-signed-in]:not([data-ss-recover-settled]) .ss-not-found-pending {
+  display: flex;
+}
+
+.ss-quiet-spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid #2a2a38;
+  border-top-color: #8b8896;
+  animation: ss-quiet-spin 0.8s linear infinite;
+}
+
+@keyframes ss-quiet-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

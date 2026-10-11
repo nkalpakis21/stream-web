@@ -123,9 +123,9 @@ export function CreativeArtistForm({ onSuccess, onCancel }: CreativeArtistFormPr
 
       if (shouldConnectX) {
         const xError = await startArtistXConnect(user, artist.id);
-        if (xError) {
+        if (xError && xError !== 'unavailable') {
           showToast(xError, 'error');
-        } else {
+        } else if (!xError) {
           return;
         }
       }

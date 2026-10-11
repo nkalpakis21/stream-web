@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import { Figtree, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/components/providers/AuthProvider';
@@ -17,6 +18,7 @@ import {
   brandOgImageUrl,
   publicUrl,
 } from '@/lib/brand/site';
+import { SIGNED_IN_HINT_SCRIPT } from '@/lib/auth/notFoundRecovery';
 
 const figtree = Figtree({
   subsets: ['latin'],
@@ -82,6 +84,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`dark listen ${figtree.variable} ${playfairDisplay.variable}`}>
       <body className="font-sans antialiased flex flex-col min-h-screen overflow-x-hidden bg-background text-foreground">
+        <Script id="ss-signed-in-hint" strategy="beforeInteractive">
+          {SIGNED_IN_HINT_SCRIPT}
+        </Script>
         <ListenSurface />
         <AnalyticsProvider>
           <AuthProvider>

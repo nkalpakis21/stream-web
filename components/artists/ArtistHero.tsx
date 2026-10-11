@@ -21,10 +21,20 @@ interface ArtistHeroProps {
   coin?: ArtistCoinQuote | null;
   /** Song-card face order. Empty means the initials disc, never a blank circle. */
   faceSources?: string[];
+  followerCount?: number | null;
+  /** Server-side. False hides Connect X. Never a key value. */
+  xConfigured?: boolean;
   children?: React.ReactNode;
 }
 
-export function ArtistHero({ artist, coin = null, faceSources = [], children }: ArtistHeroProps) {
+export function ArtistHero({
+  artist,
+  coin = null,
+  faceSources = [],
+  followerCount = null,
+  xConfigured = false,
+  children,
+}: ArtistHeroProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const isOwner = Boolean(user && user.uid === artist.ownerId);
@@ -83,9 +93,7 @@ export function ArtistHero({ artist, coin = null, faceSources = [], children }: 
   return (
     <>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-      {loading ? (
-        <div className="mb-12 h-48 animate-pulse rounded-[12px]" style={{ background: 'var(--surface)' }} />
-      ) : isOwner ? (
+      {!loading && isOwner ? (
         <>
           <ArtistOwnerPanel
             artist={{ ...artist, pumpFun, lore }}
@@ -99,6 +107,8 @@ export function ArtistHero({ artist, coin = null, faceSources = [], children }: 
             }}
             locking={locking}
             showLaunch={showLaunch}
+            followerCount={followerCount}
+            xConfigured={xConfigured}
             onLaunched={(next: PumpFunCoin) => {
               setPumpFun(toPlain(next));
               router.refresh();
@@ -114,7 +124,7 @@ export function ArtistHero({ artist, coin = null, faceSources = [], children }: 
               <div className="mb-2">
                 <AiMark />
               </div>
-              <ArtistHeader artist={{ ...artist, pumpFun }} />
+              <ArtistHeader artist={{ ...artist, pumpFun }} followerCount={followerCount} />
             </div>
           </div>
           {coinAside}

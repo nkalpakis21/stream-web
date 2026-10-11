@@ -12,6 +12,7 @@ import {
   GoogleAuthProvider,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
+import { syncSignedInHint } from '@/lib/auth/notFoundRecovery';
 
 async function publishViewerCookie(token: string | null): Promise<void> {
   if (!token) {
@@ -45,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onIdTokenChanged(auth, user => {
       setUser(user);
       setLoading(false);
+      syncSignedInHint(window.localStorage, Boolean(user));
       if (!user) {
         void publishViewerCookie(null).catch(() => {});
         return;
@@ -76,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const handleSignOut = async () => {
+    syncSignedInHint(window.localStorage, false);
     try {
       await publishViewerCookie(null);
     } catch {

@@ -2,17 +2,25 @@
 
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArtistCard } from '@/components/artists/ArtistCard';
 import { CreateArtistCard } from '@/components/dashboard/CreateArtistCard';
+import { StudioArtistTile, studioArtistFaceSong } from '@/components/dashboard/StudioArtistTile';
 import { CreativeArtistForm } from '@/components/dashboard/CreativeArtistForm';
-import type { AIArtistDocument } from '@/types/firestore';
+import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
+import type { AIArtistDocument, SongDocument } from '@/types/firestore';
 
 interface ArtistsTabProps {
   artists: AIArtistDocument[];
+  songs?: readonly SongDocument[];
+  displays?: Map<string, ArtistCardDisplay>;
   onArtistCreated?: () => void;
 }
 
-export function ArtistsTab({ artists, onArtistCreated }: ArtistsTabProps) {
+export function ArtistsTab({
+  artists,
+  songs = [],
+  displays,
+  onArtistCreated,
+}: ArtistsTabProps) {
   const searchParams = useSearchParams();
   const [showForm, setShowForm] = useState(searchParams.get('new') === '1');
 
@@ -40,10 +48,15 @@ export function ArtistsTab({ artists, onArtistCreated }: ArtistsTabProps) {
       )}
 
       {!showForm && (
-        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-5">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-5">
           <CreateArtistCard onClick={() => setShowForm(true)} />
           {artists.map(artist => (
-            <ArtistCard key={artist.id} artist={artist} />
+            <StudioArtistTile
+              key={artist.id}
+              artist={artist}
+              photoUrl={displays?.get(artist.id)?.photoUrl ?? null}
+              song={studioArtistFaceSong(songs, artist.id)}
+            />
           ))}
         </div>
       )}

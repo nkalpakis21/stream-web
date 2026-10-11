@@ -40,6 +40,10 @@ describe('artist hero face', () => {
 
     const html = faceHtml(avatar);
     assert.ok(html.includes(`src="${AVATAR}"`));
+    assert.match(html, /#14141C/);
+    assert.doesNotMatch(html, /artist-index-face-initials/);
+    assert.equal(locked[1], AVATAR);
+    assert.ok(locked.includes(COVER));
   });
 
   it('uses the latest public song cover when the artist has no avatar', () => {
@@ -49,9 +53,19 @@ describe('artist hero face', () => {
       song: coverSong,
     });
     assert.equal(sources[0], COVER);
-    const html = faceHtml(sources);
+    const html = faceHtml(sources, 'Gunna');
     assert.ok(html.includes(`src="${COVER}"`));
-    assert.match(html, /artist-index-face-initials/);
+    assert.match(html, /#14141C/);
+    assert.match(html, /artist-face-hero/);
+    assert.doesNotMatch(html, /artist-index-face-initials/);
+    assert.doesNotMatch(html, />GU</);
+
+    const row = renderToStaticMarkup(
+      createElement(ArtistFace, { name: 'Gunna', sources, size: 'card' })
+    );
+    assert.match(row, /artist-face-card/);
+    assert.match(row, /artist-index-face-initials/);
+    assert.ok(row.includes(`src="${COVER}"`));
   });
 
   it('paints initials when there is no avatar and no cover', () => {
@@ -66,6 +80,8 @@ describe('artist hero face', () => {
     });
     assert.deepEqual(sources, []);
     const html = faceHtml(sources, 'L.E.G');
+    assert.match(html, /artist-face-hero/);
+    assert.match(html, /#14141C/);
     assert.match(html, /artist-index-face-initials/);
     assert.match(html, />L\.</);
     assert.doesNotMatch(html, /<img/);

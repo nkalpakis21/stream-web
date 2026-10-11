@@ -11,6 +11,8 @@ interface UserSongsSectionProps {
   artistDisplays?: Map<string, ArtistCardDisplay>;
   /** Studio overview is the owner's catalog. Other callers leave this off. */
   ownerCatalog?: boolean;
+  /** Overview already prints the section heading. */
+  embedded?: boolean;
 }
 
 export function UserSongsSection({
@@ -18,11 +20,14 @@ export function UserSongsSection({
   songArtistMap,
   artistDisplays,
   ownerCatalog = false,
+  embedded = false,
 }: UserSongsSectionProps) {
   if (songs.length === 0) {
     return (
       <section className="mb-16">
-        <h2 className="text-xl font-semibold mb-6 text-foreground">Your Songs</h2>
+        {embedded ? null : (
+          <h2 className="text-xl font-semibold mb-6 text-foreground">Your Songs</h2>
+        )}
         <div className="bg-card/50 border border-border/40 rounded-xl p-16 text-center">
           <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
             <svg className="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,19 +52,25 @@ export function UserSongsSection({
     );
   }
 
+  const showViewAll = songs.length > 12;
+
   return (
-    <section className="mb-16">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-foreground">Your Songs</h2>
-        {songs.length > 12 && (
-          <Link
-            href="/discover"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            View all
-          </Link>
-        )}
-      </div>
+    <section className={embedded ? undefined : 'mb-16'}>
+      {!embedded || showViewAll ? (
+        <div className="flex items-center justify-between mb-6">
+          {embedded ? null : (
+            <h2 className="text-xl font-semibold text-foreground">Your Songs</h2>
+          )}
+          {showViewAll ? (
+            <Link
+              href="/discover"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              View all
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         {songs.slice(0, 12).map(song => (
           <SongCard

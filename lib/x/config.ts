@@ -28,8 +28,8 @@ export const X_TOKEN_URL = 'https://api.x.com/2/oauth2/token';
 export const X_REVOKE_URL = 'https://api.x.com/2/oauth2/revoke';
 export const X_API_BASE = 'https://api.x.com/2';
 
-export const X_CLIENT_ID_MISSING_MESSAGE =
-  'X is not configured. Set the X_CLIENT_ID and X_CLIENT_SECRET env vars to enable Connect X. The artist can still be created without an X account.';
+/** User-facing. Operators see the env names only in server logs. */
+export const X_CLIENT_ID_MISSING_MESSAGE = 'X connect is unavailable.';
 
 export function isXConfigured(): boolean {
   return Boolean(

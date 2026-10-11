@@ -14,9 +14,14 @@ import type { AIArtistDocument } from '@/types/firestore';
 interface ArtistHeaderProps {
   artist: Plain<AIArtistDocument>;
   isOwner?: boolean;
+  followerCount?: number | null;
 }
 
-export function ArtistHeader({ artist, isOwner: propIsOwner }: ArtistHeaderProps) {
+export function ArtistHeader({
+  artist,
+  isOwner: propIsOwner,
+  followerCount = null,
+}: ArtistHeaderProps) {
   const { user } = useAuth();
   const isOwner = propIsOwner ?? (user?.uid === artist.ownerId);
   const bio = isHonestBio(artist.lore, artist.name) ? artist.lore.trim() : null;
@@ -38,7 +43,7 @@ export function ArtistHeader({ artist, isOwner: propIsOwner }: ArtistHeaderProps
           <CoinBadge ticker={coinBadge.ticker} iconSrc={coinBadge.iconSrc} />
         </div>
       ) : null}
-      <FollowersList artistId={artist.id} />
+      <FollowersList artistId={artist.id} count={followerCount} />
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <FollowButton artistId={artist.id} ownerId={artist.ownerId} />
         <MessageArtistButton artistId={artist.id} ownerId={artist.ownerId} />

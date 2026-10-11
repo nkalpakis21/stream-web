@@ -46,19 +46,27 @@ async function authHeaders(user: { getIdToken: (force?: boolean) => Promise<stri
   };
 }
 
+function visibleXMessage(value: string | null | undefined): string | null {
+  if (!value) return null;
+  if (/X_CLIENT|env var|not configured/i.test(value)) return null;
+  return value;
+}
+
 export function ArtistXPanel({
   artistId,
   ownerId,
+  configured,
 }: {
   artistId: string;
   ownerId: string;
+  /** Server-side. When false the card is omitted. Never a key value. */
+  configured: boolean;
 }) {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const isOwner = Boolean(user && user.uid === ownerId);
 
-  const [available, setAvailable] = useState<boolean | null>(null);
-  const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
+  const [hidden, setHidden] = useState(!configured);
   const [x, setX] = useState<XState>(DISCONNECTED);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -66,7 +74,7 @@ export function ArtistXPanel({
   const [bannerError, setBannerError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!user || !isOwner) return;
+    if (!configured || !user || !isOwner) return;
     setLoading(true);
     try {
       const res = await fetch(`/api/x/artists/${artistId}`, {
@@ -74,8 +82,10 @@ export function ArtistXPanel({
         headers: await authHeaders(user),
       });
       const data = await res.json().catch(() => ({}));
-      setAvailable(Boolean(data.available));
-      setUnavailableMessage(data.message || data.error || null);
+      if (data.available === false) {
+        setHidden(true);
+        return;
+      }
       if (data.x) {
         setX({
           ...DISCONNECTED,
@@ -88,12 +98,12 @@ export function ArtistXPanel({
     } finally {
       setLoading(false);
     }
-  }, [artistId, isOwner, user]);
+  }, [artistId, configured, isOwner, user]);
 
   useEffect(() => {
-    if (!isOwner) return;
+    if (!configured || !isOwner) return;
     load();
-  }, [isOwner, load]);
+  }, [configured, isOwner, load]);
 
   useEffect(() => {
     const flag = searchParams.get('x');
@@ -102,12 +112,12 @@ export function ArtistXPanel({
       setBanner('X connected. Streamstar will post when a public song goes live.');
       setBannerError(null);
     } else if (flag === 'error') {
-      setBannerError(message || 'X connect failed.');
+      setBannerError(visibleXMessage(message) || 'X connect failed.');
       setBanner(null);
     }
   }, [searchParams]);
 
-  if (!isOwner) return null;
+  if (!configured || hidden || !isOwner) return null;
 
   const startConnect = async () => {
     if (!user) return;
@@ -121,19 +131,17 @@ export function ArtistXPanel({
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 503 || data.available === false) {
-        setBannerError(
-          data.error ||
-            'X is not configured (set X_CLIENT_ID and X_CLIENT_SECRET). Connect is disabled.'
-        );
-        setAvailable(false);
+        setHidden(true);
         return;
       }
       if (!res.ok || !data.authorizeUrl) {
-        throw new Error(data.error || 'Could not start X connect.');
+        throw new Error(visibleXMessage(data.error) || 'Could not start X connect.');
       }
       window.location.href = data.authorizeUrl;
     } catch (err) {
-      setBannerError(err instanceof Error ? err.message : 'Could not start X connect.');
+      setBannerError(
+        visibleXMessage(err instanceof Error ? err.message : null) || 'Could not start X connect.'
+      );
     } finally {
       setBusy(false);
     }
@@ -188,17 +196,13 @@ export function ArtistXPanel({
     ? null
     : x.lastError;
 
-  const sub =
-    available === false
-      ? unavailableMessage ||
-        'X is not configured (set X_CLIENT_ID and X_CLIENT_SECRET). Connect is disabled.'
-      : connected
-        ? x.status === 'paused'
-          ? lastError
-            ? 'Posting is paused because of an X auth or spam failure.'
-            : 'Posting is paused. Resume or disconnect anytime.'
-          : 'Verify you’re you and pull your handle onto the artist page.'
-        : 'Verify you’re you and pull your handle onto the artist page.';
+  const sub = connected
+    ? x.status === 'paused'
+      ? lastError
+        ? 'Posting is paused because of an X auth or spam failure.'
+        : 'Posting is paused. Resume or disconnect anytime.'
+      : 'Verify you’re you and pull your handle onto the artist page.'
+    : 'Verify you’re you and pull your handle onto the artist page.';
 
   return (
     <div>
@@ -238,7 +242,7 @@ export function ArtistXPanel({
             <button
               type="button"
               onClick={startConnect}
-              disabled={busy || loading || available === false}
+              disabled={busy || loading}
               className="btn-primary"
             >
               {busy ? 'Connecting…' : 'Connect X'}
@@ -269,7 +273,7 @@ export function ArtistXPanel({
               <button
                 type="button"
                 onClick={startConnect}
-                disabled={busy || available === false}
+                disabled={busy}
                 className="btn-ghost"
               >
                 Reconnect

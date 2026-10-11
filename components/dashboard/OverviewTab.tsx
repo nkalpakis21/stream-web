@@ -38,7 +38,12 @@ export function OverviewTab({
               View all →
             </Link>
           </div>
-          <UserArtistsSection artists={recentArtists} />
+          <UserArtistsSection
+            artists={recentArtists}
+            songs={songs}
+            displays={artistDisplays}
+            embedded
+          />
         </div>
       )}
 
@@ -58,6 +63,7 @@ export function OverviewTab({
             songArtistMap={songArtistMap}
             artistDisplays={artistDisplays}
             ownerCatalog
+            embedded
           />
         </div>
       )}
