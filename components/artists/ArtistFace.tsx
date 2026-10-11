@@ -11,12 +11,18 @@ export function ArtistFace({
 }: {
   name: string;
   sources: string[];
-  size?: 'index' | 'card' | 'row';
+  size?: 'index' | 'card' | 'row' | 'hero';
 }) {
   const [index, setIndex] = useState(0);
   const src = sources[index] ?? null;
   const sizeClass =
-    size === 'card' ? 'artist-face-card' : size === 'row' ? 'artist-face-row' : '';
+    size === 'card'
+      ? 'artist-face-card'
+      : size === 'row'
+        ? 'artist-face-row'
+        : size === 'hero'
+          ? 'artist-face-hero'
+          : '';
 
   return (
     <span className={`artist-index-face ${sizeClass}`.trim()}>

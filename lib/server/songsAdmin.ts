@@ -1,12 +1,55 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
-import type { SongDocument, SongVersionDocument } from '@/types/firestore';
+import type { GenerationDocument, SongDocument, SongVersionDocument } from '@/types/firestore';
 import { isMissingIndexError } from '@/lib/server/indexError';
+import { selectArtistPageSongs } from '@/lib/artists/ownerSongs';
 import {
   countedPlayFieldUpdates,
   type PlayAttribution,
 } from '@/lib/server/playAttribution';
+
+const OWNER_ARTIST_SONG_LIMIT = 100;
+
+/**
+ * Every non-deleted song on this artist that belongs to ownerId, including private.
+ * Call only after the verified viewer is that owner. Admin reads bypass rules, so
+ * the query itself is constrained to ownerId and the result is filtered again.
+ */
+export async function adminListOwnerArtistSongs(
+  artistId: string,
+  ownerId: string,
+  limitCount: number = OWNER_ARTIST_SONG_LIMIT
+): Promise<SongDocument[]> {
+  const songs = getAdminDb().collection(COLLECTIONS.songs);
+  let docs: SongDocument[];
+  try {
+    const snap = await songs
+      .where('artistId', '==', artistId)
+      .where('ownerId', '==', ownerId)
+      .orderBy('createdAt', 'desc')
+      .limit(limitCount)
+      .get();
+    docs = snap.docs.map(doc => doc.data() as SongDocument);
+  } catch (error) {
+    if (!isMissingIndexError(error)) throw error;
+    try {
+      const snap = await songs.where('artistId', '==', artistId).where('ownerId', '==', ownerId).get();
+      docs = snap.docs.map(doc => doc.data() as SongDocument);
+    } catch (fallbackError) {
+      if (!isMissingIndexError(fallbackError)) throw fallbackError;
+      const snap = await songs
+        .where('ownerId', '==', ownerId)
+        .orderBy('createdAt', 'desc')
+        .limit(limitCount)
+        .get();
+      docs = snap.docs
+        .map(doc => doc.data() as SongDocument)
+        .filter(song => song.artistId === artistId);
+    }
+  }
+  return selectArtistPageSongs(docs, ownerId, ownerId, artistId).slice(0, limitCount);
+}
 
 export async function adminGetSong(songId: string): Promise<SongDocument | null> {
   const snap = await getAdminDb().collection(COLLECTIONS.songs).doc(songId).get();
@@ -28,6 +71,29 @@ export async function adminGetSongVersions(songId: string): Promise<SongVersionD
     return snap.docs
       .map((doc) => doc.data() as SongVersionDocument)
       .sort((a, b) => a.versionNumber - b.versionNumber);
+  }
+}
+
+function timeMillis(value: unknown): number {
+  if (value && typeof value === 'object' && 'toMillis' in value) {
+    const ms = (value as { toMillis: () => number }).toMillis();
+    if (typeof ms === 'number' && Number.isFinite(ms)) return ms;
+  }
+  return 0;
+}
+
+/** Generations for a song the caller is already allowed to render. */
+export async function adminGetSongGenerations(songId: string): Promise<GenerationDocument[]> {
+  const collection = getAdminDb().collection(COLLECTIONS.generations);
+  try {
+    const snap = await collection.where('songId', '==', songId).orderBy('createdAt', 'desc').get();
+    return snap.docs.map(doc => doc.data() as GenerationDocument);
+  } catch (error) {
+    if (!isMissingIndexError(error)) throw error;
+    const snap = await collection.where('songId', '==', songId).get();
+    return snap.docs
+      .map(doc => doc.data() as GenerationDocument)
+      .sort((a, b) => timeMillis(b.createdAt) - timeMillis(a.createdAt));
   }
 }
 

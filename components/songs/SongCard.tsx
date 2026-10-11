@@ -11,7 +11,9 @@ import { ArtistFace } from '@/components/artists/ArtistFace';
 import { MaybeArtistLink } from '@/components/songs/MaybeArtistLink';
 import { coverFieldsFromSong } from '@/lib/covers/resolve';
 import { artistFaceSources, songCoverCandidates } from '@/lib/images/artistFace';
+import { songShowsPrivateTag } from '@/lib/artists/ownerSongs';
 import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
+import { PrivateSongTag } from '@/components/songs/PrivateSongTag';
 
 interface SongCardProps {
   song: SongDocument | Plain<SongDocument>;
@@ -22,6 +24,8 @@ interface SongCardProps {
   ticker?: string | null;
   coinIcon?: string | null;
   coin?: ArtistCoinQuote | null;
+  /** Owner catalogs only. Fans never pass this, so a private song cannot grow a tag. */
+  ownerCatalog?: boolean;
 }
 
 export function SongCard({
@@ -32,12 +36,14 @@ export function SongCard({
   ticker = null,
   coinIcon = null,
   coin = null,
+  ownerCatalog = false,
 }: SongCardProps) {
   const isCompact = size === 'compact';
   const showTicker = Boolean(ticker?.trim());
   const name = artist?.name || artistName;
   const linkable = artist?.isPublic === true;
   const photoUrl = artist?.photoUrl ?? null;
+  const showPrivate = songShowsPrivateTag(song, ownerCatalog);
 
   return (
     <article className="block rounded-[12px] bg-card">
@@ -52,15 +58,18 @@ export function SongCard({
         href={`/songs/${song.id}`}
       />
       <div className={isCompact ? 'p-2' : 'p-3'}>
-        <Link href={`/songs/${song.id}`} className="block">
-          <h3
-            className="font-semibold line-clamp-2"
-            style={{ fontSize: 14, lineHeight: '20px', color: 'var(--ink)' }}
-            data-entity="track"
-          >
-            {song.title}
-          </h3>
-        </Link>
+        <div className={showPrivate ? 'flex min-w-0 items-center gap-2' : undefined}>
+          <Link href={`/songs/${song.id}`} className={showPrivate ? 'block min-w-0' : 'block'}>
+            <h3
+              className={showPrivate ? 'truncate font-semibold' : 'font-semibold line-clamp-2'}
+              style={{ fontSize: 14, lineHeight: '20px', color: 'var(--ink)' }}
+              data-entity="track"
+            >
+              {song.title}
+            </h3>
+          </Link>
+          {showPrivate ? <PrivateSongTag /> : null}
+        </div>
         {name || showTicker ? (
           <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
             {name ? (

@@ -9,6 +9,7 @@
     "lint": "next lint",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:rules": "firebase emulators:exec --only firestore --project demo-stream-rules \"node --test tests/firestore.rules.test.mjs\"",
+    "test:http": "firebase emulators:exec --only firestore,auth --project demo-stream-http \"node scripts/http-status.mjs\"",
     "generate-mint-keypair": "tsx scripts/generate-mint-keypair.ts",
     "postinstall": "node scripts/patch-wallet-adapter.cjs"
   },

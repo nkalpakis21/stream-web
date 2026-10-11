@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
+import { noStoreJson } from '@/lib/http/noStore';
 import { countedPlayLogLine, songPatchMode } from '@/lib/server/playAttribution';
 import { reservePlayCount } from '@/lib/server/playRateLimit';
 import {
@@ -8,6 +9,9 @@ import {
   adminSoftDeleteSong,
   adminUpdateSongOwnerFields,
 } from '@/lib/server/songsAdmin';
+import { verifiedViewerIdFromRequest } from '@/lib/server/viewer';
+import { songIsVisible } from '@/lib/songs/visibility';
+import { toPlain } from '@/lib/serialize/toPlain';
 import { maybePostSongLive } from '@/lib/x/postSong';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +24,32 @@ const SONG_TITLE_MAX_LENGTH = 300;
 
 function badRequest(error: string) {
   return NextResponse.json({ error }, { status: 400 });
+}
+
+/**
+ * GET /api/songs/[id]
+ * 404 unless the song is public or the verified viewer is the owner.
+ * A 404 body has no title. Reads may use Authorization or the ss_viewer cookie.
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const songId = params.id?.trim();
+    if (!songId) return noStoreJson({ error: 'Song not found' }, 404);
+    const [viewerId, song] = await Promise.all([
+      verifiedViewerIdFromRequest(request),
+      adminGetSong(songId),
+    ]);
+    if (!songIsVisible(song, viewerId)) {
+      return noStoreJson({ error: 'Song not found' }, 404);
+    }
+    return noStoreJson({ song: toPlain({ ...song, id: song.id || songId }) });
+  } catch (error) {
+    console.error('[API /songs/[id]] Error:', error);
+    return noStoreJson({ error: 'Song not found' }, 404);
+  }
 }
 
 /**

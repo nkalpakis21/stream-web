@@ -13,6 +13,7 @@ import { fetchArtistCardDisplays } from '@/lib/artists/fetchCardDisplay';
 import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
 import type { SongDocument, AIArtistDocument } from '@/types/firestore';
 import { authHref, currentReturnTo } from '@/lib/auth/returnTo';
+import { DashboardPageSkeleton } from '@/components/dashboard/DashboardPageSkeleton';
 
 type DashboardTab = 'overview' | 'artists' | 'songs';
 
@@ -74,13 +75,7 @@ function DashboardContent() {
   };
 
   if (authLoading || loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin" />
-        </div>
-      </div>
-    );
+    return <DashboardPageSkeleton />;
   }
 
   if (!user) {
@@ -156,13 +151,7 @@ function DashboardContent() {
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-background">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin" />
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<DashboardPageSkeleton />}>
       <DashboardContent />
     </Suspense>
   );

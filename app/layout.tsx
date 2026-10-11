@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from 'next';
-import dynamic from 'next/dynamic';
 import { Figtree, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/components/providers/AuthProvider';
+import { SolanaWalletProvider } from '@/components/providers/SolanaWalletProvider';
 import { SongPlayerProvider } from '@/components/songs/SongPlayerProvider';
 import { AnalyticsProvider } from '@/components/providers/AnalyticsProvider';
 import { Footer } from '@/components/layout/Footer';
@@ -17,14 +17,6 @@ import {
   brandOgImageUrl,
   publicUrl,
 } from '@/lib/brand/site';
-
-const SolanaWalletProvider = dynamic(
-  () =>
-    import('@/components/providers/SolanaWalletProvider').then(
-      (mod) => mod.SolanaWalletProvider
-    ),
-  { ssr: false }
-);
 
 const figtree = Figtree({
   subsets: ['latin'],

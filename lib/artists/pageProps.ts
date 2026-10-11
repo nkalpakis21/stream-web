@@ -11,15 +11,18 @@ export function artistPageClientProps<TArtist, TSong, TCoin>(input: {
   artist: TArtist;
   songs: readonly TSong[];
   coin: TCoin;
+  faceSources?: readonly string[];
 }): {
   artist: Plain<TArtist>;
   songs: Plain<TSong>[];
   coin: Plain<TCoin>;
+  faceSources: string[];
 } {
   return {
     artist: toPlain(input.artist),
     songs: toPlain(input.songs),
     coin: toPlain(input.coin),
+    faceSources: toPlain([...(input.faceSources ?? [])]),
   };
 }
 
