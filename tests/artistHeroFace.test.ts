@@ -1,8 +1,8 @@
 import './render-setup';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ArtistFace } from '../components/artists/ArtistFace';
 import { artistHeroFaceSources, failFaceSrc } from '../lib/images/artistFace';
@@ -134,64 +134,86 @@ describe('artist hero face', () => {
     assert.doesNotMatch(html, /CoverPlaceholder|bg-muted/);
   });
 
+});
+
+const LOADED = 'https://cdn.example/ok.jpg';
+
+describe('mounted artist face', { concurrency: 1 }, () => {
   it('advances an image that already failed before hydration, then initials', async () => {
-    const restore = installFaceDom();
-    const seen: string[] = [];
-    faceSrcLog = seen;
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
-    try {
-      root = createRoot(host);
-      root.render(
-        createElement(ArtistFace, {
-          name: 'Gunna',
-          sources: [THUMB, COVER],
-          size: 'hero',
-        })
-      );
-      await new Promise(resolve => setTimeout(resolve, 30));
-      const text = host.textContent || '';
-      assert.match(text, /GU/);
+    await mountFace([THUMB, COVER], (host, seen) => {
+      assert.match(host.textContent || '', /GU/);
       assert.equal(host.querySelector('img'), null);
-      assert.deepEqual(
-        seen.filter((url, index) => seen.indexOf(url) === index),
-        [THUMB, COVER]
-      );
-    } finally {
-      root?.unmount();
-      restore();
-    }
+      assert.deepEqual(uniqueSrcs(seen), [THUMB, COVER]);
+    });
+  });
+
+  it('keeps the second candidate when the first image failed before hydration', async () => {
+    await mountFace([THUMB, LOADED], host => {
+      const img = host.querySelector('img');
+      assert.equal(img?.getAttribute('src'), LOADED);
+      assert.equal(img?.naturalWidth, 256);
+      assert.equal(host.querySelector('.artist-index-face-initials'), null);
+    });
   });
 
   it('keeps a candidate that already has pixels', async () => {
-    const restore = installFaceDom();
-    faceSrcLog = [];
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
-    try {
-      root = createRoot(host);
-      root.render(
-        createElement(ArtistFace, {
-          name: 'Gunna',
-          sources: ['https://cdn.example/ok.jpg', COVER],
-          size: 'hero',
-        })
-      );
-      await new Promise(resolve => setTimeout(resolve, 30));
+    await mountFace([LOADED, COVER], host => {
       const img = host.querySelector('img');
-      assert.equal(img?.getAttribute('src'), 'https://cdn.example/ok.jpg');
+      assert.equal(img?.getAttribute('src'), LOADED);
       assert.equal(img?.naturalWidth, 256);
       assert.equal(host.querySelector('.artist-index-face-initials'), null);
-    } finally {
-      root?.unmount();
-      restore();
-    }
+    });
   });
 });
 
 let faceSrcLog: string[] = [];
+
+function uniqueSrcs(urls: string[]): string[] {
+  return urls.filter((url, index) => urls.indexOf(url) === index);
+}
+
+async function waitFor(check: () => void) {
+  let error: unknown;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      check();
+      return;
+    } catch (caught) {
+      error = caught;
+    }
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+    });
+  }
+  throw error;
+}
+
+async function mountFace(
+  sources: string[],
+  check: (host: HTMLElement, seen: string[]) => void
+) {
+  const restore = installFaceDom();
+  const seen: string[] = [];
+  faceSrcLog = seen;
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  try {
+    await act(async () => {
+      root.render(createElement(ArtistFace, { name: 'Gunna', sources, size: 'hero' }));
+    });
+    await waitFor(() => check(host, seen));
+  } finally {
+    await act(async () => {
+      root.unmount();
+    });
+    restore();
+  }
+}
+
 
 function installFaceDom(): () => void {
   class Style {
