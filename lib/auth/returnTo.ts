@@ -1,21 +1,52 @@
+import { SITE_WWW_ORIGIN } from '@/lib/brand/site';
+
 export const DEFAULT_AFTER_AUTH = '/discover';
+
+/** Tabs, newlines, and other controls are stripped by browsers into an open redirect. */
+const CONTROL_CHARS = /[\x00-\x1F\x7F]/;
+
+function returnToOrigin(): string {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+  return SITE_WWW_ORIGIN;
+}
 
 /**
  * Only allow in-app relative paths. Reject protocol-relative, absolute,
- * and auth-page loops. Keep the path and query the visitor asked for,
- * including Studio, so sign-in returns them there.
+ * control characters, and auth-page loops. Keep the path and query the
+ * visitor asked for, including Studio, so sign-in returns them there.
  */
 export function getSafeReturnTo(value: string | null | undefined): string {
   if (!value) return DEFAULT_AFTER_AUTH;
-  if (!value.startsWith('/') || value.startsWith('//')) return DEFAULT_AFTER_AUTH;
-  if (value.includes('\\') || value.includes('://')) return DEFAULT_AFTER_AUTH;
+  if (CONTROL_CHARS.test(value)) return DEFAULT_AFTER_AUTH;
 
-  const pathOnly = value.split('?')[0] ?? value;
-  if (pathOnly === '/signin' || pathOnly === '/signup') {
+  let decoded = value;
+  try {
+    decoded = decodeURIComponent(value);
+  } catch {
+    return DEFAULT_AFTER_AUTH;
+  }
+  if (CONTROL_CHARS.test(decoded)) return DEFAULT_AFTER_AUTH;
+  if (!decoded.startsWith('/') || decoded.startsWith('//')) return DEFAULT_AFTER_AUTH;
+  if (decoded.includes('\\') || decoded.includes('://')) return DEFAULT_AFTER_AUTH;
+
+  const origin = returnToOrigin();
+  let parsed: URL;
+  try {
+    parsed = new URL(decoded, origin);
+  } catch {
+    return DEFAULT_AFTER_AUTH;
+  }
+  if (parsed.origin !== origin) return DEFAULT_AFTER_AUTH;
+  const path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  if (CONTROL_CHARS.test(path)) return DEFAULT_AFTER_AUTH;
+
+  if (parsed.pathname === '/signin' || parsed.pathname === '/signup') {
     return DEFAULT_AFTER_AUTH;
   }
 
-  return value;
+  return path;
 }
 
 export function currentReturnTo(pathname: string, search?: string | null): string {

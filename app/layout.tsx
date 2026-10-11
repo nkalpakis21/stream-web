@@ -82,7 +82,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`dark listen ${figtree.variable} ${playfairDisplay.variable}`}>
+    <html
+      lang="en"
+      className={`dark listen ${figtree.variable} ${playfairDisplay.variable}`}
+      suppressHydrationWarning
+    >
       <body className="font-sans antialiased flex flex-col min-h-screen overflow-x-hidden bg-background text-foreground">
         <Script id="ss-signed-in-hint" strategy="beforeInteractive">
           {SIGNED_IN_HINT_SCRIPT}

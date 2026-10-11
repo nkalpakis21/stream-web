@@ -11,6 +11,7 @@ import {
 } from '@/lib/server/songsAdmin';
 import { verifiedViewerIdFromPage } from '@/lib/server/viewer';
 import { hiddenSongPageMetadata, rejectHiddenSong } from '@/lib/songs/visibility';
+import { ClearOwnerRecovery } from '@/components/states/ClearOwnerRecovery';
 import { toPlain, type Plain } from '@/lib/serialize/toPlain';
 import { VersionCards } from '@/components/songs/VersionCards';
 import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
@@ -135,6 +136,7 @@ async function SongPageBody({
 
   return (
     <div className="min-h-screen bg-background">
+      <ClearOwnerRecovery kind="song" id={song.id} />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         <SongStage
           songId={song.id}

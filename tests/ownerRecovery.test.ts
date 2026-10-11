@@ -79,7 +79,7 @@ describe('owner not-found recovery', () => {
     assert.match(html, /ss-not-found-copy/);
     assert.match(html, /ss-not-found-pending/);
     assert.match(html, /ss-quiet-spinner/);
-    assert.match(html, /data-ss-signed-in/);
+    assert.doesNotMatch(html, /<script/);
     assert.doesNotMatch(html, /X_CLIENT|uid|Bearer/);
 
     const css = read('app/globals.css');
@@ -101,6 +101,10 @@ describe('owner not-found recovery', () => {
     const hook = read('components/states/useOwnerNotFoundRecovery.ts');
     assert.match(hook, /window\.location\.reload\(\)/);
     assert.match(hook, /sessionStorage/);
+    assert.match(hook, /setTimeout\(settleNotFound, RECOVERY_REVEAL_MS\)/);
+    assert.match(read('app/layout.tsx'), /SIGNED_IN_HINT_SCRIPT/);
+    assert.match(read('app/layout.tsx'), /suppressHydrationWarning/);
+    assert.match(read('components/states/ClearOwnerRecovery.tsx'), /sessionStorage\.removeItem/);
     assert.match(read('components/providers/AuthProvider.tsx'), /syncSignedInHint/);
     assert.equal(existsSync('app/artists/[id]/loading.tsx'), false);
     assert.equal(existsSync('app/songs/[id]/loading.tsx'), false);
@@ -115,6 +119,14 @@ describe('signed-out return path', () => {
     assert.equal(getSafeReturnTo('/signin'), '/discover');
     assert.equal(getSafeReturnTo('https://evil.example/dashboard'), '/discover');
     assert.equal(getSafeReturnTo('//evil.example'), '/discover');
+    assert.equal(getSafeReturnTo('/\\evil.example'), '/discover');
+    assert.equal(getSafeReturnTo('/%09/evil.example'), '/discover');
+    assert.equal(getSafeReturnTo('/%0A/evil.example'), '/discover');
+    assert.equal(getSafeReturnTo('/%0D/evil.example'), '/discover');
+    assert.equal(getSafeReturnTo('/%00/evil.example'), '/discover');
+    assert.equal(getSafeReturnTo('/\t/evil.example'), '/discover');
+    assert.equal(getSafeReturnTo('/\n/evil.example'), '/discover');
+    assert.equal(getSafeReturnTo('/dashboard?x=1'), '/dashboard?x=1');
     assert.equal(authHref('/signin', '/dashboard'), '/signin?next=%2Fdashboard');
     assert.equal(
       authHref('/signin', '/dashboard?tab=artists&new=1'),

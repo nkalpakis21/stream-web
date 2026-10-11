@@ -1,10 +1,8 @@
 import { BrandDeadEnd } from '@/components/states/BrandDeadEnd';
-import { SIGNED_IN_HINT_SCRIPT } from '@/lib/auth/notFoundRecovery';
 
 /**
  * Server-rendered 404 copy stays in the HTML for crawlers and signed-out visitors.
- * A signed-in hint (set before paint) hides that copy and shows a quiet spinner
- * until the owner check fails or times out. The hint is not a credential.
+ * The root layout's before-paint script hides that copy for a signed-in check.
  */
 export function NotFoundRecoveryShell({
   line,
@@ -15,7 +13,6 @@ export function NotFoundRecoveryShell({
 }) {
   return (
     <>
-      <script dangerouslySetInnerHTML={{ __html: SIGNED_IN_HINT_SCRIPT }} />
       {children}
       <div className="ss-not-found">
         <div className="ss-not-found-copy">

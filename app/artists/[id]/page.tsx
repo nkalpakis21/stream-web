@@ -5,11 +5,8 @@ import { artistShareMetadata, hiddenArtistPageMetadata } from '@/lib/artists/vis
 import { rejectHiddenArtist } from '@/lib/artists/pageGate';
 import { artistPageClientProps } from '@/lib/artists/pageProps';
 import { artistHeroFaceSources } from '@/lib/images/artistFace';
-import {
-  artistPageFaceSong,
-  isArtistOwner,
-  selectArtistPageSongs,
-} from '@/lib/artists/ownerSongs';
+import { ClearOwnerRecovery } from '@/components/states/ClearOwnerRecovery';
+import { isArtistOwner, selectArtistPageSongs } from '@/lib/artists/ownerSongs';
 import { adminGetArtist } from '@/lib/server/artistsAdmin';
 import { adminCountFollowers } from '@/lib/server/followsCount';
 import { isXConfigured } from '@/lib/x/config';
@@ -100,10 +97,11 @@ async function ArtistPageBody({
     artist.id
   );
 
+  const faceSongs = songs.filter(song => song.isPublic === true);
   const faceSources = artistHeroFaceSources({
     lockedLookUrl: cards.displays.get(artist.id)?.photoUrl ?? null,
     avatarURL: artist.avatarURL,
-    song: artistPageFaceSong(songs, ownerView),
+    songs: faceSongs.length > 0 ? faceSongs : ownerView ? songs : [],
   });
   const clientProps = artistPageClientProps({
     artist,
@@ -125,6 +123,7 @@ async function ArtistPageBody({
 
   return (
     <div className="min-h-screen bg-background">
+      <ClearOwnerRecovery kind="artist" id={artist.id} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         <ArtistHero
           artist={view}

@@ -22,6 +22,10 @@ function showSignedInPending() {
   document.documentElement.removeAttribute('data-ss-recover-settled');
 }
 
+function markSignedIn() {
+  document.documentElement.setAttribute('data-ss-signed-in', '');
+}
+
 function alreadyRecovered(key: string): boolean {
   try {
     return window.sessionStorage.getItem(key) === '1';
@@ -60,8 +64,13 @@ export function useOwnerNotFoundRecovery(kind: NotFoundKind, viewerPath: string)
       settleNotFound();
       return;
     }
-    showSignedInPending();
+    markSignedIn();
   }, [loading, user]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(settleNotFound, RECOVERY_REVEAL_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (loading || !user || started.current) return;
@@ -72,9 +81,6 @@ export function useOwnerNotFoundRecovery(kind: NotFoundKind, viewerPath: string)
     }
     started.current = true;
     let cancelled = false;
-    const timer = window.setTimeout(() => {
-      if (!cancelled) settleNotFound();
-    }, RECOVERY_REVEAL_MS);
 
     const api =
       kind === 'song'
@@ -112,7 +118,6 @@ export function useOwnerNotFoundRecovery(kind: NotFoundKind, viewerPath: string)
           settleNotFound();
           return;
         }
-        window.clearTimeout(timer);
         window.location.reload();
       } catch {
         if (!cancelled) settleNotFound();
@@ -122,7 +127,6 @@ export function useOwnerNotFoundRecovery(kind: NotFoundKind, viewerPath: string)
     return () => {
       cancelled = true;
       started.current = false;
-      window.clearTimeout(timer);
     };
   }, [kind, loading, pathname, user, viewerPath]);
 }

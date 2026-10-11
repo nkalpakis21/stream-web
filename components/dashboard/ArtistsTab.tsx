@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { CreateArtistCard } from '@/components/dashboard/CreateArtistCard';
-import { StudioArtistTile, studioArtistFaceSong } from '@/components/dashboard/StudioArtistTile';
+import { StudioArtistTile } from '@/components/dashboard/StudioArtistTile';
 import { CreativeArtistForm } from '@/components/dashboard/CreativeArtistForm';
 import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
 import type { AIArtistDocument, SongDocument } from '@/types/firestore';
@@ -55,7 +55,7 @@ export function ArtistsTab({
               key={artist.id}
               artist={artist}
               photoUrl={displays?.get(artist.id)?.photoUrl ?? null}
-              song={studioArtistFaceSong(songs, artist.id)}
+              songs={songs.filter(song => song.artistId === artist.id && !song.deletedAt)}
             />
           ))}
         </div>

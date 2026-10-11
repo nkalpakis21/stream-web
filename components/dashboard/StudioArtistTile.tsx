@@ -1,36 +1,40 @@
 import Link from 'next/link';
 import { ArtistFace } from '@/components/artists/ArtistFace';
-import { artistPageFaceSong } from '@/lib/artists/ownerSongs';
 import { artistHeroFaceSources } from '@/lib/images/artistFace';
 import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
 import type { AIArtistDocument, SongDocument } from '@/types/firestore';
-
-export function studioArtistFaceSong(
-  songs: readonly SongDocument[],
-  artistId: string
-): SongDocument | null {
-  const mine = songs.filter(song => song.artistId === artistId && !song.deletedAt);
-  return artistPageFaceSong(mine, true);
-}
 
 /** Same face component, order, and circle as the artist hero. */
 export function StudioArtistTile({
   artist,
   photoUrl = null,
   song = null,
+  songs = null,
 }: {
   artist: AIArtistDocument;
   photoUrl?: string | null;
   song?: {
+    isPublic?: unknown;
     coverPosterUrl?: string | null;
     albumCoverPath?: string | null;
     albumCoverThumbnail?: string | null;
   } | null;
+  songs?: readonly {
+    isPublic?: unknown;
+    artistId?: string;
+    deletedAt?: unknown;
+    coverPosterUrl?: string | null;
+    albumCoverPath?: string | null;
+    albumCoverThumbnail?: string | null;
+  }[] | null;
 }) {
+  const list =
+    songs?.filter(item => item.artistId === artist.id && !item.deletedAt) ??
+    (song ? [song] : []);
   const sources = artistHeroFaceSources({
     lockedLookUrl: photoUrl,
     avatarURL: artist.avatarURL,
-    song,
+    songs: list,
   });
 
   return (
@@ -57,7 +61,7 @@ export function StudioArtistTiles({
           key={artist.id}
           artist={artist}
           photoUrl={displays?.get(artist.id)?.photoUrl ?? null}
-          song={studioArtistFaceSong(songs, artist.id)}
+          songs={songs.filter(song => song.artistId === artist.id && !song.deletedAt)}
         />
       ))}
     </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { currentFaceSrc } from '@/lib/images/artistFace';
 import { getInitials } from '@/lib/utils/avatar';
 import './artist-card.css';
 
@@ -13,8 +14,9 @@ export function ArtistFace({
   sources: string[];
   size?: 'index' | 'card' | 'row' | 'hero';
 }) {
-  const [index, setIndex] = useState(0);
-  const src = sources[index] ?? null;
+  const [failed, setFailed] = useState<string[]>([]);
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const src = currentFaceSrc(sources, failed, loaded);
   const hero = size === 'hero';
   const sizeClass =
     size === 'card'
@@ -42,15 +44,32 @@ export function ArtistFace({
         </span>
       ) : null}
       {src ? (
-        // eslint-disable-next-line @next/next/no-img-element -- onerror must advance the face fallback immediately
+        // eslint-disable-next-line @next/next/no-img-element -- the first src is in the server HTML and onError walks the rest
         <img
-          key={src}
           src={src}
           alt={name}
           width={96}
           height={96}
           className="artist-index-face-img"
-          onError={() => setIndex(current => current + 1)}
+          onLoad={event => {
+            const url = event.currentTarget.getAttribute('src');
+            if (!url) return;
+            setLoaded(url);
+            setFailed(current => (current.includes(url) ? current.filter(item => item !== url) : current));
+          }}
+          onError={event => {
+            const img = event.currentTarget;
+            const url = img.getAttribute('src');
+            if (!url || url === loaded || img.naturalWidth > 0) return;
+            window.setTimeout(() => {
+              if (!img.isConnected || img.getAttribute('src') !== url) return;
+              if (img.naturalWidth > 0) {
+                setLoaded(url);
+                return;
+              }
+              setFailed(current => (current.includes(url) ? current : [...current, url]));
+            }, 0);
+          }}
         />
       ) : null}
     </span>

@@ -101,17 +101,75 @@ export function artistFaceSources(
   return uniqueUrls([look, ...covers]);
 }
 
+type HeroCoverSong = {
+  isPublic?: unknown;
+  coverPosterUrl?: string | null;
+  albumCoverPath?: string | null;
+  albumCoverThumbnail?: string | null;
+};
+
+/** Thumbnail, then the full cover, then the album path. No reordering. */
+export function heroSongCoverCandidates(
+  song?: HeroCoverSong | null
+): string[] {
+  if (!song) return [];
+  return uniqueUrls([
+    httpsDisplayUrl(song.albumCoverThumbnail),
+    httpsDisplayUrl(song.coverPosterUrl),
+    httpsDisplayUrl(song.albumCoverPath),
+  ]);
+}
+
 /**
- * Face order: current-version avatar, then the artist document avatar,
- * then that song's cover (artistFaceSources / songCoverCandidates).
- * An empty list means initials.
+ * Face order: version look, artist avatar, then each song's covers
+ * (thumbnail, full cover, next song). An empty list means initials.
  */
 export function artistHeroFaceSources(input: {
   lockedLookUrl?: unknown;
   avatarURL?: unknown;
-  song?: Parameters<typeof songCoverCandidates>[0];
+  song?: HeroCoverSong | null;
+  songs?: readonly (HeroCoverSong | null | undefined)[] | null;
 }): string[] {
-  const version = httpsDisplayUrl(input.lockedLookUrl);
-  const avatar = httpsDisplayUrl(input.avatarURL);
-  return artistFaceSources(version, uniqueUrls([avatar, ...songCoverCandidates(input.song)]));
+  const provided = (input.songs ?? []).filter(
+    (song): song is HeroCoverSong => Boolean(song)
+  );
+  const list = provided.length > 0 ? provided : input.song ? [input.song] : [];
+  const publicSongs = list.filter(song => song.isPublic === true);
+  const ordered = publicSongs.length > 0 ? [...publicSongs, ...list.filter(song => song.isPublic !== true)] : list;
+  return uniqueUrls([
+    httpsDisplayUrl(input.lockedLookUrl),
+    httpsDisplayUrl(input.avatarURL),
+    ...ordered.flatMap(song => heroSongCoverCandidates(song)),
+  ]);
+}
+
+/** The src to paint. A URL that already loaded stays up through a later swap. */
+export function currentFaceSrc(
+  sources: readonly string[],
+  failed: readonly string[],
+  loadedUrl: string | null
+): string | null {
+  if (loadedUrl && !failed.includes(loadedUrl)) return loadedUrl;
+  return sources.find(url => !failed.includes(url)) ?? null;
+}
+
+/**
+ * Advance one candidate when `erroredUrl` fails.
+ * Initials (`null`) only after every candidate has failed.
+ * An error for a URL that already loaded does not move off it.
+ */
+export function failFaceSrc(
+  sources: readonly string[],
+  failed: readonly string[],
+  erroredUrl: string,
+  loadedUrl: string | null
+): { src: string | null; failed: string[] } {
+  if (loadedUrl && erroredUrl === loadedUrl) {
+    return { src: loadedUrl, failed: [...failed] };
+  }
+  const nextFailed = failed.includes(erroredUrl) ? [...failed] : [...failed, erroredUrl];
+  return {
+    src: currentFaceSrc(sources, nextFailed, loadedUrl),
+    failed: nextFailed,
+  };
 }
