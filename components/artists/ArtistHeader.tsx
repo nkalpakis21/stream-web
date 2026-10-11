@@ -8,10 +8,11 @@ import { FollowersList } from './FollowersList';
 import { CoinBadge } from '@/components/songs/CoinBadge';
 import { coinBadgeFromArtist } from '@/lib/brand/coin';
 import { isHonestBio } from '@/lib/brand/bio';
+import type { Plain } from '@/lib/serialize/toPlain';
 import type { AIArtistDocument } from '@/types/firestore';
 
 interface ArtistHeaderProps {
-  artist: AIArtistDocument;
+  artist: Plain<AIArtistDocument>;
   isOwner?: boolean;
 }
 
