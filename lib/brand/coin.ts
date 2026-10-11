@@ -1,7 +1,12 @@
-import type { PumpFunCoin } from '@/types/firestore';
+/** Mint, url, and symbol. launchedAt may be a Timestamp or epoch millis. */
+type CoinIdentity = {
+  mint?: string | null;
+  url?: string | null;
+  symbol?: string | null;
+} | null;
 
 /** True only when an artist has a real launched coin — never invent mint/url. */
-export function hasLaunchedCoin(coin?: PumpFunCoin | null): boolean {
+export function hasLaunchedCoin(coin?: CoinIdentity): boolean {
   return Boolean(coin?.mint && coin.url);
 }
 
@@ -9,7 +14,7 @@ export function hasLaunchedCoin(coin?: PumpFunCoin | null): boolean {
  * Persisted ticker for a launched coin. Bare symbol, matching bag / pumpFun.symbol.
  * Null when the coin is unlaunched or symbol is empty — never invent "Coin".
  */
-export function launchedCoinTicker(coin?: PumpFunCoin | null): string | null {
+export function launchedCoinTicker(coin?: CoinIdentity): string | null {
   if (!hasLaunchedCoin(coin)) return null;
   const ticker = coin?.symbol?.trim();
   return ticker || null;
@@ -22,7 +27,7 @@ export type CoinBadgeMeta = {
 
 /** Chip payload: ticker + look (the coin image) when we have one. */
 export function coinBadgeFromArtist(artist?: {
-  pumpFun?: PumpFunCoin | null;
+  pumpFun?: CoinIdentity;
   avatarURL?: string | null;
 } | null): CoinBadgeMeta | null {
   const ticker = launchedCoinTicker(artist?.pumpFun);

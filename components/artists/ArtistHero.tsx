@@ -13,10 +13,11 @@ import { hasLaunchedCoin } from '@/lib/brand/coin';
 import { CoverImage } from '@/components/media/CoverImage';
 import { AiMark } from '@/components/brand/AiMark';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
+import { toPlain, type Plain } from '@/lib/serialize/toPlain';
 import type { AIArtistDocument, PumpFunCoin } from '@/types/firestore';
 
 interface ArtistHeroProps {
-  artist: AIArtistDocument;
+  artist: Plain<AIArtistDocument>;
   coin?: ArtistCoinQuote | null;
   children?: React.ReactNode;
 }
@@ -27,7 +28,7 @@ export function ArtistHero({ artist, coin = null, children }: ArtistHeroProps) {
   const isOwner = Boolean(user && user.uid === artist.ownerId);
   const [avatarURL, setAvatarURL] = useState<string | null>(artist.avatarURL);
   const [lore, setLore] = useState(artist.lore);
-  const [pumpFun, setPumpFun] = useState<PumpFunCoin | null | undefined>(
+  const [pumpFun, setPumpFun] = useState<Plain<PumpFunCoin> | null | undefined>(
     artist.pumpFun
   );
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
@@ -97,7 +98,7 @@ export function ArtistHero({ artist, coin = null, children }: ArtistHeroProps) {
             locking={locking}
             showLaunch={showLaunch}
             onLaunched={(next: PumpFunCoin) => {
-              setPumpFun(next);
+              setPumpFun(toPlain(next));
               router.refresh();
             }}
           />
