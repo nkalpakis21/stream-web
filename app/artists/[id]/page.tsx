@@ -1,18 +1,30 @@
+import { Suspense } from 'react';
 import { unstable_noStore as noStore } from 'next/cache';
 import type { Metadata } from 'next';
 import { artistShareMetadata, hiddenArtistPageMetadata } from '@/lib/artists/visibility';
 import { rejectHiddenArtist } from '@/lib/artists/pageGate';
 import { artistPageClientProps } from '@/lib/artists/pageProps';
+import { artistHeroFaceSources } from '@/lib/images/artistFace';
+import {
+  artistPageFaceSong,
+  isArtistOwner,
+  selectArtistPageSongs,
+} from '@/lib/artists/ownerSongs';
 import { adminGetArtist } from '@/lib/server/artistsAdmin';
+import { adminListOwnerArtistSongs } from '@/lib/server/songsAdmin';
+import { getArtistCardContext } from '@/lib/server/artistDisplay';
 import { verifiedViewerIdFromPage } from '@/lib/server/viewer';
 import { SITE_NAME, publicUrl, isDefaultTempoRange, shareImageUrl, brandOgImageUrl } from '@/lib/brand/site';
 import { getArtistSongs } from '@/lib/services/songs';
 import { SongCard } from '@/components/songs/SongCard';
 import { ArtistHero } from '@/components/artists/ArtistHero';
-import { coinBadgeFromArtist } from '@/lib/brand/coin';
+import { coinBadgeFromArtist, hasLaunchedCoin } from '@/lib/brand/coin';
+import { ArtistPageSkeleton } from '@/components/artists/ArtistPageSkeleton';
+import type { AIArtistDocument } from '@/types/firestore';
 import { fetchArtistCoinModule } from '@/lib/solana/fetchArtistCoinModule';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import { EmptyAction } from '@/components/states/EmptyAction';
+import { OwnerSongListRecovery } from '@/app/artists/[id]/OwnerSongListRecovery';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -63,21 +75,34 @@ export async function generateMetadata({ params }: ArtistPageProps): Promise<Met
   };
 }
 
-export default async function ArtistPage({ params }: ArtistPageProps) {
-  noStore();
-  const [viewerId, artist] = await Promise.all([
-    verifiedViewerIdFromPage(),
-    adminGetArtist(params.id),
-  ]);
-
-  rejectHiddenArtist(artist, viewerId);
-
-  const [songs, coin] = await Promise.all([
-    getArtistSongs(artist.id, 20),
+async function ArtistPageBody({
+  artist,
+  viewerId,
+}: {
+  artist: AIArtistDocument;
+  viewerId: string | null;
+}) {
+  const ownerView = isArtistOwner(viewerId, artist.ownerId);
+  const [fetchedSongs, coin, cards] = await Promise.all([
+    ownerView
+      ? adminListOwnerArtistSongs(artist.id, artist.ownerId)
+      : getArtistSongs(artist.id, 20),
     fetchArtistCoinModule(artist.pumpFun?.mint),
+    getArtistCardContext([artist.id]),
   ]);
+  const songs = selectArtistPageSongs(
+    fetchedSongs,
+    ownerView ? viewerId : null,
+    artist.ownerId,
+    artist.id
+  );
 
-  const clientProps = artistPageClientProps({ artist, songs, coin });
+  const faceSources = artistHeroFaceSources({
+    lockedLookUrl: cards.displays.get(artist.id)?.photoUrl ?? null,
+    avatarURL: artist.avatarURL,
+    song: artistPageFaceSong(songs, ownerView),
+  });
+  const clientProps = artistPageClientProps({ artist, songs, coin, faceSources });
   const view = clientProps.artist;
   const coinBadge = coinBadgeFromArtist(view);
   const style = view.styleDNA;
@@ -92,7 +117,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        <ArtistHero artist={view} coin={clientProps.coin}>
+        <ArtistHero artist={view} coin={clientProps.coin} faceSources={clientProps.faceSources}>
           {hasStyle ? (
             <div className="mb-12 grid grid-cols-1 gap-4 border-t border-border pt-6 sm:grid-cols-2">
               {style.genres.length > 0 && (
@@ -159,6 +184,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                   artistName={view.name}
                   ticker={coinBadge?.ticker}
                   coinIcon={coinBadge?.iconSrc}
+                  ownerCatalog={ownerView}
                 />
               ))}
             </div>
@@ -169,8 +195,27 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
           )}
         </section>
 
+        <OwnerSongListRecovery artistId={view.id} ownerId={view.ownerId} included={ownerView} />
         <CommentsSection targetType="artist" targetId={view.id} />
       </main>
     </div>
+  );
+}
+
+export default async function ArtistPage({ params }: ArtistPageProps) {
+  noStore();
+  const [viewerId, artist] = await Promise.all([
+    verifiedViewerIdFromPage(),
+    adminGetArtist(params.id),
+  ]);
+
+  // notFound() runs before any Suspense fallback is flushed, so the status
+  // stays 404. Slow songs and the coin quote stream inside the shell.
+  rejectHiddenArtist(artist, viewerId);
+
+  return (
+    <Suspense fallback={<ArtistPageSkeleton showCoin={hasLaunchedCoin(artist.pumpFun)} />}>
+      <ArtistPageBody artist={artist} viewerId={viewerId} />
+    </Suspense>
   );
 }

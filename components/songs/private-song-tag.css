@@ -1,0 +1,26 @@
+/* Owner-only private song chip. Ice at 60%, hairline border, no fill. */
+
+.private-song-tag {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 4px;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid #2A2A38;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(232, 230, 242, 0.6);
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.private-song-tag svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}

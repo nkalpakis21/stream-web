@@ -6,6 +6,7 @@ import { Search } from 'lucide-react';
 import { DiscoverSongCard } from '@/components/discover/DiscoverSongCard';
 import { InfiniteScrollSentinel } from '@/components/discover/InfiniteScrollSentinel';
 import { SongCardSkeleton, SongCardSkeletonGrid } from '@/components/discover/SongCardSkeleton';
+import { DiscoverPageSkeleton } from '@/components/discover/DiscoverPageSkeleton';
 import { EmptyAction } from '@/components/states/EmptyAction';
 import { useInfiniteSongs, type DiscoverSort } from '@/hooks/useInfiniteSongs';
 
@@ -238,7 +239,7 @@ function DiscoverPageInner() {
 
 export default function DiscoverPage() {
   return (
-    <Suspense fallback={<SongCardSkeletonGrid showCluster />}>
+    <Suspense fallback={<DiscoverPageSkeleton />}>
       <DiscoverPageInner />
     </Suspense>
   );

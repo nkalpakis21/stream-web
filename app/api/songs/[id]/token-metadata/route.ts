@@ -5,21 +5,32 @@
  * Used as the URI when minting SPL tokens.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSong } from '@/lib/services/songs';
+import { NextRequest } from 'next/server';
+import { noStoreJson } from '@/lib/http/noStore';
+import { adminGetSong } from '@/lib/server/songsAdmin';
+import { verifiedViewerIdFromRequest } from '@/lib/server/viewer';
+import { songIsVisible } from '@/lib/songs/visibility';
 import { getArtistCardContext } from '@/lib/server/artistDisplay';
 import { resolveCoverPoster } from '@/lib/covers/resolve';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const songId = params.id;
-    const song = await getSong(songId);
+    const songId = params.id?.trim();
+    if (!songId) return noStoreJson({ error: 'Song not found' }, 404);
+    const [viewerId, song] = await Promise.all([
+      verifiedViewerIdFromRequest(request),
+      adminGetSong(songId),
+    ]);
 
-    if (!song || song.deletedAt) {
-      return NextResponse.json({ error: 'Song not found' }, { status: 404 });
+    if (!songIsVisible(song, viewerId)) {
+      return noStoreJson({ error: 'Song not found' }, 404);
     }
 
     const { displays } = await getArtistCardContext([song.artistId]);
@@ -46,16 +57,9 @@ export async function GET(
       external_url: songUrl,
     };
 
-    return NextResponse.json(metadata, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    return noStoreJson(metadata);
   } catch (error) {
     console.error('[API /songs/[id]/token-metadata] Error:', error);
-    return NextResponse.json(
-      { error: 'Failed to get token metadata' },
-      { status: 500 }
-    );
+    return noStoreJson({ error: 'Song not found' }, 404);
   }
 }

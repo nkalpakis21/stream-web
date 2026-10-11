@@ -1,11 +1,17 @@
+import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
+import { unstable_noStore as noStore } from 'next/cache';
 import type { Metadata } from 'next';
-import { getSong } from '@/lib/services/songs';
-import { getSongVersion } from '@/lib/services/songVersions';
-import { getSongGenerations } from '@/lib/services/generations';
 import { getArtistCardContext } from '@/lib/server/artistDisplay';
 import { formatDistanceToNow } from 'date-fns';
-import { getSongVersions } from '@/lib/services/songs';
+import {
+  adminGetSong,
+  adminGetSongGenerations,
+  adminGetSongVersions,
+} from '@/lib/server/songsAdmin';
+import { verifiedViewerIdFromPage } from '@/lib/server/viewer';
+import { hiddenSongPageMetadata, rejectHiddenSong } from '@/lib/songs/visibility';
+import { toPlain, type Plain } from '@/lib/serialize/toPlain';
 import { VersionCards } from '@/components/songs/VersionCards';
 import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
 import { SITE_NAME, publicUrl, coverArtAlt, shareImageUrl, brandOgImageUrl } from '@/lib/brand/site';
@@ -13,13 +19,29 @@ import { coverFieldsFromSong, resolveCoverPoster } from '@/lib/covers/resolve';
 import { ArtistCoinBuy } from '@/components/artists/ArtistCoinBuy';
 import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
 import { SongStage } from '@/components/songs/SongStage';
+import { SongStageSkeleton } from '@/components/songs/SongStageSkeleton';
 import { getLyricsForSong } from '@/lib/services/lyrics';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
+import type { SongDocument, SongVersionDocument } from '@/types/firestore';
 
-// Force dynamic rendering to always fetch fresh data from Firestore
+function primaryVersion(
+  song: { currentVersionId?: string },
+  versions: Array<{ id: string; audioURL?: string | null; isPrimary?: boolean }>
+) {
+  return (
+    versions.find(version => version.isPrimary && version.audioURL) ||
+    versions.find(version => version.id === song.currentVersionId && version.audioURL) ||
+    versions.find(version => version.audioURL) ||
+    versions.find(version => version.id === song.currentVersionId) ||
+    versions[0]
+  );
+}
+
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 interface SongPageProps {
   params: {
@@ -28,25 +50,18 @@ interface SongPageProps {
 }
 
 export async function generateMetadata({ params }: SongPageProps): Promise<Metadata> {
-  const song = await getSong(params.id);
-  
-  if (!song || song.deletedAt) {
-    notFound();
+  noStore();
+  const [viewerId, song] = await Promise.all([
+    verifiedViewerIdFromPage(),
+    adminGetSong(params.id),
+  ]);
+  rejectHiddenSong(song, viewerId);
+  // The owner can open a private song. The title still stays out of the tags.
+  if (song.isPublic !== true) {
+    return hiddenSongPageMetadata();
   }
 
-  // Get all versions to find primary version
-  const versions = await getSongVersions(song.id);
-  
-  // Find primary version, fallback to currentVersionId, then first version
-  const primaryVersion = versions.find(v => v.isPrimary && v.audioURL) || 
-                         versions.find(v => v.id === song.currentVersionId && v.audioURL) ||
-                         versions.find(v => v.audioURL) ||
-                         null;
-  
-  const [songVersion, artistContext] = await Promise.all([
-    getSongVersion(primaryVersion?.id || song.currentVersionId),
-    getArtistCardContext([song.artistId]),
-  ]);
+  const artistContext = await getArtistCardContext([song.artistId]);
   const artist = artistContext.displays.get(song.artistId) ?? null;
 
   const ogImageUrl = shareImageUrl(resolveCoverPoster(song));
@@ -85,57 +100,30 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
   };
 }
 
-export default async function SongPage({ params }: SongPageProps) {
-  const song = await getSong(params.id);
-
-  if (!song || song.deletedAt) {
-    notFound();
-  }
-
-  // Check if song is public or user has access
-  // TODO: Add auth check for private songs
-
-  const [artistContext, allVersions, generations] = await Promise.all([
+async function SongPageBody({
+  song,
+  allVersions,
+}: {
+  song: Plain<SongDocument>;
+  allVersions: Plain<SongVersionDocument>[];
+}) {
+  const [artistContext, generations] = await Promise.all([
     getArtistCardContext([song.artistId]),
-    getSongVersions(song.id),
-    getSongGenerations(song.id),
+    adminGetSongGenerations(song.id),
   ]);
   const artist = artistContext.displays.get(song.artistId) ?? null;
   const coinHint = artistContext.coins.get(song.artistId);
+  const primaryWithAudio = primaryVersion(song, allVersions);
 
-  // Find primary version for display - prioritize primary with audio, then currentVersionId, then any version
-  const primaryVersion = allVersions.find(v => v.isPrimary && v.audioURL) || 
-                         allVersions.find(v => v.id === song.currentVersionId && v.audioURL) ||
-                         allVersions.find(v => v.audioURL) ||
-                         null;
-  
-  const songVersion = primaryVersion || allVersions.find(v => v.id === song.currentVersionId) || allVersions[0];
-  
-  if (!songVersion) {
-    notFound();
-  }
-
-  const versions = allVersions;
-
-  const hasPendingGeneration = generations.some(g => g.status === 'pending' || g.status === 'processing');
-  const timeAgo = formatDistanceToNow(song.createdAt.toDate(), {
-    addSuffix: true,
-  });
-
-  // Convert Timestamp fields to plain objects for client components
-  // This prevents "Only plain objects can be passed to Client Components" warnings
-  const serializedVersions = versions.map(version => ({
-    ...version,
-    createdAt: version.createdAt.toMillis(), // Convert Timestamp to milliseconds
-  }));
+  const hasPendingGeneration = generations.some(
+    generation => generation.status === 'pending' || generation.status === 'processing'
+  );
+  const createdAt = typeof song.createdAt === 'number' ? song.createdAt : 0;
+  const timeAgo = formatDistanceToNow(createdAt, { addSuffix: true });
 
   const coverImageUrl = resolveCoverPoster(song);
   const cover = coverFieldsFromSong(song);
-  
-  // Use primary version audio URL (already found above)
-  const primaryAudioUrl = primaryVersion?.audioURL || null;
-
-  // Get lyrics from generations
+  const primaryAudioUrl = primaryWithAudio?.audioURL || null;
   const lyrics = getLyricsForSong(generations);
 
   const mint = coinHint?.mint?.trim() || '';
@@ -165,10 +153,10 @@ export default async function SongPage({ params }: SongPageProps) {
           coin={coin}
           buyUrl={buyUrl}
           shareUrl={shareUrl}
-          versions={serializedVersions.map(v => ({
-            id: v.id,
-            audioURL: v.audioURL,
-            isPrimary: v.isPrimary,
+          versions={allVersions.map(version => ({
+            id: version.id,
+            audioURL: version.audioURL,
+            isPrimary: version.isPrimary,
             duration: song.duration ?? null,
           }))}
         >
@@ -185,33 +173,46 @@ export default async function SongPage({ params }: SongPageProps) {
           )}
         </SongStage>
         <div className="mt-6 mb-10 flex flex-col items-start gap-3">
-            <SongOwnerActions
-              songId={song.id}
-              songTitle={song.title}
-              ownerId={song.ownerId}
-            />
-            <ArtistCoinBuy url={buyUrl} />
-            <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3">
-              Created {timeAgo}
-            </p>
+          <SongOwnerActions songId={song.id} songTitle={song.title} ownerId={song.ownerId} />
+          <ArtistCoinBuy url={buyUrl} />
+          <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3">
+            Created {timeAgo}
+          </p>
         </div>
 
-        {/* Version Cards */}
         <VersionCards
           songTitle={song.title}
           artistName={artist?.name || 'Unknown Artist'}
           artistId={artist?.id}
           albumCoverUrl={coverImageUrl}
-          initialVersions={serializedVersions}
+          initialVersions={allVersions}
           hasPendingGeneration={hasPendingGeneration}
           songId={song.id}
           ownerId={song.ownerId}
         />
 
-        {/* Comments Section */}
         <CommentsSection targetType="song" targetId={song.id} />
       </main>
     </div>
   );
 }
 
+export default async function SongPage({ params }: SongPageProps) {
+  noStore();
+  const [viewerId, song] = await Promise.all([
+    verifiedViewerIdFromPage(),
+    adminGetSong(params.id),
+  ]);
+  rejectHiddenSong(song, viewerId);
+
+  const allVersions = await adminGetSongVersions(song.id);
+  if (!primaryVersion(song, allVersions)) {
+    notFound();
+  }
+
+  return (
+    <Suspense fallback={<SongStageSkeleton />}>
+      <SongPageBody song={toPlain(song)} allVersions={toPlain(allVersions)} />
+    </Suspense>
+  );
+}

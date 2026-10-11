@@ -61,7 +61,14 @@ function getAdminApp(): admin.app.App {
       _adminApp = admin.app();
       return _adminApp;
     }
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    if (process.env.FIRESTORE_EMULATOR_HOST) {
+      const projectId =
+        process.env.GCLOUD_PROJECT ||
+        process.env.GOOGLE_CLOUD_PROJECT ||
+        process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+        'demo-stream-http';
+      _adminApp = admin.initializeApp({ projectId });
+    } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
       const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
       _adminApp = admin.initializeApp(
         adminAppOptions(admin.credential.cert(serviceAccount))

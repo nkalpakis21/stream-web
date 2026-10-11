@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { StudioCreateCards } from '@/components/dashboard/StudioCreateCards';
 import { UserArtistsSection } from '@/components/profile/UserArtistsSection';
 import { UserSongsSection } from '@/components/profile/UserSongsSection';
 import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
@@ -24,41 +25,7 @@ export function OverviewTab({
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <Link
-          href="/dashboard?tab=artists&new=1"
-          className="group rounded-xl border border-white/10 bg-card/60 p-6 sm:p-8 hover:border-primary/40 transition-colors"
-        >
-          <p className="text-xs font-medium uppercase tracking-wide text-primary">Create</p>
-          <h3 className="mt-2 text-xl font-bold text-foreground">Artist</h3>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Photo first. Name, lore, voice. Coin optional.
-          </p>
-          <span className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-primary">
-            Open
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </span>
-        </Link>
-
-        <Link
-          href="/dashboard?tab=songs&new=1"
-          className="group rounded-xl border border-white/10 bg-card/60 p-6 sm:p-8 hover:border-primary/40 transition-colors"
-        >
-          <p className="text-xs font-medium uppercase tracking-wide text-primary">Generate</p>
-          <h3 className="mt-2 text-xl font-bold text-foreground">Song</h3>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Pick an artist, title, prompt. One generation.
-          </p>
-          <span className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-primary">
-            Open
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </span>
-        </Link>
-      </div>
+      <StudioCreateCards />
 
       {recentArtists.length > 0 && (
         <div>
@@ -90,6 +57,7 @@ export function OverviewTab({
             songs={recentSongs}
             songArtistMap={songArtistMap}
             artistDisplays={artistDisplays}
+            ownerCatalog
           />
         </div>
       )}

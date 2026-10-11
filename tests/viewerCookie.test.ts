@@ -52,6 +52,8 @@ const NO_STORE_ROUTES = [
   'app/api/conversations/[id]/route.ts',
   'app/api/conversations/[id]/messages/route.ts',
   'app/api/songs/[id]/route.ts',
+  'app/api/songs/[id]/token-metadata/route.ts',
+  'app/songs/[id]/page.tsx',
   'app/api/users/link-wallet/route.ts',
   'app/api/generations/[id]/status/route.ts',
   'app/api/generations/musicgpt/route.ts',
@@ -318,18 +320,21 @@ describe('viewer cache and private artist 404', () => {
     assert.equal(covered('/api/artists/search'), false);
     assert.equal(covered('/api/artists/display'), false);
     assert.equal(covered('/api/artists/Far2rKTQV98sbAf1iqxw/coin-quote'), false);
-    assert.equal(covered('/songs/song-1'), false);
+    assert.equal(covered('/songs/song-1'), true);
+    assert.equal(covered('/api/songs/song-1/token-metadata'), true);
   });
 
-  it('keeps public song pages free of viewer identity in the server render', () => {
+  it('gates the song page on a verified viewer and keeps the private title out of metadata', () => {
     const song = read('app/songs/[id]/page.tsx');
-    assert.match(song, /export const dynamic = 'force-dynamic'/);
-    assert.equal(song.includes('ss_viewer'), false);
-    assert.equal(song.includes('verifiedViewer'), false);
-    assert.equal(song.includes('VIEWER_COOKIE'), false);
-    assert.equal(song.includes('cookies('), false);
-    assert.equal(song.includes('authorization'), false);
+    assert.match(song, /verifiedViewerIdFromPage\(/);
+    assert.match(song, /adminGetSong\(/);
+    assert.match(song, /rejectHiddenSong\(/);
+    assert.match(song, /hiddenSongPageMetadata\(/);
+    assert.match(song, /toPlain\(/);
     assert.equal(song.includes('requireUser'), false);
+    assert.equal(song.includes('ss_viewer'), false);
+    assert.match(read('app/songs/[id]/not-found.tsx'), /This song isn't on Streamstar\./);
+    assert.match(read('lib/songs/visibility.ts'), /song\.isPublic === true/);
     assert.equal(read('app/page.tsx').includes('ss_viewer'), false);
     assert.equal(read('app/artists/page.tsx').includes('ss_viewer'), false);
   });

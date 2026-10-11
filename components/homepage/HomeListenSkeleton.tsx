@@ -26,11 +26,11 @@ function LiveTileSkeleton() {
 
 export function HomeListenSkeleton() {
   return (
-    <div className="mx-auto max-w-7xl animate-pulse px-4 py-6 sm:px-6 sm:py-10">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">
-        <section className="rounded-xl border border-white/10 bg-card/60 p-4 sm:p-6">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(400px,0.9fr)]">
+        <section className="animate-pulse rounded-xl border border-white/10 bg-card/60 p-4 sm:p-6">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-            <div className="relative w-full max-w-[280px] sm:w-[240px] sm:max-w-none">
+            <div className="relative w-full max-w-[360px] sm:w-[320px] sm:max-w-none">
               <div className="relative aspect-square overflow-hidden rounded-cover bg-muted">
                 <span className="absolute inset-0 z-10 m-auto flex h-14 w-14 rounded-full bg-black/55" />
               </div>
@@ -48,8 +48,8 @@ export function HomeListenSkeleton() {
         </section>
 
         <section className="rounded-xl border border-white/10 bg-card/60 p-4 sm:p-5">
-          <div className="mb-3 h-4 w-12 rounded bg-muted" />
-          <ol className="flex flex-col">
+          <div className="mb-3 h-4 text-sm font-semibold tracking-wide text-foreground">Heat</div>
+          <ol className="flex animate-pulse flex-col">
             {Array.from({ length: 6 }).map((_, i) => (
               <HeatRowSkeleton key={i} />
             ))}
@@ -58,8 +58,11 @@ export function HomeListenSkeleton() {
       </div>
 
       <section className="mt-10">
-        <div className="mb-4 h-8 w-16 rounded bg-muted" />
-        <div className="-mx-4 flex gap-4 overflow-hidden px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:px-0 md:grid-cols-4 lg:grid-cols-6">
+        <div className="mb-4">
+          <h2 className="listen-title text-foreground">New</h2>
+          <p className="text-sm text-muted-foreground">Tracks on Streamstar right now.</p>
+        </div>
+        <div className="-mx-4 flex animate-pulse gap-4 overflow-hidden px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:px-0 md:grid-cols-4 lg:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
             <LiveTileSkeleton key={i} />
           ))}

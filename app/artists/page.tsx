@@ -1,4 +1,6 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
+import { ArtistsIndexSkeleton } from '@/components/artists/ArtistsIndexSkeleton';
 import { getPublicArtists } from '@/lib/services/artists';
 import { getPublicSongs } from '@/lib/services/songs';
 import { ArtistCard } from '@/components/artists/ArtistCard';
@@ -16,7 +18,7 @@ export const metadata: Metadata = {
   description: 'Artists on Streamstar.',
 };
 
-export default async function ArtistsPage() {
+async function ArtistsIndex() {
   const [artists, songs] = await Promise.all([
     getPublicArtists(50),
     getPublicSongs(400),
@@ -76,5 +78,13 @@ export default async function ArtistsPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function ArtistsPage() {
+  return (
+    <Suspense fallback={<ArtistsIndexSkeleton />}>
+      <ArtistsIndex />
+    </Suspense>
   );
 }
