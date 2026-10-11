@@ -1,6 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { connectFirestoreEmulator, getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getAnalytics, Analytics, isSupported } from 'firebase/analytics';
 
@@ -77,9 +77,23 @@ function getAuthInstance(): Auth {
   return _auth;
 }
 
+let emulatorConnected = false;
+
+function connectEmulatorIfConfigured(firestore: Firestore): void {
+  if (emulatorConnected || typeof window !== 'undefined') return;
+  const host = process.env.FIRESTORE_EMULATOR_HOST;
+  if (!host) return;
+  const [hostname, portRaw] = host.split(':');
+  const port = Number(portRaw || '8080');
+  if (!hostname || !Number.isFinite(port)) return;
+  connectFirestoreEmulator(firestore, hostname, port);
+  emulatorConnected = true;
+}
+
 function getDbInstance(): Firestore {
   if (!_db) {
     _db = getFirestore(getApp());
+    connectEmulatorIfConfigured(_db);
   }
   return _db;
 }

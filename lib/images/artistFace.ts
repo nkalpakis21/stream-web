@@ -5,6 +5,8 @@
  * CDNs lose to a stored asset when both exist.
  */
 
+import { publicArtistPhotoUrl } from '@/lib/artists/cardDisplay';
+
 function trimUrl(value: string | null | undefined): string | null {
   const url = value?.trim();
   return url ? url : null;
@@ -97,4 +99,19 @@ export function artistFaceSources(
   }
 
   return uniqueUrls([look, ...covers]);
+}
+
+/**
+ * Same face order as a song card: current-version look, then the artist
+ * document avatar, then that song's cover. An empty list means initials.
+ */
+export function artistHeroFaceSources(input: {
+  lockedLookUrl?: unknown;
+  avatarURL?: unknown;
+  song?: Parameters<typeof songCoverCandidates>[0];
+}): string[] {
+  return artistFaceSources(
+    publicArtistPhotoUrl(input.lockedLookUrl, input.avatarURL),
+    songCoverCandidates(input.song)
+  );
 }

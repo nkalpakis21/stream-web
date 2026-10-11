@@ -10,7 +10,7 @@ import { ArtistCoinBuy } from '@/components/artists/ArtistCoinBuy';
 import { useToast, ToastContainer } from '@/components/ui/toast';
 import { updateArtistAvatar } from '@/lib/services/artists';
 import { hasLaunchedCoin } from '@/lib/brand/coin';
-import { CoverImage } from '@/components/media/CoverImage';
+import { ArtistFace } from '@/components/artists/ArtistFace';
 import { AiMark } from '@/components/brand/AiMark';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { toPlain, type Plain } from '@/lib/serialize/toPlain';
@@ -19,10 +19,12 @@ import type { AIArtistDocument, PumpFunCoin } from '@/types/firestore';
 interface ArtistHeroProps {
   artist: Plain<AIArtistDocument>;
   coin?: ArtistCoinQuote | null;
+  /** Song-card face order. Empty means the initials disc, never a blank circle. */
+  faceSources?: string[];
   children?: React.ReactNode;
 }
 
-export function ArtistHero({ artist, coin = null, children }: ArtistHeroProps) {
+export function ArtistHero({ artist, coin = null, faceSources = [], children }: ArtistHeroProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const isOwner = Boolean(user && user.uid === artist.ownerId);
@@ -107,18 +109,7 @@ export function ArtistHero({ artist, coin = null, children }: ArtistHeroProps) {
       ) : (
         <div className="mb-12 flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
           <div className="flex min-w-0 flex-1 gap-5">
-            <div className="h-[120px] w-[120px] flex-shrink-0 overflow-hidden rounded-full bg-muted">
-              <div className="relative h-full w-full">
-                <CoverImage
-                  key={avatarURL || 'placeholder'}
-                  src={avatarURL}
-                  title={artist.name}
-                  sizes="120px"
-                  rounded="rounded-full"
-                  unoptimized={false}
-                />
-              </div>
-            </div>
+            <ArtistFace name={artist.name} sources={faceSources} size="hero" />
             <div className="min-w-0 flex-1">
               <div className="mb-2">
                 <AiMark />

@@ -1,8 +1,10 @@
+import { Suspense } from 'react';
 import { getPublicSongs, getTopSongs, getSongVersions } from '@/lib/services/songs';
 import { getArtistCardContext } from '@/lib/server/artistDisplay';
 import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { HomeListenShell } from '@/components/homepage/HomeListenShell';
+import { HomeListenSkeleton } from '@/components/homepage/HomeListenSkeleton';
 import type { SongDocument } from '@/types/firestore';
 import { coverFieldsFromSong } from '@/lib/covers/resolve';
 
@@ -26,7 +28,7 @@ async function firstPlayableAudio(songs: SongDocument[]): Promise<{ song: SongDo
   return null;
 }
 
-export default async function HomePage() {
+async function HomeListenContent() {
   const [latestSongs, topSongs] = await Promise.all([
     getPublicSongs(LIVE_FETCH),
     getTopSongs(HEAT_LIMIT),
@@ -72,8 +74,7 @@ export default async function HomePage() {
   };
 
   return (
-    <main className="min-h-screen bg-background">
-      <HomeListenShell
+    <HomeListenShell
         featured={
           featured
             ? {
@@ -106,6 +107,15 @@ export default async function HomePage() {
           coin: null,
         }))}
       />
+  );
+}
+
+export default function HomePage() {
+  return (
+    <main className="min-h-screen bg-background">
+      <Suspense fallback={<HomeListenSkeleton />}>
+        <HomeListenContent />
+      </Suspense>
     </main>
   );
 }

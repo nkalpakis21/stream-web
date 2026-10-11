@@ -8,6 +8,7 @@ import { NewChatModal } from '@/components/chat/NewChatModal';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useToast, ToastContainer } from '@/components/ui/toast';
 import { AuthGateCard } from '@/components/auth/AuthGateCard';
+import { ChatPageSkeleton } from '@/components/chat/ChatPageSkeleton';
 import { getFreshIdToken } from '@/lib/api/clientAuth';
 
 function ChatPageContent() {
@@ -125,15 +126,7 @@ function ChatPageContent() {
   };
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-          <div className="text-center">
-            <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin mx-auto" />
-          </div>
-        </main>
-      </div>
-    );
+    return <ChatPageSkeleton />;
   }
 
   if (!user) {
@@ -195,15 +188,7 @@ function ChatPageContent() {
 
 export default function ChatPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-background">
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-          <div className="text-center">
-            <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin mx-auto" />
-          </div>
-        </main>
-      </div>
-    }>
+    <Suspense fallback={<ChatPageSkeleton />}>
       <ChatPageContent />
     </Suspense>
   );

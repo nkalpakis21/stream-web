@@ -9,12 +9,15 @@ interface UserSongsSectionProps {
   songs: SongDocument[];
   songArtistMap: Map<string, string>;
   artistDisplays?: Map<string, ArtistCardDisplay>;
+  /** Studio overview is the owner's catalog. Other callers leave this off. */
+  ownerCatalog?: boolean;
 }
 
 export function UserSongsSection({
   songs,
   songArtistMap,
   artistDisplays,
+  ownerCatalog = false,
 }: UserSongsSectionProps) {
   if (songs.length === 0) {
     return (
@@ -59,11 +62,12 @@ export function UserSongsSection({
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         {songs.slice(0, 12).map(song => (
-          <SongCard 
-            key={song.id} 
-            song={song} 
+          <SongCard
+            key={song.id}
+            song={song}
             artistName={songArtistMap.get(song.id)}
             artist={artistDisplays?.get(song.artistId) ?? null}
+            ownerCatalog={ownerCatalog}
           />
         ))}
       </div>

@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ConnectionProvider,
   WalletProvider,
 } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
+import type { Adapter } from '@solana/wallet-adapter-base';
 import { clusterApiUrl } from '@solana/web3.js';
 
 import { WalletSessionEffects } from '@/hooks/useWalletSession';
@@ -25,10 +26,14 @@ export function SolanaWalletProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
-  const wallets = useMemo(
-    () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
-    []
-  );
+  // Adapters touch the browser. Build them after mount so the layout can
+  // server-render children. A dynamic({ ssr: false }) wrapper around this
+  // provider bails the whole document out to client rendering and locks
+  // notFound() responses at HTTP 200.
+  const [wallets, setWallets] = useState<Adapter[]>([]);
+  useEffect(() => {
+    setWallets([new PhantomWalletAdapter(), new SolflareWalletAdapter()]);
+  }, []);
 
   return (
     <ConnectionProvider endpoint={endpoint}>

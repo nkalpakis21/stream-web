@@ -56,6 +56,7 @@ export function SongsTab({
               song={song}
               artistName={songArtistMap.get(song.id)}
               artist={artistDisplays?.get(song.artistId) ?? null}
+              ownerCatalog
             />
           ))}
         </div>

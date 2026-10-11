@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getSong } from '@/lib/services/songs';
@@ -13,10 +14,41 @@ import { coverFieldsFromSong, resolveCoverPoster } from '@/lib/covers/resolve';
 import { ArtistCoinBuy } from '@/components/artists/ArtistCoinBuy';
 import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
 import { SongStage } from '@/components/songs/SongStage';
+import { SongStageSkeleton } from '@/components/songs/SongStageSkeleton';
 import { getLyricsForSong } from '@/lib/services/lyrics';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
+import type { SongDocument, SongVersionDocument } from '@/types/firestore';
+
+function isPermissionDenied(error: unknown): boolean {
+  if (!error || typeof error !== 'object' || !('code' in error)) return false;
+  const code = String((error as { code: unknown }).code);
+  return code === 'permission-denied' || code.endsWith('/permission-denied');
+}
+
+/** Missing and private songs are the same screen: the track isn't available. */
+async function loadSong(songId: string): Promise<SongDocument | null> {
+  try {
+    return await getSong(songId);
+  } catch (error) {
+    if (isPermissionDenied(error)) return null;
+    throw error;
+  }
+}
+
+function primaryVersion(
+  song: SongDocument,
+  versions: SongVersionDocument[]
+): SongVersionDocument | undefined {
+  return (
+    versions.find(v => v.isPrimary && v.audioURL) ||
+    versions.find(v => v.id === song.currentVersionId && v.audioURL) ||
+    versions.find(v => v.audioURL) ||
+    versions.find(v => v.id === song.currentVersionId) ||
+    versions[0]
+  );
+}
 
 // Force dynamic rendering to always fetch fresh data from Firestore
 export const dynamic = 'force-dynamic';
@@ -28,8 +60,8 @@ interface SongPageProps {
 }
 
 export async function generateMetadata({ params }: SongPageProps): Promise<Metadata> {
-  const song = await getSong(params.id);
-  
+  const song = await loadSong(params.id);
+
   if (!song || song.deletedAt) {
     notFound();
   }
@@ -85,35 +117,24 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
   };
 }
 
-export default async function SongPage({ params }: SongPageProps) {
-  const song = await getSong(params.id);
-
-  if (!song || song.deletedAt) {
-    notFound();
-  }
-
-  // Check if song is public or user has access
-  // TODO: Add auth check for private songs
-
-  const [artistContext, allVersions, generations] = await Promise.all([
+async function SongPageBody({
+  song,
+  allVersions,
+}: {
+  song: SongDocument;
+  allVersions: SongVersionDocument[];
+}) {
+  const [artistContext, generations] = await Promise.all([
     getArtistCardContext([song.artistId]),
-    getSongVersions(song.id),
     getSongGenerations(song.id),
   ]);
   const artist = artistContext.displays.get(song.artistId) ?? null;
   const coinHint = artistContext.coins.get(song.artistId);
-
-  // Find primary version for display - prioritize primary with audio, then currentVersionId, then any version
-  const primaryVersion = allVersions.find(v => v.isPrimary && v.audioURL) || 
-                         allVersions.find(v => v.id === song.currentVersionId && v.audioURL) ||
-                         allVersions.find(v => v.audioURL) ||
-                         null;
-  
-  const songVersion = primaryVersion || allVersions.find(v => v.id === song.currentVersionId) || allVersions[0];
-  
-  if (!songVersion) {
-    notFound();
-  }
+  const primaryWithAudio =
+    allVersions.find(v => v.isPrimary && v.audioURL) ||
+    allVersions.find(v => v.id === song.currentVersionId && v.audioURL) ||
+    allVersions.find(v => v.audioURL) ||
+    null;
 
   const versions = allVersions;
 
@@ -133,7 +154,7 @@ export default async function SongPage({ params }: SongPageProps) {
   const cover = coverFieldsFromSong(song);
   
   // Use primary version audio URL (already found above)
-  const primaryAudioUrl = primaryVersion?.audioURL || null;
+  const primaryAudioUrl = primaryWithAudio?.audioURL || null;
 
   // Get lyrics from generations
   const lyrics = getLyricsForSong(generations);
@@ -212,6 +233,26 @@ export default async function SongPage({ params }: SongPageProps) {
         <CommentsSection targetType="song" targetId={song.id} />
       </main>
     </div>
+  );
+}
+
+export default async function SongPage({ params }: SongPageProps) {
+  const song = await loadSong(params.id);
+
+  if (!song || song.deletedAt) {
+    notFound();
+  }
+
+  const allVersions = await getSongVersions(song.id);
+  const songVersion = primaryVersion(song, allVersions);
+  if (!songVersion) {
+    notFound();
+  }
+
+  return (
+    <Suspense fallback={<SongStageSkeleton />}>
+      <SongPageBody song={song} allVersions={allVersions} />
+    </Suspense>
   );
 }
 

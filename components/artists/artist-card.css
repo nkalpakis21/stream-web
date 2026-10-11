@@ -75,6 +75,15 @@
   font-size: 14px;
 }
 
+.artist-face-hero {
+  width: 120px;
+  height: 120px;
+}
+
+.artist-face-hero .artist-index-face-initials {
+  font-size: 36px;
+}
+
 .artist-index-face-initials {
   display: flex;
   width: 100%;
