@@ -3,7 +3,7 @@ import { artistIsVisible } from '@/lib/artists/visibility';
 import { getArtist } from '@/lib/services/artists';
 import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
 import { noStoreJson } from '@/lib/http/noStore';
-import { isXConfigured, X_CLIENT_ID_MISSING_MESSAGE } from '@/lib/x/config';
+import { isXConfigured } from '@/lib/x/config';
 import { getArtistAdmin, publicXConnection } from '@/lib/x/artistStore';
 import { emptyXConnection, type XPostLogEntry } from '@/types/firestore';
 
@@ -50,7 +50,6 @@ export async function GET(
     if (!available) {
       return noStoreJson({
         available: false,
-        message: X_CLIENT_ID_MISSING_MESSAGE,
         x: emptyXConnection(),
       });
     }

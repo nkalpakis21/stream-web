@@ -22,6 +22,8 @@ interface ArtistOwnerPanelProps {
   onLoreSaved: (lore: string) => void;
   locking: boolean;
   showLaunch: boolean;
+  followerCount?: number | null;
+  xConfigured?: boolean;
   onLaunched: (coin: PumpFunCoin) => void;
 }
 
@@ -34,6 +36,8 @@ export function ArtistOwnerPanel({
   onLoreSaved,
   locking,
   showLaunch,
+  followerCount = null,
+  xConfigured = false,
   onLaunched,
 }: ArtistOwnerPanelProps) {
   const coinBadge = coinBadgeFromArtist({ ...artist, avatarURL });
@@ -76,7 +80,7 @@ export function ArtistOwnerPanel({
             </div>
           ) : null}
           <div className="owner-identity-followers">
-            <FollowersList artistId={artist.id} />
+            <FollowersList artistId={artist.id} count={followerCount} />
           </div>
           <p
             className="owner-identity-bio"
@@ -94,7 +98,11 @@ export function ArtistOwnerPanel({
 
       <div className="owner-flat-card">
         <Suspense fallback={null}>
-          <ArtistXPanel artistId={artist.id} ownerId={artist.ownerId} />
+          <ArtistXPanel
+            artistId={artist.id}
+            ownerId={artist.ownerId}
+            configured={xConfigured}
+          />
         </Suspense>
         {showLaunch ? (
           <>

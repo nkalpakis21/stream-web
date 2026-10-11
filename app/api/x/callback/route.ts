@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
   if (!isXConfigured()) {
     return redirectToArtist(request, artistId, {
       x: 'error',
-      xMessage: 'X is not configured (X_CLIENT_ID).',
+      xMessage: 'X connect is unavailable.',
     });
   }
 

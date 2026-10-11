@@ -21,10 +21,7 @@ export async function startArtistXConnect(
   });
   const data = await res.json().catch(() => ({}));
   if (res.status === 503 || data.available === false) {
-    return (
-      data.error ||
-      'X is not configured (set X_CLIENT_ID and X_CLIENT_SECRET). Your artist was created without X connected.'
-    );
+    return 'unavailable';
   }
   if (!res.ok || !data.authorizeUrl) {
     return data.error || 'Could not start X connect. Open the artist page to try again.';

@@ -3,7 +3,7 @@ import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
 import { noStoreJson } from '@/lib/http/noStore';
 import { artistIsVisible } from '@/lib/artists/visibility';
 import { getArtist } from '@/lib/services/artists';
-import { isXConfigured, X_CLIENT_ID_MISSING_MESSAGE } from '@/lib/x/config';
+import { isXConfigured } from '@/lib/x/config';
 import { emptyXConnection } from '@/types/firestore';
 import { getArtistAdmin, updateArtistX } from '@/lib/x/artistStore';
 import { deleteXAuth, loadXAuth } from '@/lib/x/tokens';
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     const userId = await requireUserId(request);
     if (!isXConfigured()) {
       return noStoreJson(
-        { error: X_CLIENT_ID_MISSING_MESSAGE, available: false },
+        { available: false },
         503
       );
     }

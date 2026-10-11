@@ -50,8 +50,12 @@ function DashboardContent() {
         setSongs(userSongs);
         setArtists(userArtists);
 
-        if (userSongs.length > 0) {
-          const displays = await fetchArtistCardDisplays(userSongs.map(song => song.artistId));
+        const displayIds = [
+          ...userArtists.map(artist => artist.id),
+          ...userSongs.map(song => song.artistId),
+        ];
+        if (displayIds.length > 0) {
+          const displays = await fetchArtistCardDisplays(displayIds);
           setArtistDisplays(displays);
           const artistMap = new Map<string, string>();
           userSongs.forEach(song => {
@@ -112,6 +116,8 @@ function DashboardContent() {
           {activeTab === 'artists' && (
             <ArtistsTab
               artists={artists}
+              songs={songs}
+              displays={artistDisplays}
               onArtistCreated={() => {
                 // Reload artists when one is created
                 getUserArtists(user.uid).then(setArtists);

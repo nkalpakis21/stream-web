@@ -4,7 +4,7 @@ import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
 import { noStoreJson } from '@/lib/http/noStore';
 import { artistIsVisible } from '@/lib/artists/visibility';
 import { getArtist } from '@/lib/services/artists';
-import { isXConfigured, X_CLIENT_ID_MISSING_MESSAGE } from '@/lib/x/config';
+import { isXConfigured } from '@/lib/x/config';
 import { buildAuthorizeUrl } from '@/lib/x/oauth';
 import { signOAuthSession } from '@/lib/x/pkce';
 import { getArtistAdmin } from '@/lib/x/artistStore';
@@ -26,10 +26,7 @@ export async function POST(request: NextRequest) {
   try {
     const userId = await requireUserId(request);
     if (!isXConfigured()) {
-      return noStoreJson(
-        { error: X_CLIENT_ID_MISSING_MESSAGE, available: false },
-        503
-      );
+      return noStoreJson({ available: false }, 503);
     }
     const body = (await request.json().catch(() => ({}))) as { artistId?: string };
     const artistId = body.artistId?.trim();

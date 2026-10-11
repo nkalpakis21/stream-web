@@ -1,18 +1,30 @@
 'use client';
 
-import type { AIArtistDocument } from '@/types/firestore';
-import { ArtistCard } from '@/components/artists/ArtistCard';
+import type { AIArtistDocument, SongDocument } from '@/types/firestore';
+import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
+import { StudioArtistTiles } from '@/components/dashboard/StudioArtistTile';
 import Link from 'next/link';
 
 interface UserArtistsSectionProps {
   artists: AIArtistDocument[];
+  songs?: readonly SongDocument[];
+  displays?: Map<string, ArtistCardDisplay>;
+  /** Overview already prints the section heading. */
+  embedded?: boolean;
 }
 
-export function UserArtistsSection({ artists }: UserArtistsSectionProps) {
+export function UserArtistsSection({
+  artists,
+  songs = [],
+  displays,
+  embedded = false,
+}: UserArtistsSectionProps) {
   if (artists.length === 0) {
     return (
       <section className="mb-16">
-        <h2 className="text-xl font-semibold mb-6 text-foreground">Your Artists</h2>
+        {embedded ? null : (
+          <h2 className="text-xl font-semibold mb-6 text-foreground">Your Artists</h2>
+        )}
         <div className="bg-card/50 border border-border/40 rounded-xl p-16 text-center">
           <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
             <svg className="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -37,24 +49,26 @@ export function UserArtistsSection({ artists }: UserArtistsSectionProps) {
     );
   }
 
+  const showViewAll = artists.length > 8;
+
   return (
-    <section className="mb-16">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-foreground">Your Artists</h2>
-        {artists.length > 8 && (
-          <Link
-            href="/artists"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            View all
-          </Link>
-        )}
-      </div>
-      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-5">
-        {artists.slice(0, 8).map(artist => (
-          <ArtistCard key={artist.id} artist={artist} />
-        ))}
-      </div>
+    <section className={embedded ? undefined : 'mb-16'}>
+      {!embedded || showViewAll ? (
+        <div className="flex items-center justify-between mb-6">
+          {embedded ? null : (
+            <h2 className="text-xl font-semibold text-foreground">Your Artists</h2>
+          )}
+          {showViewAll ? (
+            <Link
+              href="/artists"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              View all
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+      <StudioArtistTiles artists={artists.slice(0, 8)} songs={songs} displays={displays} />
     </section>
   );
 }

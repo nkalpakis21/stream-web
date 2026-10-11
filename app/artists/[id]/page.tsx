@@ -5,12 +5,11 @@ import { artistShareMetadata, hiddenArtistPageMetadata } from '@/lib/artists/vis
 import { rejectHiddenArtist } from '@/lib/artists/pageGate';
 import { artistPageClientProps } from '@/lib/artists/pageProps';
 import { artistHeroFaceSources } from '@/lib/images/artistFace';
-import {
-  artistPageFaceSong,
-  isArtistOwner,
-  selectArtistPageSongs,
-} from '@/lib/artists/ownerSongs';
+import { ClearOwnerRecovery } from '@/components/states/ClearOwnerRecovery';
+import { isArtistOwner, selectArtistPageSongs } from '@/lib/artists/ownerSongs';
 import { adminGetArtist } from '@/lib/server/artistsAdmin';
+import { adminCountFollowers } from '@/lib/server/followsCount';
+import { isXConfigured } from '@/lib/x/config';
 import { adminListOwnerArtistSongs } from '@/lib/server/songsAdmin';
 import { getArtistCardContext } from '@/lib/server/artistDisplay';
 import { verifiedViewerIdFromPage } from '@/lib/server/viewer';
@@ -83,12 +82,13 @@ async function ArtistPageBody({
   viewerId: string | null;
 }) {
   const ownerView = isArtistOwner(viewerId, artist.ownerId);
-  const [fetchedSongs, coin, cards] = await Promise.all([
+  const [fetchedSongs, coin, cards, followerCount] = await Promise.all([
     ownerView
       ? adminListOwnerArtistSongs(artist.id, artist.ownerId)
       : getArtistSongs(artist.id, 20),
     fetchArtistCoinModule(artist.pumpFun?.mint),
     getArtistCardContext([artist.id]),
+    adminCountFollowers(artist.id),
   ]);
   const songs = selectArtistPageSongs(
     fetchedSongs,
@@ -97,12 +97,19 @@ async function ArtistPageBody({
     artist.id
   );
 
+  const faceSongs = songs.filter(song => song.isPublic === true);
   const faceSources = artistHeroFaceSources({
     lockedLookUrl: cards.displays.get(artist.id)?.photoUrl ?? null,
     avatarURL: artist.avatarURL,
-    song: artistPageFaceSong(songs, ownerView),
+    songs: faceSongs.length > 0 ? faceSongs : ownerView ? songs : [],
   });
-  const clientProps = artistPageClientProps({ artist, songs, coin, faceSources });
+  const clientProps = artistPageClientProps({
+    artist,
+    songs,
+    coin,
+    faceSources,
+    followerCount,
+  });
   const view = clientProps.artist;
   const coinBadge = coinBadgeFromArtist(view);
   const style = view.styleDNA;
@@ -116,8 +123,15 @@ async function ArtistPageBody({
 
   return (
     <div className="min-h-screen bg-background">
+      <ClearOwnerRecovery kind="artist" id={artist.id} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        <ArtistHero artist={view} coin={clientProps.coin} faceSources={clientProps.faceSources}>
+        <ArtistHero
+          artist={view}
+          coin={clientProps.coin}
+          faceSources={clientProps.faceSources}
+          followerCount={clientProps.followerCount}
+          xConfigured={isXConfigured()}
+        >
           {hasStyle ? (
             <div className="mb-12 grid grid-cols-1 gap-4 border-t border-border pt-6 sm:grid-cols-2">
               {style.genres.length > 0 && (
