@@ -70,6 +70,7 @@ export function ArtistXPanel({
     setLoading(true);
     try {
       const res = await fetch(`/api/x/artists/${artistId}`, {
+        cache: 'no-store',
         headers: await authHeaders(user),
       });
       const data = await res.json().catch(() => ({}));

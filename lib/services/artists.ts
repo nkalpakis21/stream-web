@@ -26,6 +26,7 @@ import {
 } from '@/lib/firebase/collections';
 import { hasLaunchedCoin } from '@/lib/brand/coin';
 import { MAX_ARTIST_BIO_LENGTH } from '@/lib/brand/bio';
+import { isPermissionDenied } from '@/lib/artists/cardDisplay';
 import {
   emptyPumpFunCoin,
   emptyXConnection,
@@ -122,11 +123,16 @@ export async function getArtist(
   artistId: string
 ): Promise<AIArtistDocument | null> {
   const artistRef = doc(db, getArtistPath(artistId));
-  const snapshot = await getDoc(artistRef);
-  if (!snapshot.exists()) {
-    return null;
+  try {
+    const snapshot = await getDoc(artistRef);
+    if (!snapshot.exists()) {
+      return null;
+    }
+    return snapshot.data() as AIArtistDocument;
+  } catch (error) {
+    if (isPermissionDenied(error)) return null;
+    throw error;
   }
-  return snapshot.data() as AIArtistDocument;
 }
 
 /**
@@ -332,7 +338,7 @@ export async function getPublicArtists(
   // Handle both null and undefined (for older documents without deletedAt field)
   return snapshot.docs
     .map(doc => doc.data() as AIArtistDocument)
-    .filter(artist => !artist.deletedAt);
+    .filter(artist => artist.isPublic === true && !artist.deletedAt);
 }
 
 /**
@@ -486,9 +492,12 @@ export async function getArtistsByIds(
   
   for (let i = 0; i < artistIds.length; i += 10) {
     const batch = artistIds.slice(i, i + 10);
-    const artistPromises = batch.map(artistId => getArtist(artistId));
-    const batchArtists = await Promise.all(artistPromises);
-    artists.push(...batchArtists.filter((a): a is AIArtistDocument => a !== null));
+    const settled = await Promise.allSettled(batch.map(artistId => getArtist(artistId)));
+    for (const result of settled) {
+      if (result.status === 'fulfilled' && result.value) {
+        artists.push(result.value);
+      }
+    }
   }
 
   return artists;

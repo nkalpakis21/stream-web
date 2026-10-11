@@ -14,13 +14,31 @@ export async function adminGetArtist(artistId: string): Promise<AIArtistDocument
   return adminGetArtistFrom(getAdminDb(), artistId);
 }
 
+export async function adminGetArtistsByIds(artistIds: readonly string[]): Promise<AIArtistDocument[]> {
+  const unique = [...new Set(artistIds.map(id => id.trim()).filter(Boolean))];
+  const artists: AIArtistDocument[] = [];
+  const db = getAdminDb();
+  for (let i = 0; i < unique.length; i += 100) {
+    const chunk = unique.slice(i, i + 100);
+    const refs = chunk.map(id => db.collection(COLLECTIONS.artists).doc(id));
+    const snaps = await db.getAll(...refs);
+    for (const snap of snaps) {
+      if (!snap.exists) continue;
+      const data = snap.data() as AIArtistDocument;
+      artists.push({ ...data, id: data.id || snap.id });
+    }
+  }
+  return artists;
+}
+
 async function adminGetArtistFrom(
   db: Firestore,
   artistId: string
 ): Promise<AIArtistDocument | null> {
   const snap = await db.collection(COLLECTIONS.artists).doc(artistId).get();
   if (!snap.exists) return null;
-  return snap.data() as AIArtistDocument;
+  const data = snap.data() as AIArtistDocument;
+  return { ...data, id: data.id || snap.id };
 }
 
 async function adminGetArtistVersion(

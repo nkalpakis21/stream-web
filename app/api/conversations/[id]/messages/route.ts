@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
 import { adminGetMessages, adminSendMessage } from '@/lib/server/conversationsAdmin';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
 
 /**

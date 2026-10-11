@@ -9,6 +9,8 @@ import type { AIArtistDocument } from '@/types/firestore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 const MAX_QUOTES_CHUNK = 30;
 

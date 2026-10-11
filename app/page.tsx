@@ -1,8 +1,7 @@
-import { getPublicSongs, getTopSongs, getArtistNamesForSongs, getSongVersions } from '@/lib/services/songs';
-import { getArtistsData } from '@/lib/services/artists';
-import { coinBadgeFromArtist, hasLaunchedCoin, type CoinBadgeMeta } from '@/lib/brand/coin';
-import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
+import { getPublicSongs, getTopSongs, getSongVersions } from '@/lib/services/songs';
+import { getArtistCardContext } from '@/lib/server/artistDisplay';
 import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
+import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { HomeListenShell } from '@/components/homepage/HomeListenShell';
 import type { SongDocument } from '@/types/firestore';
 import { coverFieldsFromSong } from '@/lib/covers/resolve';
@@ -41,33 +40,35 @@ export default async function HomePage() {
   const allSongs = [...heat, ...live];
   const unique = Array.from(new Map(allSongs.map(s => [s.id, s])).values());
 
-  const [featured, artistNames, artists] = await Promise.all([
+  const [featured, artistContext] = await Promise.all([
     firstPlayableAudio(catalog),
-    getArtistNamesForSongs(unique),
-    getArtistsData(unique.map(s => s.artistId)),
+    getArtistCardContext(unique.map(song => song.artistId)),
   ]);
-
-  const badgeByArtist = new Map<string, CoinBadgeMeta | null>();
-  const mintByArtist = new Map<string, string>();
-  artists.forEach((artist, id) => {
-    badgeByArtist.set(id, coinBadgeFromArtist(artist));
-    const mint = artist.pumpFun?.mint?.trim();
-    if (hasLaunchedCoin(artist.pumpFun) && mint) {
-      mintByArtist.set(id, mint);
-    }
-  });
+  const { displays, coins } = artistContext;
 
   const heatArtistIds = new Set(heat.map(song => song.artistId));
   if (featured) heatArtistIds.add(featured.song.artistId);
   const heatMints = Array.from(heatArtistIds)
-    .map(id => mintByArtist.get(id))
+    .map(id => coins.get(id)?.mint)
     .filter((mint): mint is string => Boolean(mint));
   const quotes = await fetchCoinQuotes(heatMints);
 
   const quoteForArtist = (artistId: string): ArtistCoinQuote | null => {
-    const mint = mintByArtist.get(artistId);
+    const mint = coins.get(artistId)?.mint;
     if (!mint) return null;
     return quotes.get(mint) ?? null;
+  };
+
+  const artistFields = (artistId: string) => {
+    const display = displays.get(artistId);
+    const coin = coins.get(artistId);
+    return {
+      artistName: display?.name || 'Artist',
+      artistPhotoUrl: display?.photoUrl ?? null,
+      artistLinkable: display?.isPublic === true,
+      ticker: coin?.ticker ?? null,
+      coinIcon: coin?.coinIcon ?? null,
+    };
   };
 
   return (
@@ -78,12 +79,10 @@ export default async function HomePage() {
             ? {
                 songId: featured.song.id,
                 title: featured.song.title,
-                artistName: artistNames.get(featured.song.id) || 'Artist',
+                ...artistFields(featured.song.artistId),
                 artistId: featured.song.artistId,
                 cover: coverFieldsFromSong(featured.song),
                 audioUrl: featured.audioUrl,
-                ticker: badgeByArtist.get(featured.song.artistId)?.ticker ?? null,
-                coinIcon: badgeByArtist.get(featured.song.artistId)?.iconSrc ?? null,
                 coin: quoteForArtist(featured.song.artistId),
               }
             : null
@@ -91,23 +90,19 @@ export default async function HomePage() {
         heat={heat.map(song => ({
           id: song.id,
           title: song.title,
-          artistName: artistNames.get(song.id) || 'Artist',
+          ...artistFields(song.artistId),
           artistId: song.artistId,
           cover: coverFieldsFromSong(song),
           playCount: song.playCount ?? 0,
-          ticker: badgeByArtist.get(song.artistId)?.ticker ?? null,
-          coinIcon: badgeByArtist.get(song.artistId)?.iconSrc ?? null,
           coin: quoteForArtist(song.artistId),
         }))}
         live={live.map(song => ({
           id: song.id,
           title: song.title,
-          artistName: artistNames.get(song.id) || 'Artist',
+          ...artistFields(song.artistId),
           artistId: song.artistId,
           cover: coverFieldsFromSong(song),
           playCount: song.playCount ?? 0,
-          ticker: badgeByArtist.get(song.artistId)?.ticker ?? null,
-          coinIcon: badgeByArtist.get(song.artistId)?.iconSrc ?? null,
           coin: null,
         }))}
       />

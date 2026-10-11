@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getComments } from '@/lib/services/comments';
 import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
+import { commentClientPayload } from '@/lib/comments/author';
 import {
+  adminCountLiveComments,
   adminCreateComment,
   adminDeleteComment,
+  adminListComments,
+  adminListReplies,
   adminUpdateComment,
 } from '@/lib/server/commentsAdmin';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
 
 /**
@@ -50,20 +56,36 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const result = await getComments(targetType, targetId, limit, cursor);
+    if (searchParams.get('count') === '1') {
+      const liveCount = await adminCountLiveComments(targetType, targetId);
+      return NextResponse.json({ liveCount });
+    }
 
-    // Serialize Timestamps for client
-    const serializedComments = result.comments.map(comment => ({
-      ...comment,
-      createdAt: comment.createdAt.toMillis(),
-      updatedAt: comment.updatedAt.toMillis(),
-      deletedAt: comment.deletedAt ? comment.deletedAt.toMillis() : null,
-    }));
+    const parentCommentId = searchParams.get('parentCommentId');
+    const result = parentCommentId
+      ? await adminListReplies(parentCommentId, limit, cursor)
+      : await adminListComments(targetType, targetId, limit, cursor);
+
+    const serializedComments = result.comments.map(comment =>
+      commentClientPayload({
+        id: comment.id,
+        targetType: comment.targetType,
+        targetId: comment.targetId,
+        authorId: comment.authorId,
+        content: comment.content,
+        parentCommentId: comment.parentCommentId,
+        createdAt: comment.createdAt.toMillis(),
+        updatedAt: comment.updatedAt.toMillis(),
+        deletedAt: comment.deletedAt ? comment.deletedAt.toMillis() : null,
+        deleted: comment.deleted === true,
+      })
+    );
 
     return NextResponse.json({
       comments: serializedComments,
       nextCursor: result.nextCursor,
       hasMore: result.hasMore,
+      ...('liveCount' in result ? { liveCount: result.liveCount } : {}),
     });
   } catch (error) {
     console.error('[API /comments] Error:', error);
@@ -109,13 +131,18 @@ export async function POST(request: NextRequest) {
 
     const comment = await adminCreateComment(targetType, targetId, authorId, content, parentCommentId);
 
-    // Serialize Timestamps for client
-    const serialized = {
-      ...comment,
+    const serialized = commentClientPayload({
+      id: comment.id,
+      targetType: comment.targetType,
+      targetId: comment.targetId,
+      authorId: comment.authorId,
+      content: comment.content,
+      parentCommentId: comment.parentCommentId,
       createdAt: comment.createdAt.toMillis(),
       updatedAt: comment.updatedAt.toMillis(),
       deletedAt: comment.deletedAt ? comment.deletedAt.toMillis() : null,
-    };
+      deleted: comment.deleted === true,
+    });
 
     return NextResponse.json({
       comment: serialized,
@@ -206,9 +233,9 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await adminDeleteComment(commentId, authorId);
+    const outcome = await adminDeleteComment(commentId, authorId);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ outcome });
   } catch (error) {
     if (error instanceof HttpError) return errorResponse(error);
     console.error('[API /comments] Error:', error);

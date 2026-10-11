@@ -582,15 +582,14 @@ export async function getArtistNamesForSongs(
   // Get unique artist IDs
   const uniqueArtistIds = [...new Set(songs.map(song => song.artistId))];
   
-  // Fetch all artists in parallel
-  const artistPromises = uniqueArtistIds.map(artistId => getArtist(artistId));
-  const artists = await Promise.all(artistPromises);
-  
+  // One denied artist must not reject the whole page.
+  const settled = await Promise.allSettled(uniqueArtistIds.map(artistId => getArtist(artistId)));
+
   // Create a map of artistId -> artistName
   const artistMap = new Map<string, string>();
-  artists.forEach((artist, index) => {
-    if (artist) {
-      artistMap.set(uniqueArtistIds[index], artist.name);
+  settled.forEach((result, index) => {
+    if (result.status === 'fulfilled' && result.value) {
+      artistMap.set(uniqueArtistIds[index], result.value.name);
     }
   });
   

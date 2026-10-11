@@ -234,11 +234,50 @@ test('signed-out users can read public artists and songs', async () => {
   await assertSucceeds(getDocs(query(collection(anon, 'songs'), where('isPublic', '==', true))));
 });
 
+test('client get of a private artist is denied for signed-out and non-owner', async () => {
+  await seedCatalog();
+  await assertFails(getDoc(doc(dbFor(null), 'artists/privateArtist')));
+  await assertFails(getDoc(doc(dbFor('bob'), 'artists/privateArtist')));
+  await assertSucceeds(getDoc(doc(dbFor('alice'), 'artists/privateArtist')));
+});
+
 test('signed-out users cannot read private artists or songs', async () => {
   await seedCatalog();
   const anon = dbFor(null);
   await assertFails(getDoc(doc(anon, 'artists/privateArtist')));
   await assertFails(getDoc(doc(anon, 'songs/privateSong')));
+});
+
+test('a public song by a private artist is readable and the artist doc is not', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'artists/privateArtist'), artistData({
+      id: 'privateArtist',
+      ownerId: 'alice',
+      name: 'Hidden',
+      nameLowercase: 'hidden',
+      isPublic: false,
+    }));
+    await setDoc(doc(db, 'songs/publicByPrivate'), songData({
+      id: 'publicByPrivate',
+      artistId: 'privateArtist',
+      title: 'Still Public',
+      isPublic: true,
+      ownerId: 'alice',
+    }));
+  });
+  for (const uid of [null, 'bob']) {
+    const client = dbFor(uid);
+    const song = await assertSucceeds(getDoc(doc(client, 'songs/publicByPrivate')));
+    assert.equal(song.data().title, 'Still Public');
+    assert.equal(song.data().artistId, 'privateArtist');
+    await assertFails(getDoc(doc(client, 'artists/privateArtist')));
+    const listed = await assertSucceeds(getDocs(query(
+      collection(client, 'songs'),
+      where('isPublic', '==', true),
+    )));
+    assert.equal(listed.docs.some(snapshot => snapshot.id === 'publicByPrivate'), true);
+  }
+  await assertSucceeds(getDoc(doc(dbFor('alice'), 'artists/privateArtist')));
 });
 
 test('owner can read and list their own private catalog', async () => {
@@ -689,6 +728,33 @@ test('X tokens and song-post claims are unreadable and unwritable', async () => 
   }
 });
 
+test('clients cannot read or write xSongPosts or any subcollection', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'xSongPosts/song1'), {
+      songId: 'song1',
+      artistId: 'artist1',
+      status: 'posted',
+      accessToken: 'secret',
+    });
+    await setDoc(doc(db, 'xSongPosts/song1/attempts/a1'), {
+      body: 'secret post',
+    });
+  });
+  for (const uid of [null, 'alice', 'bob']) {
+    const client = dbFor(uid);
+    await assertFails(getDoc(doc(client, 'xSongPosts/song1')));
+    await assertFails(getDocs(collection(client, 'xSongPosts')));
+    await assertFails(getDoc(doc(client, 'xSongPosts/song1/attempts/a1')));
+    await assertFails(getDocs(collection(client, 'xSongPosts/song1/attempts')));
+    await assertFails(setDoc(doc(client, 'xSongPosts/song2'), { songId: 'song2', status: 'pending' }));
+    await assertFails(updateDoc(doc(client, 'xSongPosts/song1'), { status: 'stolen' }));
+    await assertFails(deleteDoc(doc(client, 'xSongPosts/song1')));
+    await assertFails(setDoc(doc(client, 'xSongPosts/song1/attempts/a2'), { body: 'nope' }));
+    await assertFails(updateDoc(doc(client, 'xSongPosts/song1/attempts/a1'), { body: 'nope' }));
+    await assertFails(deleteDoc(doc(client, 'xSongPosts/song1/attempts/a1')));
+  }
+});
+
 test('user profile get and display-name prefix search are public', async () => {
   await seedCatalog();
   await seed(async (db) => {
@@ -873,6 +939,70 @@ test('comments are publicly readable and only the author can write', async () =>
   await assertSucceeds(updateDoc(doc(alice, 'comments/c1'), { content: 'edited', updatedAt: now }));
   await assertFails(updateDoc(doc(dbFor('bob'), 'comments/c1'), { content: 'nope' }));
   await assertSucceeds(updateDoc(doc(alice, 'comments/c1'), { deletedAt: now }));
+});
+
+const TOMBSTONE_KEYS = ['createdAt', 'deleted', 'parentCommentId', 'targetId', 'targetType'];
+
+test('a comment tombstone get returns no author, body, name, or avatar', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'comments/tomb'), {
+      deleted: true,
+      parentCommentId: null,
+      targetType: 'song',
+      targetId: 'song1',
+      createdAt: now,
+    });
+  });
+  for (const uid of [null, 'bob', 'alice']) {
+    const snap = await assertSucceeds(getDoc(doc(dbFor(uid), 'comments/tomb')));
+    const data = snap.data();
+    assert.deepEqual(Object.keys(data).sort(), TOMBSTONE_KEYS);
+    assert.equal(data.deleted, true);
+    assert.equal(data.authorId, undefined);
+    assert.equal(data.content, undefined);
+    assert.equal(data.body, undefined);
+    assert.equal(data.name, undefined);
+    assert.equal(data.authorName, undefined);
+    assert.equal(data.avatar, undefined);
+    assert.equal(data.avatarURL, undefined);
+    assert.equal(data.photoURL, undefined);
+  }
+  // The live comment list requires deletedAt == null. A tombstone has no
+  // deletedAt, so that query cannot return its fields.
+  const liveList = await assertSucceeds(getDocs(query(
+    collection(dbFor(null), 'comments'),
+    where('targetType', '==', 'song'),
+    where('targetId', '==', 'song1'),
+    where('parentCommentId', '==', null),
+    where('deletedAt', '==', null),
+  )));
+  assert.deepEqual(liveList.docs.map(snapshot => snapshot.id), []);
+  await assertFails(getDocs(query(
+    collection(dbFor('bob'), 'comments'),
+    where('deleted', '==', true),
+  )));
+});
+
+test('a tombstone that still carries author, body, name, or avatar cannot be read', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'comments/dirty'), {
+      deleted: true,
+      parentCommentId: null,
+      targetType: 'song',
+      targetId: 'song1',
+      createdAt: now,
+      authorId: 'alice',
+      content: 'secret body',
+      body: 'secret body',
+      authorName: 'Alice',
+      name: 'Alice',
+      avatar: 'https://cdn.example/alice.png',
+      avatarURL: 'https://cdn.example/alice.png',
+    });
+  });
+  for (const uid of [null, 'bob', 'alice']) {
+    await assertFails(getDoc(doc(dbFor(uid), 'comments/dirty')));
+  }
 });
 
 test('conversations and messages stay inside the participant set', async () => {

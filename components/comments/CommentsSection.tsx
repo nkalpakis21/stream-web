@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { CommentThread } from './CommentThread';
 import { CommentForm } from './CommentForm';
-import { getComments, getReplies } from '@/lib/services/comments';
+import { getCommentCount, getComments } from '@/lib/services/comments';
+import type { CommentDeleteOutcome } from '@/lib/comments/live';
 import type { CommentDocument } from '@/types/firestore';
 import { MessageSquare } from 'lucide-react';
 import { AuthGateCard } from '@/components/auth/AuthGateCard';
@@ -33,6 +34,7 @@ export function CommentsSection({ targetType, targetId }: CommentsSectionProps) 
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [cursor, setCursor] = useState<string | null>(null);
+  const [liveCount, setLiveCount] = useState(0);
 
   const loadComments = useCallback(async (cursorParam: string | null = null) => {
     try {
@@ -53,6 +55,9 @@ export function CommentsSection({ targetType, targetId }: CommentsSectionProps) 
 
       setCursor(result.nextCursor);
       setHasMore(result.hasMore);
+      if (typeof result.liveCount === 'number') {
+        setLiveCount(result.liveCount);
+      }
     } catch (error) {
       console.error('Failed to load comments:', error);
     } finally {
@@ -60,16 +65,37 @@ export function CommentsSection({ targetType, targetId }: CommentsSectionProps) 
     }
   }, [targetType, targetId]);
 
+  const refreshCount = useCallback(async () => {
+    try {
+      const next = await getCommentCount(targetType, targetId);
+      setLiveCount(next);
+    } catch (error) {
+      console.error('Failed to count comments:', error);
+    }
+  }, [targetType, targetId]);
+
   useEffect(() => {
+    setLiveCount(0);
     loadComments();
   }, [loadComments]);
 
   const handleCommentAdded = (newComment: SerializedCommentDocument) => {
     setComments(prev => [newComment, ...prev]);
+    void refreshCount();
   };
 
-  const handleCommentDeleted = (commentId: string) => {
-    setComments(prev => prev.filter(c => c.id !== commentId));
+  const handleCommentDeleted = (commentId: string, outcome: CommentDeleteOutcome) => {
+    setComments(prev => {
+      if (outcome === 'tombstone') {
+        return prev.map(comment =>
+          comment.id === commentId
+            ? { ...comment, deleted: true, authorId: '', content: '' }
+            : comment
+        );
+      }
+      return prev.filter(comment => comment.id !== commentId);
+    });
+    void refreshCount();
   };
 
   const handleCommentUpdated = (updatedComment: SerializedCommentDocument) => {
@@ -81,8 +107,8 @@ export function CommentsSection({ targetType, targetId }: CommentsSectionProps) 
       <div className="flex items-center gap-2 mb-6">
         <MessageSquare className="w-5 h-5 text-muted-foreground" />
         <h2 className="text-2xl font-bold">Comments</h2>
-        {comments.length > 0 && (
-          <span className="text-sm text-muted-foreground">({comments.length})</span>
+        {liveCount > 0 && (
+          <span className="text-sm text-muted-foreground">({liveCount})</span>
         )}
       </div>
 
@@ -133,6 +159,7 @@ export function CommentsSection({ targetType, targetId }: CommentsSectionProps) 
               targetId={targetId}
               onCommentDeleted={handleCommentDeleted}
               onCommentUpdated={handleCommentUpdated}
+              onLiveCommentsChanged={refreshCount}
             />
           ))}
           

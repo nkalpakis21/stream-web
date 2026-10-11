@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { PlayableArt } from '@/components/songs/PlayableArt';
 import { CoinBadge } from '@/components/songs/CoinBadge';
+import { ArtistFace } from '@/components/artists/ArtistFace';
+import { MaybeArtistLink } from '@/components/songs/MaybeArtistLink';
 import { EmptyAction } from '@/components/states/EmptyAction';
 import { FeaturedCoinMeta, HeatTape } from '@/components/homepage/HeatTape';
 import { LoggedInEmptyCreateBanner, LoggedOutCreateBand } from '@/components/homepage/HomeCreateBands';
@@ -12,12 +14,15 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { useOwnedArtistCount } from '@/hooks/useOwnedArtistCount';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { playerCoverPayload, type CoverFields } from '@/lib/covers/resolve';
+import { artistFaceSources, songCoverCandidates } from '@/lib/images/artistFace';
 
 export interface ListenTrack {
   id: string;
   title: string;
   artistName: string;
   artistId: string;
+  artistPhotoUrl: string | null;
+  artistLinkable: boolean;
   cover: CoverFields;
   playCount: number;
   ticker: string | null;
@@ -30,6 +35,8 @@ interface FeaturedTrack {
   title: string;
   artistName: string;
   artistId: string;
+  artistPhotoUrl: string | null;
+  artistLinkable: boolean;
   cover: CoverFields;
   audioUrl: string;
   ticker: string | null;
@@ -116,16 +123,26 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                   {featured.title}
                 </h1>
                 <div className="mt-1 flex min-w-0 items-center gap-2">
-                  <Link
-                    href={`/artists/${featured.artistId}`}
+                  <ArtistFace
+                    name={featured.artistName}
+                    sources={artistFaceSources(featured.artistPhotoUrl, songCoverCandidates(featured.cover))}
+                    size="card"
+                  />
+                  <MaybeArtistLink
+                    artistId={featured.artistId}
+                    linkable={featured.artistLinkable}
                     className="min-w-0 truncate text-accent hover:text-ink"
-                    data-entity="artist"
+                    dataEntity="artist"
                   >
                     {featured.artistName}
-                  </Link>
+                  </MaybeArtistLink>
                   <CoinBadge ticker={featured.ticker} iconSrc={featured.coinIcon} />
                 </div>
-                <FeaturedCoinMeta artistId={featured.artistId} quote={featured.coin} />
+                <FeaturedCoinMeta
+                  artistId={featured.artistId}
+                  quote={featured.coin}
+                  linkable={featured.artistLinkable}
+                />
                 <div className="mt-5 flex flex-wrap items-center gap-3">
                   <FeaturedPlay featured={featured} />
                   <Link href="/discover" className="listen-btn-ghost">
@@ -161,6 +178,8 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
               title: track.title,
               artistName: track.artistName,
               artistId: track.artistId,
+              artistPhotoUrl: track.artistPhotoUrl,
+              artistLinkable: track.artistLinkable,
               cover: track.cover,
               coin: track.coin,
             }))}
@@ -206,6 +225,11 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                 </div>
                 <p className="mt-2 truncate text-sm font-medium" data-entity="track">{track.title}</p>
                 <div className="flex min-w-0 items-center gap-1.5">
+                  <ArtistFace
+                    name={track.artistName}
+                    sources={artistFaceSources(track.artistPhotoUrl, songCoverCandidates(track.cover))}
+                    size="card"
+                  />
                   <p className="min-w-0 truncate text-xs text-muted-foreground" data-entity="artist">
                     {track.artistName}
                   </p>

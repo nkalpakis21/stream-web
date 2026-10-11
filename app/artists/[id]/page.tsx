@@ -1,6 +1,9 @@
-import { notFound } from 'next/navigation';
+import { unstable_noStore as noStore } from 'next/cache';
 import type { Metadata } from 'next';
-import { getArtist } from '@/lib/services/artists';
+import { artistShareMetadata, hiddenArtistPageMetadata } from '@/lib/artists/visibility';
+import { rejectHiddenArtist } from '@/lib/artists/pageGate';
+import { adminGetArtist } from '@/lib/server/artistsAdmin';
+import { verifiedViewerIdFromPage } from '@/lib/server/viewer';
 import { SITE_NAME, publicUrl, isDefaultTempoRange, shareImageUrl, brandOgImageUrl } from '@/lib/brand/site';
 import { getArtistSongs } from '@/lib/services/songs';
 import { SongCard } from '@/components/songs/SongCard';
@@ -11,6 +14,8 @@ import { CommentsSection } from '@/components/comments/CommentsSection';
 import { EmptyAction } from '@/components/states/EmptyAction';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 interface ArtistPageProps {
   params: {
@@ -19,15 +24,17 @@ interface ArtistPageProps {
 }
 
 export async function generateMetadata({ params }: ArtistPageProps): Promise<Metadata> {
-  const artist = await getArtist(params.id);
-  if (!artist || artist.deletedAt) {
-    return { title: 'Artist' };
+  noStore();
+  const artist = await adminGetArtist(params.id);
+  const pageUrl = publicUrl(`/artists/${params.id}`);
+  const share = artistShareMetadata(artist, pageUrl);
+  if (!share.description) {
+    return hiddenArtistPageMetadata();
   }
-  const ogImageUrl = shareImageUrl(artist.avatarURL);
+  const ogImageUrl = share.image ? shareImageUrl(share.image) : brandOgImageUrl();
   const usingBrandOg = ogImageUrl === brandOgImageUrl();
-  const title = artist.name;
-  const description = `Listen to ${artist.name} on Streamstar`;
-  const pageUrl = publicUrl(`/artists/${artist.id}`);
+  const title = share.title;
+  const description = share.description;
   return {
     title,
     description,
@@ -42,7 +49,7 @@ export async function generateMetadata({ params }: ArtistPageProps): Promise<Met
           url: ogImageUrl,
           width: 1200,
           height: usingBrandOg ? 630 : 1200,
-          alt: usingBrandOg ? SITE_NAME : `${artist.name} cover art`,
+          alt: usingBrandOg ? SITE_NAME : `${share.title} cover art`,
         },
       ],
     },
@@ -56,11 +63,13 @@ export async function generateMetadata({ params }: ArtistPageProps): Promise<Met
 }
 
 export default async function ArtistPage({ params }: ArtistPageProps) {
-  const artist = await getArtist(params.id);
+  noStore();
+  const [viewerId, artist] = await Promise.all([
+    verifiedViewerIdFromPage(),
+    adminGetArtist(params.id),
+  ]);
 
-  if (!artist || artist.deletedAt) {
-    notFound();
-  }
+  rejectHiddenArtist(artist, viewerId);
 
   const [songs, coin] = await Promise.all([
     getArtistSongs(artist.id, 20),

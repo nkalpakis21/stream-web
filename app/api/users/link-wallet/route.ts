@@ -11,6 +11,9 @@ import { errorResponse, HttpError, requireUser } from '@/lib/server/auth';
 import { verifyIdToken } from '@/lib/firebase/admin';
 import { adminUpdateUserSolanaWallet } from '@/lib/server/usersAdmin';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {

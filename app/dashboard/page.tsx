@@ -9,7 +9,8 @@ import { ArtistsTab } from '@/components/dashboard/ArtistsTab';
 import { SongsTab } from '@/components/dashboard/SongsTab';
 import { getUserSongs } from '@/lib/services/songs';
 import { getUserArtists } from '@/lib/services/artists';
-import { getArtistNamesForSongs } from '@/lib/services/songs';
+import { fetchArtistCardDisplays } from '@/lib/artists/fetchCardDisplay';
+import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
 import type { SongDocument, AIArtistDocument } from '@/types/firestore';
 import { authHref, currentReturnTo } from '@/lib/auth/returnTo';
 
@@ -22,6 +23,7 @@ function DashboardContent() {
   const [songs, setSongs] = useState<SongDocument[]>([]);
   const [artists, setArtists] = useState<AIArtistDocument[]>([]);
   const [songArtistMap, setSongArtistMap] = useState<Map<string, string>>(new Map());
+  const [artistDisplays, setArtistDisplays] = useState<Map<string, ArtistCardDisplay>>(new Map());
   const [loading, setLoading] = useState(true);
   
   // Get active tab from URL or default to 'overview'
@@ -47,9 +49,14 @@ function DashboardContent() {
         setSongs(userSongs);
         setArtists(userArtists);
 
-        // Get artist names for songs
         if (userSongs.length > 0) {
-          const artistMap = await getArtistNamesForSongs(userSongs);
+          const displays = await fetchArtistCardDisplays(userSongs.map(song => song.artistId));
+          setArtistDisplays(displays);
+          const artistMap = new Map<string, string>();
+          userSongs.forEach(song => {
+            const name = displays.get(song.artistId)?.name;
+            if (name) artistMap.set(song.id, name);
+          });
           setSongArtistMap(artistMap);
         }
       } catch (error) {
@@ -104,6 +111,7 @@ function DashboardContent() {
               songs={songs}
               artists={artists}
               songArtistMap={songArtistMap}
+              artistDisplays={artistDisplays}
             />
           )}
           {activeTab === 'artists' && (
@@ -119,14 +127,22 @@ function DashboardContent() {
             <SongsTab
               songs={songs}
               songArtistMap={songArtistMap}
+              artistDisplays={artistDisplays}
               preselectedArtistId={artistId || undefined}
               onSongCreated={() => {
                 // Reload songs when one is created
                 getUserSongs(user.uid).then(userSongs => {
                   setSongs(userSongs);
-                  if (userSongs.length > 0) {
-                    getArtistNamesForSongs(userSongs).then(setSongArtistMap);
-                  }
+                  if (userSongs.length === 0) return;
+                  fetchArtistCardDisplays(userSongs.map(song => song.artistId)).then(displays => {
+                    setArtistDisplays(displays);
+                    const artistMap = new Map<string, string>();
+                    userSongs.forEach(song => {
+                      const name = displays.get(song.artistId)?.name;
+                      if (name) artistMap.set(song.id, name);
+                    });
+                    setSongArtistMap(artistMap);
+                  });
                 });
               }}
             />

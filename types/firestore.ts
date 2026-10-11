@@ -472,6 +472,11 @@ export interface CommentDocument {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   deletedAt: Timestamp | null;
+  /**
+   * Tombstone left when a deleted comment still has replies.
+   * The stored doc is only { deleted, parentCommentId, targetType, targetId, createdAt }.
+   */
+  deleted?: boolean;
 }
 
 // ============================================================================

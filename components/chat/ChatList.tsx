@@ -7,11 +7,12 @@ import { db } from '@/lib/firebase/config';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import { getUserConversations } from '@/lib/services/conversations';
 import { useUsersDisplayNames } from '@/hooks/useUserDisplayName';
-import type { ConversationDocument, AIArtistDocument } from '@/types/firestore';
+import { fetchArtistCardDisplays } from '@/lib/artists/fetchCardDisplay';
+import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
+import { ArtistFace } from '@/components/artists/ArtistFace';
+import type { ConversationDocument } from '@/types/firestore';
 import { formatDistanceToNow } from 'date-fns';
 import { MessageCircle, Users, Plus } from 'lucide-react';
-import Image from 'next/image';
-import { getAvatarGradient, getInitials } from '@/lib/utils/avatar';
 
 interface ChatListProps {
   selectedConversationId: string | null;
@@ -30,7 +31,7 @@ export function ChatList({ selectedConversationId, onSelectConversation, onNewCh
   const { user } = useAuth();
   const [conversations, setConversations] = useState<SerializedConversationDocument[]>([]);
   const [loading, setLoading] = useState(true);
-  const [artists, setArtists] = useState<Map<string, AIArtistDocument>>(new Map());
+  const [artists, setArtists] = useState<Map<string, ArtistCardDisplay>>(new Map());
 
   // Get all artist IDs from conversations
   const artistIds = useMemo(() => {
@@ -49,29 +50,8 @@ export function ChatList({ selectedConversationId, onSelectConversation, onNewCh
 
     const fetchArtists = async () => {
       try {
-        const response = await fetch('/api/artists/batch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ artistIds }),
-        });
-
-        if (!response.ok) {
-          console.error('Failed to fetch artists');
-          return;
-        }
-
-        const data = await response.json();
-        const artistsMap = new Map<string, AIArtistDocument>();
-        data.artists.forEach((artist: any) => {
-          // Convert serialized artist back to AIArtistDocument format
-          artistsMap.set(artist.id, {
-            ...artist,
-            createdAt: Timestamp.fromMillis(artist.createdAt),
-            updatedAt: Timestamp.fromMillis(artist.updatedAt),
-            deletedAt: artist.deletedAt ? Timestamp.fromMillis(artist.deletedAt) : null,
-          } as AIArtistDocument);
-        });
-        setArtists(artistsMap);
+        const displays = await fetchArtistCardDisplays(artistIds);
+        setArtists(displays);
       } catch (error) {
         console.error('Failed to fetch artists:', error);
       }
@@ -207,28 +187,12 @@ export function ChatList({ selectedConversationId, onSelectConversation, onNewCh
           if (conv.artistId && artists.has(conv.artistId)) {
             const artist = artists.get(conv.artistId)!;
             displayName = artist.name;
-            const avatarBg = getAvatarGradient(artist.name);
-            const initials = getInitials(artist.name);
-            
-            avatarElement = artist.avatarURL ? (
-              <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden">
-                <Image
-                  src={artist.avatarURL}
-                  alt={artist.name}
-                  width={40}
-                  height={40}
-                  className="object-cover"
-                />
-              </div>
-            ) : (
-              <div 
-                className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
-                style={{ background: avatarBg }}
-              >
-                <span className="text-white font-semibold text-sm">
-                  {initials}
-                </span>
-              </div>
+            avatarElement = (
+              <ArtistFace
+                name={artist.name}
+                sources={artist.photoUrl ? [artist.photoUrl] : []}
+                size="row"
+              />
             );
           } else if (conv.type === 'direct') {
             // Fallback to user display name for old conversations
