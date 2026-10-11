@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import type { Plain } from '@/lib/serialize/toPlain';
 import type { SongDocument } from '@/types/firestore';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { PlayableArt } from '@/components/songs/PlayableArt';
@@ -13,7 +14,7 @@ import { artistFaceSources, songCoverCandidates } from '@/lib/images/artistFace'
 import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
 
 interface SongCardProps {
-  song: SongDocument;
+  song: SongDocument | Plain<SongDocument>;
   artistName?: string;
   artist?: ArtistCardDisplay | null;
   variant?: 'default' | 'glass';

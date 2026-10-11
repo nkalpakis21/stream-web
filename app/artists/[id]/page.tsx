@@ -2,6 +2,7 @@ import { unstable_noStore as noStore } from 'next/cache';
 import type { Metadata } from 'next';
 import { artistShareMetadata, hiddenArtistPageMetadata } from '@/lib/artists/visibility';
 import { rejectHiddenArtist } from '@/lib/artists/pageGate';
+import { artistPageClientProps } from '@/lib/artists/pageProps';
 import { adminGetArtist } from '@/lib/server/artistsAdmin';
 import { verifiedViewerIdFromPage } from '@/lib/server/viewer';
 import { SITE_NAME, publicUrl, isDefaultTempoRange, shareImageUrl, brandOgImageUrl } from '@/lib/brand/site';
@@ -76,20 +77,22 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
     fetchArtistCoinModule(artist.pumpFun?.mint),
   ]);
 
-  const coinBadge = coinBadgeFromArtist(artist);
-  const style = artist.styleDNA;
+  const clientProps = artistPageClientProps({ artist, songs, coin });
+  const view = clientProps.artist;
+  const coinBadge = coinBadgeFromArtist(view);
+  const style = view.styleDNA;
   const showTempo = !isDefaultTempoRange(style.tempoRange);
   const hasStyle =
     style.genres.length > 0 ||
     style.moods.length > 0 ||
     style.influences.length > 0 ||
-    Boolean(artist.vocalIdentity) ||
+    Boolean(view.vocalIdentity) ||
     showTempo;
 
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        <ArtistHero artist={artist} coin={coin}>
+        <ArtistHero artist={view} coin={clientProps.coin}>
           {hasStyle ? (
             <div className="mb-12 grid grid-cols-1 gap-4 border-t border-border pt-6 sm:grid-cols-2">
               {style.genres.length > 0 && (
@@ -116,12 +119,12 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                   <p className="text-sm font-medium">{style.influences.join(', ')}</p>
                 </div>
               )}
-              {artist.vocalIdentity ? (
+              {view.vocalIdentity ? (
                 <div>
                   <span className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">
                     Vocal identity
                   </span>
-                  <p className="text-sm font-medium">{artist.vocalIdentity}</p>
+                  <p className="text-sm font-medium">{view.vocalIdentity}</p>
                 </div>
               ) : null}
               {showTempo ? (
@@ -149,11 +152,11 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
           </div>
           {songs.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {songs.map(song => (
+              {clientProps.songs.map(song => (
                 <SongCard
                   key={song.id}
                   song={song}
-                  artistName={artist.name}
+                  artistName={view.name}
                   ticker={coinBadge?.ticker}
                   coinIcon={coinBadge?.iconSrc}
                 />
@@ -166,7 +169,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
           )}
         </section>
 
-        <CommentsSection targetType="artist" targetId={artist.id} />
+        <CommentsSection targetType="artist" targetId={view.id} />
       </main>
     </div>
   );
