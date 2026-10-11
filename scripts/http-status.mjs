@@ -121,7 +121,7 @@ async function seed() {
   );
   batch.set(
     db.collection('songs').doc('song-private'),
-    songDoc('song-private', 'Secret Track', { isPublic: false, deleted: false, artistId: 'artist-private' })
+    songDoc('song-private', 'Seed Private Song', { isPublic: false, deleted: false, artistId: 'artist-private' })
   );
   for (const id of ['song-public', 'song-deleted', 'song-private']) {
     batch.set(db.collection('songVersions').doc(`${id}-v1`), versionDoc(id));
@@ -167,13 +167,46 @@ function visibleText(html) {
     .trim();
 }
 
-async function get(path) {
+async function get(path, cookie) {
+  const headers = cookie ? { cookie: `ss_viewer=${cookie}` } : undefined;
   const res = await fetch(`${BASE}${path}`, {
     redirect: 'manual',
+    headers,
     signal: AbortSignal.timeout(30_000),
   });
   const raw = await res.text();
   return { status: res.status, raw, visible: visibleText(raw) };
+}
+
+/**
+ * Auth emulator ID token. verifyIdToken on the Next server accepts it when
+ * FIREBASE_AUTH_EMULATOR_HOST is set. The uid is fixed so the song ownerId matches.
+ */
+async function idTokenFor(uid) {
+  if (!admin.apps.length) {
+    admin.initializeApp({ projectId: PROJECT });
+  }
+  try {
+    await admin.auth().createUser({ uid });
+  } catch (error) {
+    if (error?.code !== 'auth/uid-already-exists') throw error;
+  }
+  const custom = await admin.auth().createCustomToken(uid);
+  const host = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+  const res = await fetch(
+    `http://${host}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=demo-api-key`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token: custom, returnSecureToken: true }),
+    }
+  );
+  if (!res.ok) {
+    throw new Error(`auth emulator token for ${uid} failed: ${await res.text()}`);
+  }
+  const body = await res.json();
+  if (!body.idToken) throw new Error(`auth emulator returned no idToken for ${uid}`);
+  return body.idToken;
 }
 
 function assertCase(result, expected) {
@@ -196,6 +229,16 @@ function assertCase(result, expected) {
   if (expected.excludes && result.visible.includes(expected.excludes)) {
     problems.push(`body leaked ${JSON.stringify(expected.excludes)}`);
   }
+  if (expected.rawExcludes && result.raw.includes(expected.rawExcludes)) {
+    problems.push(`raw leaked ${JSON.stringify(expected.rawExcludes)}`);
+  }
+  if (expected.headExcludes) {
+    const headEnd = result.raw.toLowerCase().indexOf('</head>');
+    const head = headEnd === -1 ? result.raw : result.raw.slice(0, headEnd);
+    if (head.includes(expected.headExcludes)) {
+      problems.push(`meta leaked ${JSON.stringify(expected.headExcludes)}`);
+    }
+  }
   if (result.status === 200 && result.raw.includes('id="__next_error__"')) {
     problems.push('successful response rendered the not-found error shell');
   }
@@ -204,6 +247,17 @@ function assertCase(result, expected) {
 
 async function main() {
   await seed();
+  // Admin can read this private song (rules cannot block it). The page must
+  // 404 from its own isPublic/owner check, not from a permission-denied read.
+  const seeded = await admin.firestore().collection('songs').doc('song-private').get();
+  if (!seeded.exists || seeded.get('isPublic') !== false) {
+    throw new Error('private song seed was not readable');
+  }
+  if (seeded.get('title') !== 'Seed Private Song') {
+    throw new Error('private song seed title drifted');
+  }
+  const ownerToken = await idTokenFor('owner-alice');
+  const strangerToken = await idTokenFor('owner-bob');
   await run('pnpm', ['exec', 'next', 'build']);
 
   const server = spawn('pnpm', ['exec', 'next', 'start', '-H', '127.0.0.1', '-p', String(PORT)], {
@@ -235,25 +289,54 @@ async function main() {
     {
       path: '/songs/song-missing',
       status: 404,
-      includes: "This track isn't on Streamstar.",
+      includes: "This song isn't on Streamstar.",
     },
     {
       path: '/songs/song-deleted',
       status: 404,
-      includes: "This track isn't on Streamstar.",
+      includes: "This song isn't on Streamstar.",
       excludes: 'Gone Track',
+      rawExcludes: 'Gone Track',
     },
     {
       path: '/songs/song-private',
       status: 404,
-      includes: "This track isn't on Streamstar.",
-      excludes: 'Secret Track',
+      includes: "This song isn't on Streamstar.",
+      excludes: 'Seed Private Song',
+      rawExcludes: 'Seed Private Song',
+    },
+    {
+      path: '/songs/song-private',
+      status: 404,
+      cookie: strangerToken,
+      includes: "This song isn't on Streamstar.",
+      excludes: 'Seed Private Song',
+      rawExcludes: 'Seed Private Song',
+    },
+    {
+      path: '/songs/song-private',
+      status: 200,
+      cookie: ownerToken,
+      visibleIncludes: 'Seed Private Song',
+      headExcludes: 'Seed Private Song',
+      excludes: "This song isn't on Streamstar.",
+    },
+    {
+      path: '/api/songs/song-private/token-metadata',
+      status: 404,
+      rawExcludes: 'Seed Private Song',
+    },
+    {
+      path: '/api/songs/song-private/token-metadata',
+      status: 404,
+      cookie: strangerToken,
+      rawExcludes: 'Seed Private Song',
     },
     {
       path: '/songs/song-public',
       status: 200,
       includes: 'Public Signal',
-      excludes: "This track isn't on Streamstar.",
+      excludes: "This song isn't on Streamstar.",
     },
     { path: '/', status: 200, includes: 'Heat' },
     { path: '/discover', status: 200, includes: 'Discover' },
@@ -265,7 +348,7 @@ async function main() {
   try {
     await waitForServer();
     for (const expected of cases) {
-      const result = await get(expected.path);
+      const result = await get(expected.path, expected.cookie);
       const problems = assertCase(result, expected);
       const mark = problems.length === 0 ? 'ok' : 'FAIL';
       console.log(`${mark} ${result.status} ${expected.path}${problems.length ? ` — ${problems.join('; ')}` : ''}`);

@@ -1,7 +1,7 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
-import type { SongDocument, SongVersionDocument } from '@/types/firestore';
+import type { GenerationDocument, SongDocument, SongVersionDocument } from '@/types/firestore';
 import { isMissingIndexError } from '@/lib/server/indexError';
 import { selectArtistPageSongs } from '@/lib/artists/ownerSongs';
 import {
@@ -71,6 +71,29 @@ export async function adminGetSongVersions(songId: string): Promise<SongVersionD
     return snap.docs
       .map((doc) => doc.data() as SongVersionDocument)
       .sort((a, b) => a.versionNumber - b.versionNumber);
+  }
+}
+
+function timeMillis(value: unknown): number {
+  if (value && typeof value === 'object' && 'toMillis' in value) {
+    const ms = (value as { toMillis: () => number }).toMillis();
+    if (typeof ms === 'number' && Number.isFinite(ms)) return ms;
+  }
+  return 0;
+}
+
+/** Generations for a song the caller is already allowed to render. */
+export async function adminGetSongGenerations(songId: string): Promise<GenerationDocument[]> {
+  const collection = getAdminDb().collection(COLLECTIONS.generations);
+  try {
+    const snap = await collection.where('songId', '==', songId).orderBy('createdAt', 'desc').get();
+    return snap.docs.map(doc => doc.data() as GenerationDocument);
+  } catch (error) {
+    if (!isMissingIndexError(error)) throw error;
+    const snap = await collection.where('songId', '==', songId).get();
+    return snap.docs
+      .map(doc => doc.data() as GenerationDocument)
+      .sort((a, b) => timeMillis(b.createdAt) - timeMillis(a.createdAt));
   }
 }
 
