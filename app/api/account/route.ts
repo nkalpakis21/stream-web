@@ -2,6 +2,8 @@
  * DELETE /api/account
  *
  * Authorization: Bearer <Firebase ID token>
+ * The token is verified with checkRevoked (`verifyIdToken(token, true)`).
+ * auth_time is not checked.
  * Optional JSON body for Apple-linked users:
  * `{ "appleAuthorizationCode": "<fresh Sign in with Apple code>" }`
  *
@@ -17,12 +19,24 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isFirebaseAdminInitError } from '@/lib/firebase/admin';
-import { AccountAuthError, requireRecentAccountUser } from '@/lib/server/accountAuth';
+import { AccountAuthError, requireAccountUser } from '@/lib/server/accountAuth';
 import {
   appleAuthorizationCodeFromBody,
   revokeAppleOnAccountDeletion,
 } from '@/lib/server/appleRevoke';
 import { deleteAccount } from '@/lib/server/deleteAccount';
+
+type DeleteAccountFn = (uid: string, email: string | null) => Promise<void>;
+
+let deleteAccountForTests: DeleteAccountFn | null = null;
+
+/** Test-only. Production requests always call `deleteAccount`. */
+export function setDeleteAccountForTests(fn: DeleteAccountFn | null): void {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('setDeleteAccountForTests is disabled in production');
+  }
+  deleteAccountForTests = fn;
+}
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -41,7 +55,7 @@ function failureCode(error: unknown): string {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const user = await requireRecentAccountUser(request);
+    const user = await requireAccountUser(request);
     const authorizationCode = user.appleLinked
       ? appleAuthorizationCodeFromBody(await request.text().catch(() => ''))
       : null;
@@ -49,7 +63,11 @@ export async function DELETE(request: NextRequest) {
       appleLinked: user.appleLinked,
       authorizationCode,
     });
-    await deleteAccount(user.uid, user.email);
+    const removeAccount =
+      process.env.NODE_ENV !== 'production' && deleteAccountForTests
+        ? deleteAccountForTests
+        : deleteAccount;
+    await removeAccount(user.uid, user.email);
     return NextResponse.json(appleRevoke ? { ok: true, appleRevoke } : { ok: true });
   } catch (error) {
     if (error instanceof AccountAuthError) {
