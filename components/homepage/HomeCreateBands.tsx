@@ -14,9 +14,11 @@ export function LoggedOutCreateBand() {
 
   return (
     <section className="mb-6 rounded-xl border border-white/10 bg-card/60 p-5 sm:p-6">
-      <h2 className="listen-h1 text-foreground">Music you can trade.</h2>
-      <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-        Create AI artists - everyone listens and trades.
+      <h2 className="font-playfair font-semibold tracking-[-0.02em] text-[#E8E6F2] text-[40px] leading-[44px] sm:text-[48px] sm:leading-[52px] md:text-[64px] md:leading-[68px]">
+        Create music. Go viral. Earn.
+      </h2>
+      <p className="mt-4 max-w-[34ch] font-sans text-[16px] font-normal leading-[23px] text-muted-foreground sm:text-[18px] sm:leading-[26px]">
+        AI builds your artist, makes the songs, and monetizes them for you.
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Link
