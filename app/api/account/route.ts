@@ -20,23 +20,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isFirebaseAdminInitError } from '@/lib/firebase/admin';
 import { AccountAuthError, requireAccountUser } from '@/lib/server/accountAuth';
+import { deleteAccountForRequest } from '@/lib/server/accountDeletion';
 import {
   appleAuthorizationCodeFromBody,
   revokeAppleOnAccountDeletion,
 } from '@/lib/server/appleRevoke';
-import { deleteAccount } from '@/lib/server/deleteAccount';
-
-type DeleteAccountFn = (uid: string, email: string | null) => Promise<void>;
-
-let deleteAccountForTests: DeleteAccountFn | null = null;
-
-/** Test-only. Production requests always call `deleteAccount`. */
-export function setDeleteAccountForTests(fn: DeleteAccountFn | null): void {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('setDeleteAccountForTests is disabled in production');
-  }
-  deleteAccountForTests = fn;
-}
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -63,11 +51,7 @@ export async function DELETE(request: NextRequest) {
       appleLinked: user.appleLinked,
       authorizationCode,
     });
-    const removeAccount =
-      process.env.NODE_ENV !== 'production' && deleteAccountForTests
-        ? deleteAccountForTests
-        : deleteAccount;
-    await removeAccount(user.uid, user.email);
+    await deleteAccountForRequest(user.uid, user.email);
     return NextResponse.json(appleRevoke ? { ok: true, appleRevoke } : { ok: true });
   } catch (error) {
     if (error instanceof AccountAuthError) {

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 import { NextRequest } from 'next/server';
-import { DELETE, setDeleteAccountForTests } from '../app/api/account/route';
+import { DELETE } from '../app/api/account/route';
+import { setDeleteAccountForTests } from '../lib/server/accountDeletion';
 import { setAppleFetchForTests } from '../lib/server/appleRevoke';
 import {
   AccountAuthError,
