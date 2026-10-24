@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { PRIVACY_EMAIL } from '@/lib/brand/site';
+import { SUPPORT_EMAIL } from '@/lib/brand/site';
 
 export const dynamic = 'force-static';
 
@@ -24,10 +24,10 @@ export default function SupportPage() {
             <h2 className="mb-4 text-2xl font-semibold">Contact</h2>
             <p className="leading-relaxed text-muted-foreground">
               <a
-                href={`mailto:${PRIVACY_EMAIL}`}
+                href={`mailto:${SUPPORT_EMAIL}`}
                 className="font-medium text-accent hover:opacity-80"
               >
-                {PRIVACY_EMAIL}
+                {SUPPORT_EMAIL}
               </a>
             </p>
           </section>
