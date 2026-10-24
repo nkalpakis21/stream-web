@@ -15,6 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: publicUrl('/artists'), changeFrequency: 'daily', priority: 0.8 },
     { url: publicUrl('/terms'), changeFrequency: 'yearly', priority: 0.3 },
     { url: publicUrl('/privacy'), changeFrequency: 'yearly', priority: 0.3 },
+    { url: publicUrl('/support'), changeFrequency: 'yearly', priority: 0.3 },
   ];
 
   const songRoutes = songs.map(song => ({
