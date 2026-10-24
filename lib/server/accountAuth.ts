@@ -6,6 +6,7 @@
 import { NextRequest } from 'next/server';
 import * as admin from 'firebase-admin';
 import { isFirebaseAdminConfigured } from '@/lib/firebase/admin';
+import { hasAppleProvider } from '@/lib/server/appleRevoke';
 
 /** Mobile re-authenticates, then calls delete within this window. */
 export const RECENT_LOGIN_WINDOW_SECONDS = 5 * 60;
@@ -29,7 +30,7 @@ export function isRecentSignIn(authTimeSeconds: number, nowSeconds: number): boo
  */
 export async function requireRecentAccountUser(
   request: NextRequest
-): Promise<{ uid: string; email: string | null }> {
+): Promise<{ uid: string; email: string | null; appleLinked: boolean }> {
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     throw new AccountAuthError('unauthorized');
@@ -72,5 +73,9 @@ export async function requireRecentAccountUser(
     typeof decoded.email === 'string' && decoded.email.includes('@')
       ? decoded.email
       : null;
-  return { uid: decoded.uid, email };
+  const appleLinked = hasAppleProvider({
+    signInProvider: decoded.firebase?.sign_in_provider,
+    identities: decoded.firebase?.identities,
+  });
+  return { uid: decoded.uid, email, appleLinked };
 }
