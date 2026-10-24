@@ -5,14 +5,15 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import SupportPage, { dynamic, metadata } from '../app/support/page';
 import { Footer } from '../components/layout/Footer';
-import { PRIVACY_EMAIL } from '../lib/brand/site';
+import { SUPPORT_EMAIL } from '../lib/brand/site';
 
 const FORBIDDEN = ['crypto', 'coin', 'wallet', 'token', 'pump.fun', 'trading'];
 
 describe('support page', () => {
   it('renders the contact email and the account deletion section', () => {
     const html = renderToStaticMarkup(createElement(SupportPage));
-    const escapedEmail = PRIVACY_EMAIL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.equal(SUPPORT_EMAIL, 'marketing@streamstar.xyz');
+    const escapedEmail = SUPPORT_EMAIL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     assert.equal(dynamic, 'force-static');
     assert.deepEqual(metadata.title, { absolute: 'Support | Streamstar' });
