@@ -4,6 +4,7 @@ import { Logo } from '@/components/branding/Logo';
 const footerLinks = [
   { label: 'Discover', href: '/discover' },
   { label: 'Artists', href: '/artists' },
+  { label: 'Support', href: '/support' },
   { label: 'Terms', href: '/terms' },
   { label: 'Privacy', href: '/privacy' },
 ];
