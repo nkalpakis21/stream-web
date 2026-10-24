@@ -32,6 +32,16 @@ type Warn = (event: string, reason: string) => void;
 
 type AppleEnv = Record<string, string | undefined>;
 
+let fetchImplForTests: typeof fetch | null = null;
+
+/** Test-only. Production requests always use global fetch when no fetchImpl is passed. */
+export function setAppleFetchForTests(fetchImpl: typeof fetch | null): void {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('setAppleFetchForTests is disabled in production');
+  }
+  fetchImplForTests = fetchImpl;
+}
+
 type AppleSiwaConfig = {
   teamId: string;
   keyId: string;
@@ -294,7 +304,9 @@ export async function revokeAppleOnAccountDeletion(input: {
       return 'failed';
     }
 
-    const fetchImpl = input.fetchImpl ?? fetch;
+    const fetchImpl =
+      input.fetchImpl ??
+      (process.env.NODE_ENV !== 'production' && fetchImplForTests ? fetchImplForTests : fetch);
     const refreshToken = await exchangeAuthorizationCode({
       fetchImpl,
       clientId: config.clientId,
