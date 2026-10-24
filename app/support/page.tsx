@@ -42,7 +42,7 @@ export default function SupportPage() {
           <section>
             <h2 className="mb-4 text-2xl font-semibold">How to sign in</h2>
             <p className="leading-relaxed text-muted-foreground">
-              Open Sign in and continue with Google, or with your email and password. New accounts use the same choices on Sign up.
+              Open Sign in and continue with Apple, Google, or your email and password. New accounts use the same choices on Sign up.
             </p>
           </section>
 
