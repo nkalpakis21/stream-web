@@ -381,9 +381,25 @@ service cloud.firestore {
         && (!('coinImagePath' in request.resource.data) || request.resource.data.coinImagePath == null);
     }
 
+    // Terms acceptance written by the owner. termsAcceptedAt is the request
+    // time (client serverTimestamp()). termsVersion is any string.
+    // A create may be only those two fields: mobile never creates the user doc.
+    function termsPairValid() {
+      return request.resource.data.termsAcceptedAt == request.time
+        && request.resource.data.termsVersion is string;
+    }
+
+    function termsOnWriteValid() {
+      return (
+        !('termsAcceptedAt' in request.resource.data)
+        && !('termsVersion' in request.resource.data)
+      ) || termsPairValid();
+    }
+
     match /users/{uid} {
       // Public profile: display name and avatar. email and solanaWalletAddress
       // live on users/{uid}/private/profile and are not readable here.
+      // termsAcceptedAt and termsVersion are the owner's terms acceptance.
       allow get: if true;
       // Prefix search is displayName >= q AND displayName <= q+\uf8ff, plus an
       // optional deletedAt equality. `displayName is string` cannot satisfy
@@ -391,20 +407,29 @@ service cloud.firestore {
       // the public fields; email and wallet stay on private/profile.
       allow list: if true;
 
-      allow create: if isOwner(uid)
-        && request.resource.data.keys().hasOnly([
-          'displayName',
-          'photoURL',
-          'createdAt',
-          'updatedAt',
-          'deletedAt'
-        ])
-        && request.resource.data.deletedAt == null
-        && (
-          !('displayName' in request.resource.data)
-          || request.resource.data.displayName == null
-          || isValidDisplayName(request.resource.data.displayName)
-        );
+      allow create: if isOwner(uid) && (
+        (
+          request.resource.data.keys().hasOnly(['termsAcceptedAt', 'termsVersion'])
+          && termsPairValid()
+        ) || (
+          request.resource.data.keys().hasOnly([
+            'displayName',
+            'photoURL',
+            'createdAt',
+            'updatedAt',
+            'deletedAt',
+            'termsAcceptedAt',
+            'termsVersion'
+          ])
+          && request.resource.data.deletedAt == null
+          && (
+            !('displayName' in request.resource.data)
+            || request.resource.data.displayName == null
+            || isValidDisplayName(request.resource.data.displayName)
+          )
+          && termsOnWriteValid()
+        )
+      );
 
       allow update: if isOwner(uid)
         && request.resource.data.keys().hasOnly([
@@ -412,18 +437,30 @@ service cloud.firestore {
           'photoURL',
           'createdAt',
           'updatedAt',
-          'deletedAt'
+          'deletedAt',
+          'termsAcceptedAt',
+          'termsVersion'
         ])
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'displayName',
           'updatedAt',
-          'photoURL'
+          'photoURL',
+          'termsAcceptedAt',
+          'termsVersion'
         ])
         && fieldUnchanged('createdAt')
         && fieldUnchanged('deletedAt')
         && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['displayName'])
           || isValidDisplayName(request.resource.data.displayName)
+        )
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['termsAcceptedAt'])
+          || request.resource.data.termsAcceptedAt == request.time
+        )
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['termsVersion'])
+          || request.resource.data.termsVersion is string
         );
 
       // In-app account deletion (mobile). Web soft-deletes are not used on users.
@@ -778,6 +815,87 @@ service cloud.firestore {
       match /{document=**} {
         allow read, write: if false;
       }
+    }
+
+    // Hourly report counter. Doc id is the reporter uid. Admin SDK only.
+    match /reportRateLimits/{uid} {
+      allow read, write: if false;
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // Single doc per user. The client reads blockedUids and filters locally.
+    // Size cap is 500. Per-element string checks do not fit the rules
+    // expression budget, so the value is a list and nothing more.
+    match /blocks/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['blockedUids', 'updatedAt'])
+        && request.resource.data.blockedUids is list
+        && request.resource.data.blockedUids.size() <= 500
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isOwner(uid);
+    }
+
+    function reportTextOk(field) {
+      return !(field in request.resource.data)
+        || (
+          request.resource.data[field] is string
+          && request.resource.data[field].size() > 0
+          && request.resource.data[field].size() <= 128
+        );
+    }
+
+    // Clients may file a report. They cannot read or change one. Admin reads.
+    // songId is required on a comment report and forbidden on song or artist.
+    match /reports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'reporterUid',
+          'targetType',
+          'targetId',
+          'reason',
+          'note',
+          'createdAt',
+          'status',
+          'targetOwnerId',
+          'songId'
+        ])
+        && request.resource.data.reporterUid == request.auth.uid
+        && request.resource.data.targetType in ['song', 'artist', 'comment']
+        && request.resource.data.targetId is string
+        && request.resource.data.targetId.size() > 0
+        && request.resource.data.targetId.size() <= 128
+        && request.resource.data.reason in [
+          'sexual',
+          'hate_harassment',
+          'violence_self_harm',
+          'copyright_impersonation',
+          'spam_scam',
+          'other'
+        ]
+        && request.resource.data.status == 'open'
+        && request.resource.data.createdAt is timestamp
+        && (
+          !('note' in request.resource.data)
+          || (
+            request.resource.data.note is string
+            && request.resource.data.note.size() <= 500
+          )
+        )
+        && reportTextOk('targetOwnerId')
+        && (
+          (
+            request.resource.data.targetType == 'comment'
+            && 'songId' in request.resource.data
+            && reportTextOk('songId')
+          ) || (
+            request.resource.data.targetType != 'comment'
+            && !('songId' in request.resource.data)
+          )
+        );
+      allow read, update, delete: if false;
     }
 
     match /{document=**} {

@@ -6,6 +6,11 @@ export const LEGAL_EMAIL = 'legal@streamstar.xyz';
 export const PRIVACY_EMAIL = 'privacy@streamstar.xyz';
 export const SUPPORT_EMAIL = 'marketing@streamstar.xyz';
 export const LEGAL_UPDATED = 'September 2, 2026';
+/**
+ * Written to users/{uid}.termsVersion when a member accepts the terms.
+ * Bump this when the Terms of Service text changes.
+ */
+export const TERMS_VERSION = '2026-10-26';
 export const THEME_COLOR = '#0A0A10';
 export const SITE_OG_IMAGE_PATH = '/og-image.png';
 export const SITE_OG_IMAGE_WIDTH = 1200;
