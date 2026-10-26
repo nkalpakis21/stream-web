@@ -23,6 +23,7 @@ import {
   limit,
   orderBy,
   query,
+  serverTimestamp,
   setDoc,
   updateDoc,
   where,
@@ -2422,6 +2423,210 @@ test('client list queries are allowed only for the principal the rules expect', 
     where('songVersionId', '==', 'ver1'),
     orderBy('createdAt', 'desc'),
   )));
+});
+
+function reportData(overrides = {}) {
+  return {
+    reporterUid: 'alice',
+    targetType: 'song',
+    targetId: 'song1',
+    reason: 'spam_scam',
+    status: 'open',
+    createdAt: now,
+    ...overrides,
+  };
+}
+
+test('the owner can store terms acceptance and other fields stay locked', async () => {
+  await seedCatalog();
+  const alice = dbFor('alice');
+  await assertSucceeds(updateDoc(doc(alice, 'users/alice'), {
+    termsAcceptedAt: serverTimestamp(),
+    termsVersion: '2026-10-26',
+  }));
+  await assertSucceeds(updateDoc(doc(alice, 'users/alice'), {
+    termsVersion: '',
+  }));
+  await assertSucceeds(updateDoc(doc(alice, 'users/alice'), {
+    termsVersion: 'x'.repeat(65),
+  }));
+  await assertSucceeds(updateDoc(doc(alice, 'users/alice'), {
+    displayName: 'Alice Two',
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'users/alice'), { termsVersion: 1 }));
+  await assertFails(updateDoc(doc(alice, 'users/alice'), { termsAcceptedAt: now }));
+  await assertFails(updateDoc(doc(alice, 'users/alice'), { termsAcceptedAt: '2026-10-26' }));
+  await assertFails(updateDoc(doc(alice, 'users/alice'), { email: 'alice@example.com' }));
+  await assertFails(updateDoc(doc(dbFor('bob'), 'users/alice'), {
+    termsAcceptedAt: serverTimestamp(),
+    termsVersion: '2026-10-26',
+  }));
+  await assertSucceeds(setDoc(doc(dbFor('carol'), 'users/carol'), {
+    termsAcceptedAt: serverTimestamp(),
+    termsVersion: '2026-10-26',
+  }));
+  await assertFails(setDoc(doc(dbFor('dave'), 'users/dave'), {
+    termsAcceptedAt: now,
+    termsVersion: '2026-10-26',
+  }));
+  await assertFails(setDoc(doc(dbFor('erin'), 'users/erin'), {
+    termsVersion: '2026-10-26',
+  }));
+  await assertSucceeds(setDoc(doc(dbFor('bob'), 'users/bob'), {
+    displayName: 'Bob',
+    photoURL: null,
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    termsAcceptedAt: serverTimestamp(),
+    termsVersion: '2026-10-26',
+  }));
+  await assertFails(setDoc(doc(dbFor('frank'), 'users/frank'), {
+    displayName: 'Frank',
+    photoURL: null,
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    termsAcceptedAt: now,
+    termsVersion: '2026-10-26',
+  }));
+  await assertFails(setDoc(doc(dbFor('gina'), 'users/gina'), {
+    displayName: 'Gina',
+    photoURL: null,
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    termsVersion: 2,
+  }));
+});
+
+test('blocks/{uid} is an owner-only list of at most 500 entries', async () => {
+  const alice = dbFor('alice');
+  const bob = dbFor('bob');
+  const anon = dbFor(null);
+  await assertSucceeds(setDoc(doc(alice, 'blocks/alice'), {
+    blockedUids: ['bob', 'carol'],
+    updatedAt: serverTimestamp(),
+  }));
+  const own = await assertSucceeds(getDoc(doc(alice, 'blocks/alice')));
+  assert.deepEqual(own.data().blockedUids, ['bob', 'carol']);
+  await assertSucceeds(updateDoc(doc(alice, 'blocks/alice'), {
+    blockedUids: [],
+    updatedAt: serverTimestamp(),
+  }));
+  const blockedCap = 500;
+  await assertSucceeds(setDoc(doc(alice, 'blocks/alice'), {
+    blockedUids: Array.from({ length: blockedCap }, (_, index) => `uid-${index}`),
+    updatedAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(alice, 'blocks/alice'), {
+    blockedUids: Array.from({ length: blockedCap + 1 }, (_, index) => `uid-${index}`),
+    updatedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(alice, 'blocks/alice'), {
+    blockedUids: ['bob', 1],
+    updatedAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(alice, 'blocks/alice'), {
+    blockedUids: ['bob'],
+    updatedAt: now,
+  }));
+  await assertFails(setDoc(doc(alice, 'blocks/alice'), {
+    blockedUids: ['bob'],
+  }));
+  await assertFails(setDoc(doc(alice, 'blocks/alice'), {
+    blockedUids: ['bob'],
+    updatedAt: serverTimestamp(),
+    note: 'nope',
+  }));
+  await assertFails(setDoc(doc(alice, 'blocks/alice'), {
+    blockedUids: 'bob',
+    updatedAt: serverTimestamp(),
+  }));
+  await assertFails(getDoc(doc(bob, 'blocks/alice')));
+  await assertFails(getDoc(doc(anon, 'blocks/alice')));
+  await assertFails(setDoc(doc(bob, 'blocks/alice'), {
+    blockedUids: ['alice'],
+    updatedAt: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(doc(bob, 'blocks/alice'), { blockedUids: [] }));
+  await assertFails(deleteDoc(doc(bob, 'blocks/alice')));
+  await assertFails(getDocs(collection(alice, 'blocks')));
+  await assertSucceeds(deleteDoc(doc(alice, 'blocks/alice')));
+  await assertSucceeds(setDoc(doc(bob, 'blocks/bob'), {
+    blockedUids: ['alice'],
+    updatedAt: serverTimestamp(),
+  }));
+  await assertFails(getDoc(doc(alice, 'blocks/bob')));
+});
+
+test('a signed-in user can create their own report and nobody can read it', async () => {
+  const alice = dbFor('alice');
+  const bob = dbFor('bob');
+  await assertSucceeds(setDoc(doc(alice, 'reports/r1'), reportData()));
+  await assertSucceeds(setDoc(doc(alice, 'reports/r2'), reportData({
+    targetType: 'comment',
+    targetId: 'c1',
+    reason: 'sexual',
+    note: 'x'.repeat(500),
+    songId: 'song1',
+    targetOwnerId: 'bob',
+  })));
+  await assertSucceeds(setDoc(doc(alice, 'reports/r3'), reportData({
+    targetType: 'comment',
+    targetId: 'c2',
+    reason: 'copyright_impersonation',
+    songId: 'song2',
+  })));
+  await assertFails(setDoc(doc(alice, 'reports/r3b'), reportData({
+    targetType: 'comment',
+    targetId: 'c2',
+    artistId: 'artist1',
+  })));
+  await assertFails(setDoc(doc(alice, 'reports/r3c'), reportData({
+    targetType: 'comment',
+    targetId: 'c2',
+  })));
+  for (const reason of [
+    'sexual',
+    'hate_harassment',
+    'violence_self_harm',
+    'copyright_impersonation',
+    'spam_scam',
+    'other',
+  ]) {
+    await assertSucceeds(setDoc(doc(alice, 'reports/reason-' + reason), reportData({ reason })));
+  }
+
+  await assertFails(getDoc(doc(alice, 'reports/r1')));
+  await assertFails(getDocs(collection(alice, 'reports')));
+  await assertFails(updateDoc(doc(alice, 'reports/r1'), { status: 'closed' }));
+  await assertFails(deleteDoc(doc(alice, 'reports/r1')));
+  await assertFails(getDoc(doc(bob, 'reports/r1')));
+  await assertFails(setDoc(doc(bob, 'reports/r4'), reportData({ reporterUid: 'alice' })));
+  await assertFails(setDoc(doc(dbFor(null), 'reports/r5'), reportData()));
+  await assertFails(setDoc(doc(alice, 'reports/r6'), reportData({ targetType: 'user' })));
+  await assertFails(setDoc(doc(alice, 'reports/r7'), reportData({ reason: 'spam' })));
+  await assertFails(setDoc(doc(alice, 'reports/r8'), reportData({ status: 'closed' })));
+  await assertFails(setDoc(doc(alice, 'reports/r9'), reportData({ note: 'x'.repeat(501) })));
+  await assertFails(setDoc(doc(alice, 'reports/r10'), reportData({ songId: 'song1' })));
+  await assertFails(setDoc(doc(alice, 'reports/r11'), reportData({ targetId: '' })));
+  await assertFails(setDoc(doc(alice, 'reports/r12'), reportData({ reporterUid: 'bob' })));
+});
+
+test('clients cannot read or write report rate limits', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'reportRateLimits/alice'), { count: 3 });
+  });
+  for (const uid of [null, 'alice', 'bob']) {
+    const client = dbFor(uid);
+    await assertFails(getDoc(doc(client, 'reportRateLimits/alice')));
+    await assertFails(getDocs(collection(client, 'reportRateLimits')));
+    await assertFails(setDoc(doc(client, 'reportRateLimits/alice'), { count: 0 }));
+    await assertFails(updateDoc(doc(client, 'reportRateLimits/alice'), { count: 0 }));
+    await assertFails(deleteDoc(doc(client, 'reportRateLimits/alice')));
+  }
 });
 
 test('catch-all denies unknown collections', async () => {
