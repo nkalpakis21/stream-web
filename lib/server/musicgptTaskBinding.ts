@@ -35,6 +35,11 @@ export type MusicGptTaskBinding = {
   conversionIds: string[];
   createdAt: unknown;
   expireAt: unknown;
+  /** Model sent on the create call. v1 rollback leaves this null. */
+  model?: string | null;
+  apiVersion?: 'v1' | 'v2';
+  /** credit_estimate from the MusicAI create response, when the API sends one. */
+  creditEstimate?: number | null;
 };
 
 export type GenerationCandidate = {
@@ -113,13 +118,30 @@ export function readMusicGptTaskBinding(data: unknown): MusicGptTaskBinding | nu
     ? record.conversionIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
     : [];
 
-  return {
+  const binding: MusicGptTaskBinding = {
     uid: record.uid,
     songId,
     conversionIds,
     createdAt: record.createdAt,
     expireAt: record.expireAt,
   };
+
+  if (typeof record.model === 'string') {
+    const model = record.model.trim();
+    if (model) binding.model = model;
+  } else if (record.model === null) {
+    binding.model = null;
+  }
+
+  if (record.apiVersion === 'v1' || record.apiVersion === 'v2') {
+    binding.apiVersion = record.apiVersion;
+  }
+
+  if (typeof record.creditEstimate === 'number' && Number.isFinite(record.creditEstimate)) {
+    binding.creditEstimate = record.creditEstimate;
+  }
+
+  return binding;
 }
 
 function matchesBinding(
@@ -199,12 +221,18 @@ export function musicGptTaskBindingFields(input: {
   songId: string | null;
   conversionIds: string[];
   nowMs?: number;
+  model?: string | null;
+  apiVersion?: 'v1' | 'v2';
+  creditEstimate?: number | null;
 }): {
   uid: string;
   songId: string | null;
   conversionIds: string[];
   createdAt: Timestamp;
   expireAt: Timestamp;
+  model?: string | null;
+  apiVersion?: 'v1' | 'v2';
+  creditEstimate?: number;
 } {
   const nowMs = input.nowMs ?? Date.now();
   return {
@@ -213,6 +241,11 @@ export function musicGptTaskBindingFields(input: {
     conversionIds: input.conversionIds,
     createdAt: Timestamp.fromMillis(nowMs),
     expireAt: Timestamp.fromMillis(nowMs + MUSICGPT_TASK_TTL_MS),
+    ...(input.model !== undefined ? { model: input.model } : {}),
+    ...(input.apiVersion ? { apiVersion: input.apiVersion } : {}),
+    ...(typeof input.creditEstimate === 'number' && Number.isFinite(input.creditEstimate)
+      ? { creditEstimate: input.creditEstimate }
+      : {}),
   };
 }
 
@@ -222,6 +255,9 @@ export async function saveMusicGptTaskBinding(input: {
   songId: string | null;
   conversionIds: string[];
   nowMs?: number;
+  model?: string | null;
+  apiVersion?: 'v1' | 'v2';
+  creditEstimate?: number | null;
 }): Promise<void> {
   if (!input.taskId) {
     throw new Error('MusicGPT task id is required');
@@ -281,4 +317,10 @@ export async function findAuthorizedMusicGptGeneration(
     generation: resolution.accepted.generation,
     mode: resolution.mode === 'legacy' ? 'legacy' : 'bound',
   };
+}
+
+export async function getMusicGptTaskBinding(taskId: string): Promise<MusicGptTaskBinding | null> {
+  const snap = await getAdminDb().collection(COLLECTIONS.musicgptTasks).doc(taskId).get();
+  if (!snap.exists) return null;
+  return readMusicGptTaskBinding(snap.data());
 }

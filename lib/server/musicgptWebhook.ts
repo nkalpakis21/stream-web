@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
-import type { GenerationDocument, SongVersionDocument } from '@/types/firestore';
+import type { GenerationDocument, MusicGptUsageRecord, SongVersionDocument } from '@/types/firestore';
 import { getConversionDataByConversionID } from '@/lib/ai/providers/musicgpt';
 import { maybePostSongLive } from '@/lib/x/postSong';
 import { isFalCoverPipeline, shouldWriteMusicGptAlbumCover } from '@/lib/covers/config';
@@ -19,8 +19,17 @@ import {
 } from '@/lib/server/notificationsAdmin';
 import {
   findAuthorizedMusicGptGeneration,
+  getMusicGptTaskBinding,
   musicGptTaskLogId,
+  timestampMillis,
 } from '@/lib/server/musicgptTaskBinding';
+import {
+  isMusicGptAudioStreamingEvent,
+  logMusicGptUsage,
+  musicGptDurationMs,
+  resolveMusicGptUsageNumbers,
+  safeMusicGptStreamingUrl,
+} from '@/lib/server/musicgptUsage';
 import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
 import { redactForLog } from '@/lib/webhooks/redactUrl';
 import { revalidateHomepage } from '@/lib/webhooks/revalidate';
@@ -44,6 +53,13 @@ export interface MusicGPTWebhookPayload {
   image_path?: string;
   thumbnail_path?: string;
   album_cover_generator_output?: boolean;
+  streaming_url?: string;
+  model?: string;
+  credit_estimate?: number | string;
+  cost?: number | string;
+  charged_cost?: number | string;
+  credits_used?: number | string;
+  credit_used?: number | string;
 }
 
 async function tryPostSongLive(songId: string, reason: string): Promise<void> {
@@ -180,6 +196,28 @@ export async function processMusicGptWebhook(
     );
     console.log(`[MusicGPT Webhook] Updated lyrics for generation ${generation.id}`);
     return NextResponse.json({ ok: true });
+  }
+
+  // v2 can post subtype audio_streaming (documented for pro models) before
+  // the file exists. That payload has no conversion_path. Accept it so the
+  // later lyrics, cover, and conversion_path webhooks can still finish the song.
+  if (isMusicGptAudioStreamingEvent(body)) {
+    const streamingUrl = safeMusicGptStreamingUrl(body.streaming_url);
+    if (streamingUrl && body.conversion_id) {
+      try {
+        await rememberMusicGptStreamingUrl(body.task_id, body.conversion_id, streamingUrl);
+        console.log(
+          `[MusicGPT Webhook] Stored audio streaming URL task=${body.task_id} conversion=${body.conversion_id}`
+        );
+      } catch (error) {
+        console.error('[MusicGPT Webhook] Failed to store streaming URL:', error);
+      }
+    } else {
+      console.log(
+        `[MusicGPT Webhook] Ignoring audio streaming webhook task=${body.task_id} conversion=${body.conversion_id ?? ''}`
+      );
+    }
+    return NextResponse.json({ ok: true, ignored: 'audio_streaming' });
   }
 
   if (!body.conversion_id) {
@@ -353,11 +391,44 @@ export async function processMusicGptWebhook(
     }
   }
 
+  let musicGptUsage: MusicGptUsageRecord | undefined;
+  if (shouldMarkCompleted) {
+    try {
+      const binding = await getMusicGptTaskBinding(body.task_id);
+      const startedAtMs = timestampMillis(binding?.createdAt) ?? timestampMillis(generation.createdAt);
+      const completedAtMs = now.toMillis();
+      const observed = resolveMusicGptUsageNumbers({
+        webhook: body as unknown as Record<string, unknown>,
+        conversion:
+          conversionDetailsResponse?.success && conversionDetailsResponse.conversion
+            ? (conversionDetailsResponse.conversion as Record<string, unknown>)
+            : null,
+        metadata: (generation.output?.metadata as Record<string, unknown> | undefined) ?? null,
+        bindingCreditEstimate: binding?.creditEstimate ?? null,
+        bindingModel: binding?.model ?? null,
+        bindingApiVersion: binding?.apiVersion ?? null,
+      });
+      musicGptUsage = {
+        ...observed,
+        durationMs: musicGptDurationMs(startedAtMs, completedAtMs),
+        taskId: body.task_id,
+        songId: song.id,
+        generationId: generation.id,
+        startedAtMs,
+        completedAtMs,
+      };
+      logMusicGptUsage(musicGptUsage);
+    } catch (error) {
+      console.error('[MusicGPT Webhook] Failed to record usage:', error);
+    }
+  }
+
   await db.collection(COLLECTIONS.generations).doc(generation.id).set(
     {
       providerProcessedConversions: updatedProcessedConversions,
       status: shouldMarkCompleted ? 'completed' : generation.status,
       completedAt: shouldMarkCompleted ? now : generation.completedAt,
+      ...(musicGptUsage ? { musicGptUsage } : {}),
       output: {
         audioURL: shouldMarkCompleted ? body.conversion_path : generation.output?.audioURL || null,
         stems: body.conversion_path_wav ? [body.conversion_path_wav] : null,
@@ -397,6 +468,28 @@ export async function processMusicGptWebhook(
   }
 
   return NextResponse.json({ ok: true });
+}
+
+async function rememberMusicGptStreamingUrl(
+  taskId: string,
+  conversionId: string,
+  streamingUrl: string
+): Promise<void> {
+  const ref = getAdminDb().collection(COLLECTIONS.musicgptTasks).doc(taskId);
+  const snap = await ref.get();
+  if (!snap.exists) return;
+  const data = snap.data() as { streamingByConversionId?: unknown } | undefined;
+  const existing = data?.streamingByConversionId;
+  const map: Record<string, string> =
+    existing && typeof existing === 'object' && !Array.isArray(existing)
+      ? Object.fromEntries(
+          Object.entries(existing as Record<string, unknown>).filter(
+            (entry): entry is [string, string] => typeof entry[1] === 'string'
+          )
+        )
+      : {};
+  map[conversionId] = streamingUrl;
+  await ref.set({ streamingByConversionId: map }, { merge: true });
 }
 
 export async function songOwnerForMusicGptTask(taskId: string): Promise<string | null> {

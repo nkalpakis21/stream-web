@@ -325,6 +325,26 @@ export interface SongVersionDocument {
 // Generation
 // ============================================================================
 
+/**
+ * Admin webhook write when a MusicGPT job finishes. Clients do not set this.
+ * Search server logs for `musicgpt_generation_complete` or read this map.
+ */
+export interface MusicGptUsageRecord {
+  model: string | null;
+  apiVersion: 'v1' | 'v2' | null;
+  /** Provider estimate from the create response, webhook, or byId. */
+  creditEstimate: number | null;
+  /** Billed amount when the provider sends one. Not a copy of the estimate. */
+  chargedCost: number | null;
+  /** completedAt minus task start, in milliseconds. */
+  durationMs: number | null;
+  taskId: string;
+  songId: string;
+  generationId: string;
+  startedAtMs: number | null;
+  completedAtMs: number;
+}
+
 export interface GenerationParameters {
   duration?: number; // Seconds
   quality?: 'low' | 'medium' | 'high';
@@ -384,6 +404,11 @@ export interface GenerationDocument {
   completedAt: Timestamp | null;
   // Hash for proof-ready ownership (can be minted on-chain later)
   contentHash: string | null; // Hash of prompt + output references
+  /**
+   * Present after the MusicGPT webhook marks the job completed.
+   * Older generations omit it.
+   */
+  musicGptUsage?: MusicGptUsageRecord;
 }
 
 // ============================================================================
