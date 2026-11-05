@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 import { NextRequest } from 'next/server';
-import { GET, setMusicGptConversionRouteDepsForTests } from '../app/api/musicgpt/conversion/[id]/route';
+import { GET } from '../app/api/musicgpt/conversion/[id]/route';
+import { setMusicGptConversionRouteDepsForTests } from '../lib/server/musicgptConversionRouteDeps';
 import { POST } from '../app/api/generations/musicgpt/route';
 import {
   buildMusicGptCreateBody,

@@ -2,33 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getConversionDataByConversionID } from '@/lib/ai/providers/musicgpt';
 import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
 import { isAdminUid } from '@/lib/server/adminUids';
+import { musicGptConversionRouteDeps } from '@/lib/server/musicgptConversionRouteDeps';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const fetchCache = 'force-no-store';
-
-type ConversionLookup = typeof getConversionDataByConversionID;
-
-type ConversionRouteDeps = {
-  verifyToken?: (idToken: string) => Promise<{ uid: string }>;
-  getConversion?: ConversionLookup;
-};
-
-let depsForTests: ConversionRouteDeps | null = null;
-
-/** Test-only. Production requests always use the real auth and MusicGPT clients. */
-export function setMusicGptConversionRouteDepsForTests(deps: ConversionRouteDeps | null): void {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('MusicGPT conversion route test hooks are disabled in production');
-  }
-  depsForTests = deps;
-}
-
-function routeDeps(): ConversionRouteDeps {
-  if (process.env.NODE_ENV === 'production') return {};
-  return depsForTests ?? {};
-}
 
 function notFound() {
   return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -55,7 +34,7 @@ export async function GET(
 
   let userId: string;
   try {
-    userId = await requireUser(request, { verifyToken: routeDeps().verifyToken });
+    userId = await requireUser(request, { verifyToken: musicGptConversionRouteDeps().verifyToken });
   } catch (error) {
     if (error instanceof HttpError) return notFound();
     console.error('[MusicGPT Conversion API] Error:', error);
@@ -71,7 +50,9 @@ export async function GET(
       return NextResponse.json({ error: 'Conversion ID is required' }, { status: 400 });
     }
 
-    const result = await (routeDeps().getConversion ?? getConversionDataByConversionID)(conversionId);
+    const result = await (musicGptConversionRouteDeps().getConversion ?? getConversionDataByConversionID)(
+      conversionId
+    );
 
     if (!result || !result.success) {
       return NextResponse.json({ error: 'Failed to fetch conversion details' }, { status: 404 });
