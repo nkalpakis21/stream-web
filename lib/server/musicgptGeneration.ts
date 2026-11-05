@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   buildMusicGPTStyleFromArtistContext,
   createMusicGPTSong,
+  MUSICGPT_DEFAULT_MODEL,
+  musicGptApiVersion,
 } from '@/lib/ai/providers/musicgpt';
 import type { AIGenerationRequest } from '@/lib/ai/types';
 import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
@@ -18,6 +20,7 @@ import {
 } from '@/lib/webhooks/baseUrl';
 import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
 import { redactForLog, redactSecrets } from '@/lib/webhooks/redactUrl';
+import { readMusicGptCreditEstimate } from '@/lib/server/musicgptUsage';
 
 export type MusicGptGenerationDeps = {
   verifyToken?: (idToken: string) => Promise<{ uid: string }>;
@@ -70,12 +73,11 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
     const deps = generationDeps();
     const userId = await requireUser(request, { verifyToken: deps.verifyToken });
     const body = await request.json();
-    const { prompt, lyrics, artistContext, artistId, num_outputs, songId: songIdRaw } = body as {
+    const { prompt, lyrics, artistContext, artistId, songId: songIdRaw } = body as {
       prompt?: string;
       lyrics?: string;
       artistContext?: AIGenerationRequest['artistContext'];
       artistId?: string;
-      num_outputs?: 1 | 2;
       songId?: unknown;
     };
 
@@ -126,14 +128,12 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
     }
 
     const style = buildMusicGPTStyleFromArtistContext(artistContext);
-    const numOutputs: 1 | 2 = num_outputs === 2 ? 2 : 1;
 
     const createMusic = deps.createMusic ?? createMusicGPTSong;
     const response = await createMusic({
       prompt,
       lyrics,
       ...style,
-      num_outputs: numOutputs,
       webhook_url: webhookUrl,
     });
 
@@ -151,12 +151,18 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
     if (conversionId1) conversionIds.push(conversionId1);
     if (conversionId2) conversionIds.push(conversionId2);
 
+    const apiVersion = musicGptApiVersion();
+    const creditEstimate = readMusicGptCreditEstimate(response);
+
     try {
       await (deps.saveTaskBinding ?? saveMusicGptTaskBinding)({
         taskId,
         uid: userId,
         songId,
         conversionIds,
+        model: apiVersion === 'v2' ? MUSICGPT_DEFAULT_MODEL : null,
+        apiVersion,
+        ...(creditEstimate != null ? { creditEstimate } : {}),
       });
     } catch (bindingError) {
       console.error(`musicgpt_task_binding_failed ${musicGptTaskLogId(taskId)}`);
