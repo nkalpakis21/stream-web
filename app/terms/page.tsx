@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { TERMS_VERSION } from '@/lib/brand/site';
 
 export const metadata = {
   title: 'Terms of Service',
@@ -13,7 +14,9 @@ export default function TermsOfServicePage() {
           <h1 className="listen-h1 mb-8">Terms of Service</h1>
           
           <p className="text-muted-foreground mb-6">
-            <strong>Last updated:</strong> September 2, 2026
+            <strong>Last updated:</strong> October 26, 2026
+            <br />
+            <strong>Version:</strong> {TERMS_VERSION}
           </p>
 
           <div className="space-y-8 text-foreground">
@@ -68,6 +71,12 @@ export default function TermsOfServicePage() {
                     <li>Impersonates any person or entity</li>
                     <li>Contains viruses or malicious code</li>
                   </ul>
+                </div>
+                <div>
+                  <h3 className="text-xl font-medium mb-2 text-foreground">4.3 Objectionable content</h3>
+                  <p className="leading-relaxed">
+                    We have zero tolerance for objectionable content and abusive users. You can report a song, an artist, or a comment, and you can block a user. We review reports and act within 24 hours by removing the content and ejecting the user who posted it.
+                  </p>
                 </div>
               </div>
             </section>

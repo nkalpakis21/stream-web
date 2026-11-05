@@ -20,6 +20,7 @@ import {
 } from '@/lib/webhooks/baseUrl';
 import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
 import { redactForLog, redactSecrets } from '@/lib/webhooks/redactUrl';
+import { assertNoObjectionableContent } from '@/lib/server/objectionable';
 import { readMusicGptCreditEstimate } from '@/lib/server/musicgptUsage';
 
 export type MusicGptGenerationDeps = {
@@ -99,6 +100,7 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
       return NextResponse.json({ error: songIdResult.error }, { status: 400 });
     }
     let songId = songIdResult.songId;
+    let songTitle: string | undefined;
     if (songId) {
       const song = await (deps.getSong ?? adminGetSong)(songId);
       if (!song) {
@@ -110,11 +112,17 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
           { status: 403 }
         );
       }
+      songTitle = song.title;
     }
 
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
+    assertNoObjectionableContent(
+      prompt,
+      typeof lyrics === 'string' ? lyrics : undefined,
+      songTitle
+    );
 
     const webhookUrl = callback.webhookUrl;
     if (!musicGptWebhookSecret()) {
