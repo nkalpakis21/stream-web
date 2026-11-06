@@ -19,6 +19,22 @@ export interface UserDocument {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   deletedAt: Timestamp | null; // Soft delete
+  /**
+   * Set by the signed-in user when they accept the terms.
+   * termsVersion is TERMS_VERSION from lib/brand/site.ts.
+   */
+  termsAcceptedAt?: Timestamp;
+  termsVersion?: string;
+}
+
+/**
+ * blocks/{uid}. Readable and writable only by that user.
+ * blockedUids is a list of at most BLOCKED_UIDS_MAX (500) entries.
+ * The client hides those users' songs and artists.
+ */
+export interface BlockListDocument {
+  blockedUids: string[];
+  updatedAt: Timestamp;
 }
 
 /**

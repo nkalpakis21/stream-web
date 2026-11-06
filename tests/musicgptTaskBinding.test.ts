@@ -760,6 +760,43 @@ describe('POST /api/generations/musicgpt song binding', { concurrency: false }, 
     ]);
   });
 
+  it('rejects an objectionable prompt or title before MusicGPT and does not echo the word', async () => {
+    let musicCalls = 0;
+    const slur = 'n1gg3r';
+    const promptResponse = await callRoute(
+      { prompt: `play ${slur} now`, songId: 'song-victim' },
+      {
+        verifyToken: async () => ({ uid: 'victim' }),
+        getSong: async () => song({ id: 'song-victim', ownerId: 'victim', title: 'Mine' }),
+        createMusic: async () => {
+          musicCalls += 1;
+          return { task_id: 'should-not-run' };
+        },
+      }
+    );
+    assert.equal(promptResponse.status, 400);
+    const promptBody = await promptResponse.json();
+    assert.equal(promptBody.error, 'objectionable_content');
+    assert.equal(JSON.stringify(promptBody).includes(slur), false);
+    assert.equal(JSON.stringify(promptBody).toLowerCase().includes('nigg'), false);
+    assert.equal(musicCalls, 0);
+
+    const titleResponse = await callRoute(
+      { prompt: 'a spicy cocktail', songId: 'song-victim' },
+      {
+        verifyToken: async () => ({ uid: 'victim' }),
+        getSong: async () => song({ id: 'song-victim', ownerId: 'victim', title: 'c o c k' }),
+        createMusic: async () => {
+          musicCalls += 1;
+          return { task_id: 'should-not-run' };
+        },
+      }
+    );
+    assert.equal(titleResponse.status, 400);
+    assert.equal((await titleResponse.json()).error, 'objectionable_content');
+    assert.equal(musicCalls, 0);
+  });
+
   it('stores songId null when the client omits it', async () => {
     let songReads = 0;
     const saved: Array<{ songId: string | null; uid: string }> = [];

@@ -13,6 +13,7 @@ import { verifiedViewerIdFromRequest } from '@/lib/server/viewer';
 import { songIsVisible } from '@/lib/songs/visibility';
 import { toPlain } from '@/lib/serialize/toPlain';
 import { maybePostSongLive } from '@/lib/x/postSong';
+import { hasObjectionableContent } from '@/lib/server/objectionable';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -107,6 +108,9 @@ export async function PATCH(
       if (!title) return badRequest('title cannot be empty');
       if (title.length > SONG_TITLE_MAX_LENGTH) {
         return badRequest(`title must be ${SONG_TITLE_MAX_LENGTH} characters or fewer`);
+      }
+      if (hasObjectionableContent(title)) {
+        return badRequest('objectionable_content');
       }
     }
     if (hasPublic && typeof record.isPublic !== 'boolean') {
