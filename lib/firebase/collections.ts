@@ -53,9 +53,33 @@ export const COLLECTIONS = {
    * removes uid and creatorWallet. The doc is not deleted.
    */
   coinMints: 'coinMints',
+  /**
+   * Content reports filed through POST /api/reports.
+   * Clients may create their own report. They cannot read, update, or delete.
+   */
+  reports: 'reports',
+  /**
+   * Per-reporter hourly cap for POST /api/reports. Doc id is the reporter uid.
+   * Admin SDK only.
+   */
+  reportRateLimits: 'reportRateLimits',
+  /**
+   * Owner-only block list at blocks/{uid}.
+   * { blockedUids: list, updatedAt: Timestamp }, at most BLOCKED_UIDS_MAX entries.
+   * The signed-in user reads and writes this doc and filters songs and artists locally.
+   */
+  blocks: 'blocks',
 } as const;
 
 export type CollectionName = typeof COLLECTIONS[keyof typeof COLLECTIONS];
+
+/**
+ * Max entries in blocks/{uid}.blockedUids.
+ * Rules allow a list of this size. They do not check every element:
+ * a per-element string check of 500 indexes does not fit the rules
+ * expression budget. Keep this in sync with firestore.rules.
+ */
+export const BLOCKED_UIDS_MAX = 500;
 
 /**
  * Helper functions to build document paths
