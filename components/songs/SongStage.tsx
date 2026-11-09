@@ -183,7 +183,13 @@ export function SongStage({
           </div>
         )}
         <div className="mt-6">
-          <ShareButton url={shareUrl} title={songTitle} artistName={artistName} />
+          <ShareButton
+            url={shareUrl}
+            title={songTitle}
+            artistName={artistName}
+            songId={songId}
+            artistId={artistId || undefined}
+          />
         </div>
         {children}
       </div>

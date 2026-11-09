@@ -12,6 +12,7 @@ import {
   GoogleAuthProvider,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
+import { webPlatformHeaders } from '@/lib/funnel/platform';
 import { syncSignedInHint } from '@/lib/auth/notFoundRecovery';
 
 async function publishViewerCookie(token: string | null): Promise<void> {
@@ -22,7 +23,7 @@ async function publishViewerCookie(token: string | null): Promise<void> {
   await fetch('/api/auth/viewer', {
     method: 'POST',
     cache: 'no-store',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: webPlatformHeaders({ Authorization: `Bearer ${token}` }),
   });
 }
 

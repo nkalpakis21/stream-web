@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { isXConfigured } from '@/lib/x/config';
 import { exchangeAuthorizationCode } from '@/lib/x/oauth';
 import { verifyOAuthSession } from '@/lib/x/pkce';
+import { platformFromRequest } from '@/lib/funnel/platform';
 import { completeXConnect } from '@/lib/x/completeConnect';
 import { getArtistAdmin } from '@/lib/x/artistStore';
 
@@ -93,6 +94,11 @@ export async function GET(request: NextRequest) {
       artistId: session.artistId,
       ownerId: artist.ownerId,
       tokens,
+      platform: (() => {
+        const fromHeader = platformFromRequest(request);
+        if (fromHeader === 'web' || fromHeader === 'ios') return fromHeader;
+        return session.platform === 'web' || session.platform === 'ios' ? session.platform : 'unknown';
+      })(),
     });
 
     return redirectToArtist(request, session.artistId, { x: 'connected' });

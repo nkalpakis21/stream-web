@@ -4,6 +4,8 @@
  * Handles debounced play count tracking with session-based deduplication.
  */
 
+import { reportClientFunnelEvent } from '@/lib/analytics/reportFunnel';
+
 /**
  * Check if a song has already been played in this session
  */
@@ -55,6 +57,11 @@ export async function trackPlay(songId: string): Promise<void> {
   }
   
   try {
+    try {
+      reportClientFunnelEvent('play', { songId });
+    } catch (error) {
+      console.error('[funnel] play', error instanceof Error ? error.message : 'failed');
+    }
     const response = await fetch(`/api/songs/${songId}`, {
       method: 'PATCH',
       headers: {

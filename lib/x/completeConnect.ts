@@ -1,3 +1,5 @@
+import type { FunnelPlatform } from '@/lib/funnel/platform';
+import { recordFunnelEvent } from '@/lib/server/funnel';
 import { composeProfileBio, composeProfileName } from './compose';
 import { getXUserMe, syncXProfile } from './client';
 import { firestoreNow, getArtistAdmin, updateArtistX } from './artistStore';
@@ -29,6 +31,7 @@ export async function completeXConnect(input: {
   artistId: string;
   ownerId: string;
   tokens: XTokenSet;
+  platform?: FunnelPlatform;
 }): Promise<{ username: string; profileSyncDetail: string | null }> {
   const artist = await getArtistAdmin(input.artistId);
   if (!artist) {
@@ -70,6 +73,17 @@ export async function completeXConnect(input: {
     lastErrorAt: sync.ok || profileSyncUnavailableOnly ? null : now,
     profileSyncedAt: sync.ok ? now : null,
   });
+
+  try {
+    recordFunnelEvent(
+      input.ownerId,
+      'x_connected',
+      { artistId: input.artistId },
+      input.platform ?? 'unknown'
+    );
+  } catch (error) {
+    console.error('[funnel] x_connected', error instanceof Error ? error.message : 'failed');
+  }
 
   return { username: me.username, profileSyncDetail: sync.detail };
 }

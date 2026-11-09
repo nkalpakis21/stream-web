@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from '@/lib/firebase/config';
+import { webPlatformHeaders } from '@/lib/funnel/platform';
 import {
   COLLECTIONS,
   getGenerationPath,
@@ -87,10 +88,10 @@ export async function createGeneration(
       const token = await user.getIdToken();
       const apiResponse = await fetch('/api/generations/musicgpt', {
         method: 'POST',
-        headers: {
+        headers: webPlatformHeaders({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
-        },
+        }),
         body: JSON.stringify({
           prompt: data.prompt.freeText,
           // Includes locked vocalIdentity; server maps it into music_style.

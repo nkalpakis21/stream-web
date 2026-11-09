@@ -69,6 +69,12 @@ export const COLLECTIONS = {
    * The signed-in user reads and writes this doc and filters songs and artists locally.
    */
   blocks: 'blocks',
+  /**
+   * Funnel events. First-time milestones use doc id `${uid}_${event}`.
+   * play and song_shared use an auto id and are written every time.
+   * Admin SDK only. Clients cannot read or write this collection.
+   */
+  funnelEvents: 'funnelEvents',
 } as const;
 
 export type CollectionName = typeof COLLECTIONS[keyof typeof COLLECTIONS];

@@ -900,6 +900,7 @@ describe('POST /api/generations/musicgpt song binding', { concurrency: false }, 
         conversionIds: ['c1', 'c2'],
         model: 'v6',
         apiVersion: 'v2',
+        platform: 'unknown',
       },
     ]);
   });

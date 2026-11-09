@@ -20,6 +20,8 @@ import {
 } from '@/lib/webhooks/baseUrl';
 import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
 import { redactForLog, redactSecrets } from '@/lib/webhooks/redactUrl';
+import { platformFromRequest } from '@/lib/funnel/platform';
+import { recordFunnelEvent } from '@/lib/server/funnel';
 import { assertNoObjectionableContent } from '@/lib/server/objectionable';
 import { readMusicGptCreditEstimate } from '@/lib/server/musicgptUsage';
 
@@ -161,6 +163,8 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
 
     const apiVersion = musicGptApiVersion();
     const creditEstimate = readMusicGptCreditEstimate(response);
+    const platform = platformFromRequest(request);
+    const trimmedArtistId = typeof artistId === 'string' ? artistId.trim() : '';
 
     try {
       await (deps.saveTaskBinding ?? saveMusicGptTaskBinding)({
@@ -170,11 +174,30 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
         conversionIds,
         model: apiVersion === 'v2' ? MUSICGPT_DEFAULT_MODEL : null,
         apiVersion,
+        platform,
         ...(creditEstimate != null ? { creditEstimate } : {}),
       });
     } catch (bindingError) {
       console.error(`musicgpt_task_binding_failed ${musicGptTaskLogId(taskId)}`);
       throw bindingError;
+    }
+
+    try {
+      recordFunnelEvent(
+        userId,
+        'first_song_started',
+        {
+          taskId,
+          ...(songId ? { songId } : {}),
+          ...(trimmedArtistId ? { artistId: trimmedArtistId } : {}),
+        },
+        platform
+      );
+    } catch (error) {
+      console.error(
+        '[funnel] first_song_started',
+        error instanceof Error ? error.message : 'failed'
+      );
     }
 
     return NextResponse.json({

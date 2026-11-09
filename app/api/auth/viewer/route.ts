@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server';
 import { VIEWER_COOKIE, viewerCookieMaxAge, viewerCookieOptions } from '@/lib/auth/viewerCookie';
 import { noStoreJson } from '@/lib/http/noStore';
-import { verifyViewerToken } from '@/lib/server/viewer';
+import { platformFromRequest } from '@/lib/funnel/platform';
+import { recordSignedUp } from '@/lib/server/funnel';
+import { usesViewerTestVerifier, verifyViewerToken } from '@/lib/server/viewer';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -29,6 +31,14 @@ export async function POST(request: NextRequest) {
   const maxAge = viewerCookieMaxAge(verified?.exp);
   if (!verified || maxAge <= 0) {
     return noStoreJson({ error: 'Invalid or expired token' }, 401);
+  }
+
+  if (!usesViewerTestVerifier()) {
+    try {
+      recordSignedUp(verified.uid, platformFromRequest(request));
+    } catch (error) {
+      console.error('[funnel] signed_up', error instanceof Error ? error.message : 'failed');
+    }
   }
 
   const response = noStoreJson({ ok: true });

@@ -2629,6 +2629,43 @@ test('clients cannot read or write report rate limits', async () => {
   }
 });
 
+test('clients cannot read or write funnelEvents', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'funnelEvents/alice_signed_up'), {
+      uid: 'alice',
+      event: 'signed_up',
+      at: now,
+      props: {},
+      platform: 'web',
+    });
+    await setDoc(doc(db, 'funnelEvents/playAuto1'), {
+      uid: 'alice',
+      event: 'play',
+      at: now,
+      props: { songId: 'song1' },
+      platform: 'web',
+    });
+  });
+  for (const uid of [null, 'alice', 'bob']) {
+    const client = dbFor(uid);
+    await assertFails(getDoc(doc(client, 'funnelEvents/alice_signed_up')));
+    await assertFails(getDoc(doc(client, 'funnelEvents/playAuto1')));
+    await assertFails(getDocs(collection(client, 'funnelEvents')));
+    await assertFails(setDoc(doc(client, 'funnelEvents/playAuto2'), {
+      uid: 'alice',
+      event: 'play',
+      at: now,
+      props: { songId: 'song1' },
+      platform: 'ios',
+    }));
+    await assertFails(updateDoc(doc(client, 'funnelEvents/alice_signed_up'), { platform: 'ios' }));
+    await assertFails(updateDoc(doc(client, 'funnelEvents/playAuto1'), { platform: 'ios' }));
+    await assertFails(deleteDoc(doc(client, 'funnelEvents/alice_signed_up')));
+    await assertFails(getDoc(doc(client, 'funnelEvents/alice_signed_up/nested/secret')));
+    await assertFails(setDoc(doc(client, 'funnelEvents/alice_signed_up/nested/secret'), { uid: 'alice' }));
+  }
+});
+
 test('catch-all denies unknown collections', async () => {
   await assertFails(getDoc(doc(dbFor(null), 'secrets/one')));
   await assertFails(setDoc(doc(dbFor('alice'), 'secrets/one'), { leak: true }));

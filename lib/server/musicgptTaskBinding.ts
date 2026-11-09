@@ -40,6 +40,11 @@ export type MusicGptTaskBinding = {
   apiVersion?: 'v1' | 'v2';
   /** credit_estimate from the MusicAI create response, when the API sends one. */
   creditEstimate?: number | null;
+  /**
+   * Client that started the task. Missing on older bindings, which the
+   * webhook records as `unknown`.
+   */
+  platform?: 'web' | 'ios' | 'unknown';
 };
 
 export type GenerationCandidate = {
@@ -141,6 +146,10 @@ export function readMusicGptTaskBinding(data: unknown): MusicGptTaskBinding | nu
     binding.creditEstimate = record.creditEstimate;
   }
 
+  if (record.platform === 'web' || record.platform === 'ios' || record.platform === 'unknown') {
+    binding.platform = record.platform;
+  }
+
   return binding;
 }
 
@@ -224,6 +233,7 @@ export function musicGptTaskBindingFields(input: {
   model?: string | null;
   apiVersion?: 'v1' | 'v2';
   creditEstimate?: number | null;
+  platform?: 'web' | 'ios' | 'unknown';
 }): {
   uid: string;
   songId: string | null;
@@ -233,6 +243,7 @@ export function musicGptTaskBindingFields(input: {
   model?: string | null;
   apiVersion?: 'v1' | 'v2';
   creditEstimate?: number;
+  platform?: 'web' | 'ios' | 'unknown';
 } {
   const nowMs = input.nowMs ?? Date.now();
   return {
@@ -246,6 +257,9 @@ export function musicGptTaskBindingFields(input: {
     ...(typeof input.creditEstimate === 'number' && Number.isFinite(input.creditEstimate)
       ? { creditEstimate: input.creditEstimate }
       : {}),
+    ...(input.platform === 'web' || input.platform === 'ios' || input.platform === 'unknown'
+      ? { platform: input.platform }
+      : {}),
   };
 }
 
@@ -258,6 +272,7 @@ export async function saveMusicGptTaskBinding(input: {
   model?: string | null;
   apiVersion?: 'v1' | 'v2';
   creditEstimate?: number | null;
+  platform?: 'web' | 'ios' | 'unknown';
 }): Promise<void> {
   if (!input.taskId) {
     throw new Error('MusicGPT task id is required');

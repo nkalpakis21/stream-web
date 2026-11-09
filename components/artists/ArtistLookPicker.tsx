@@ -13,6 +13,7 @@ import {
   SIGN_IN_AGAIN_MESSAGE,
   userFacingApiError,
 } from '@/lib/api/clientAuth';
+import { webPlatformHeaders } from '@/lib/funnel/platform';
 
 const MAX_SOURCE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_SOURCE_TYPES = new Set([
@@ -41,6 +42,8 @@ interface ArtistLookPickerProps {
   mode?: 'create' | 'lock';
   /** Current locked face on the artist page. Ignored in create mode. */
   lockedUrl?: string | null;
+  /** Set on the owner page so a framed photo can be tied to this artist. */
+  artistId?: string;
 }
 
 function splitCsv(value: string): string[] {
@@ -85,6 +88,7 @@ export function ArtistLookPicker({
   disabled = false,
   mode = 'create',
   lockedUrl = null,
+  artistId,
 }: ArtistLookPickerProps) {
   const { user } = useAuth();
   const isLockMode = mode === 'lock';
@@ -178,9 +182,10 @@ export function ArtistLookPicker({
       const token = await getFreshIdToken(user);
       const form = new FormData();
       form.append('file', blob, 'look.jpg');
+      if (artistId) form.append('artistId', artistId);
       const response = await fetch('/api/artists/looks/upload', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: webPlatformHeaders({ Authorization: `Bearer ${token}` }),
         body: form,
       });
       const data = await response.json().catch(() => ({}));

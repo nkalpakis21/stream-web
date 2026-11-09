@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { webPlatformHeaders } from '@/lib/funnel/platform';
 import {
   RECOVERY_REVEAL_MS,
   idFromNotFoundPath,
@@ -93,7 +94,7 @@ export function useOwnerNotFoundRecovery(kind: NotFoundKind, viewerPath: string)
         const session = await fetch(viewerPath, {
           method: 'POST',
           cache: 'no-store',
-          headers: { Authorization: `Bearer ${token}` },
+          headers: webPlatformHeaders({ Authorization: `Bearer ${token}` }),
         });
         if (!session.ok) {
           if (!cancelled) settleNotFound();

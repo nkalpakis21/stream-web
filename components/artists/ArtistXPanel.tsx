@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { webPlatformHeaders } from '@/lib/funnel/platform';
 import { useSearchParams } from 'next/navigation';
 import { isProfileSyncUnavailableError } from '@/lib/x/profileSyncUnavailable';
 
@@ -40,10 +41,10 @@ const DISCONNECTED: XState = {
 
 async function authHeaders(user: { getIdToken: (force?: boolean) => Promise<string> }) {
   const token = await user.getIdToken();
-  return {
+  return webPlatformHeaders({
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
-  };
+  });
 }
 
 function visibleXMessage(value: string | null | undefined): string | null {
