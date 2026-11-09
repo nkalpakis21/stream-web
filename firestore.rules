@@ -898,6 +898,15 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // Funnel events. First-time docs are `${uid}_${event}`. play and
+    // song_shared are auto ids. Admin SDK only, including nested docs.
+    match /funnelEvents/{eventId} {
+      allow read, write: if false;
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

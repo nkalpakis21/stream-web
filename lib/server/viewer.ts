@@ -22,6 +22,15 @@ export function setViewerVerifierForTests(verifier: ViewerTokenVerifier | null):
   viewerVerifierForTests = verifier;
 }
 
+/**
+ * True while a unit test has replaced ID-token verification.
+ * The viewer route uses this to skip the signup lookup, which would
+ * otherwise call Admin Auth.
+ */
+export function usesViewerTestVerifier(): boolean {
+  return process.env.NODE_ENV !== 'production' && viewerVerifierForTests != null;
+}
+
 function bearerToken(header: string | null): string | null {
   if (!header?.startsWith('Bearer ')) return null;
   const token = header.slice('Bearer '.length).trim();

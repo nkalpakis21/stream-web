@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
+import { recordFunnelEvent, type FunnelPlatform } from '@/lib/server/funnel';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import type { GenerationDocument, MusicGptUsageRecord, SongVersionDocument } from '@/types/firestore';
 import { getConversionDataByConversionID } from '@/lib/ai/providers/musicgpt';
@@ -324,6 +325,30 @@ export async function processMusicGptWebhook(
     isPrimary: !hasExistingAudio,
   };
   await versionRef.set(version);
+
+  if (persisted.audioPersisted) {
+    try {
+      const binding = await getMusicGptTaskBinding(body.task_id);
+      const stored = binding?.platform;
+      const platform: FunnelPlatform =
+        stored === 'web' || stored === 'ios' || stored === 'unknown' ? stored : 'unknown';
+      recordFunnelEvent(
+        song.ownerId,
+        'first_song_ready',
+        {
+          songId: song.id,
+          taskId: body.task_id,
+          ...(typeof song.artistId === 'string' && song.artistId ? { artistId: song.artistId } : {}),
+        },
+        platform
+      );
+    } catch (error) {
+      console.error(
+        '[funnel] first_song_ready',
+        error instanceof Error ? error.message : 'failed'
+      );
+    }
+  }
 
   await tryPostSongLive(song.id, 'audio-written');
 

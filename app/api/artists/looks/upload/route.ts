@@ -2,6 +2,9 @@ import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
 import { getAdminBucket } from '@/lib/firebase/admin';
+import { platformFromRequest } from '@/lib/funnel/platform';
+import { adminGetArtist } from '@/lib/server/artistsAdmin';
+import { recordFunnelEvent, sanitizeFunnelProps } from '@/lib/server/funnel';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -121,6 +124,20 @@ export async function POST(request: NextRequest) {
 
     const encodedPath = encodeURIComponent(objectPath);
     const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${downloadToken}`;
+
+    try {
+      const rawArtistId = form?.get('artistId');
+      const artistId =
+        typeof rawArtistId === 'string' ? sanitizeFunnelProps({ artistId: rawArtistId }).artistId : undefined;
+      if (artistId) {
+        const artist = await adminGetArtist(artistId);
+        if (artist && !artist.deletedAt && artist.ownerId === userId) {
+          recordFunnelEvent(userId, 'face_set', { artistId }, platformFromRequest(request));
+        }
+      }
+    } catch (error) {
+      console.error('[funnel] face_set', error instanceof Error ? error.message : 'failed');
+    }
 
     return NextResponse.json({ url });
   } catch (error) {

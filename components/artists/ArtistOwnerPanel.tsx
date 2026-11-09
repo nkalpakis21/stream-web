@@ -59,6 +59,7 @@ export function ArtistOwnerPanel({
       <div className="owner-panel-top">
         <ArtistLookPicker
           mode="lock"
+          artistId={artist.id}
           artistName={artist.name}
           lore={lore}
           genres={artist.styleDNA.genres.join(', ')}

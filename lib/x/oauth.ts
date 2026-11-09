@@ -7,6 +7,7 @@ import {
   getXCallbackUrlFromRequest,
   getXClientId,
 } from './config';
+import type { FunnelPlatform } from '@/lib/funnel/platform';
 import { generateOAuthState, generatePkce, type XOAuthSession } from './pkce';
 
 export interface XTokenSet {
@@ -28,6 +29,7 @@ interface TokenResponse {
 export function buildAuthorizeUrl(input: {
   request: { url: string; headers: Headers };
   artistId: string;
+  platform?: FunnelPlatform;
 }): { url: string; session: XOAuthSession } {
   const { verifier, challenge } = generatePkce();
   const state = generateOAuthState();
@@ -35,6 +37,7 @@ export function buildAuthorizeUrl(input: {
     state,
     verifier,
     artistId: input.artistId,
+    ...(input.platform ? { platform: input.platform } : {}),
   };
 
   const params = new URLSearchParams({

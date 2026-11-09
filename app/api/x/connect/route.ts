@@ -4,6 +4,7 @@ import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
 import { noStoreJson } from '@/lib/http/noStore';
 import { artistIsVisible } from '@/lib/artists/visibility';
 import { getArtist } from '@/lib/services/artists';
+import { platformFromRequest } from '@/lib/funnel/platform';
 import { isXConfigured } from '@/lib/x/config';
 import { buildAuthorizeUrl } from '@/lib/x/oauth';
 import { signOAuthSession } from '@/lib/x/pkce';
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
     const { url, session } = buildAuthorizeUrl({
       request,
       artistId,
+      platform: platformFromRequest(request),
     });
 
     const signed = signOAuthSession(session);

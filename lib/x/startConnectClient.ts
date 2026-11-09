@@ -1,6 +1,7 @@
 'use client';
 
 import type { User } from 'firebase/auth';
+import { webPlatformHeaders } from '@/lib/funnel/platform';
 
 /**
  * Start per-artist X OAuth after create (or from the artist page).
@@ -13,10 +14,10 @@ export async function startArtistXConnect(
   const token = await user.getIdToken();
   const res = await fetch('/api/x/connect', {
     method: 'POST',
-    headers: {
+    headers: webPlatformHeaders({
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-    },
+    }),
     body: JSON.stringify({ artistId }),
   });
   const data = await res.json().catch(() => ({}));

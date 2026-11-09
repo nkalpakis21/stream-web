@@ -17,6 +17,7 @@ import {
   Timestamp,
   serverTimestamp,
 } from 'firebase/firestore';
+import { reportArtistObserved } from '@/lib/analytics/reportFunnel';
 import { auth, db } from '@/lib/firebase/config';
 import { getFreshIdToken, userFacingApiError } from '@/lib/api/clientAuth';
 import {
@@ -112,6 +113,12 @@ export async function createArtist(
   // Write both documents
   await setDoc(artistRef, artist);
   await setDoc(versionRef, version);
+
+  try {
+    reportArtistObserved(artistId);
+  } catch (error) {
+    console.error('[funnel] artist_created', error instanceof Error ? error.message : 'failed');
+  }
 
   return artist;
 }
@@ -468,6 +475,12 @@ export async function updateArtistAvatar(
   }
 
   await createArtistVersion(artistId, userId, { avatarURL: trimmed });
+
+  try {
+    reportArtistObserved(artistId);
+  } catch (error) {
+    console.error('[funnel] face_set', error instanceof Error ? error.message : 'failed');
+  }
 
   const updatedArtist = await getArtist(artistId);
   if (!updatedArtist) {
