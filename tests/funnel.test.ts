@@ -92,6 +92,8 @@ describe('trackFunnelEvent', () => {
     assert.equal(isClientFunnelEvent('create_started'), true);
     assert.equal(isClientFunnelEvent('face_set'), true);
     assert.equal(isClientFunnelEvent('create_submitted'), true);
+    assert.equal(isFunnelEvent('x_post'), true);
+    assert.equal(isClientFunnelEvent('x_post'), false);
   });
 
   it('writes each event once per user and keeps only id props', async () => {

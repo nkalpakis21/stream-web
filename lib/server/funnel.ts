@@ -3,8 +3,9 @@
  *
  * Client Firebase Analytics records page views and CTA clicks. It cannot see
  * the MusicGPT webhook. First-time milestones use doc id `${uid}_${event}`
- * and create-if-absent. `play` and `song_shared` are a new auto-id doc each
- * time. `platform` is `web`, `ios`, or `unknown` (`lib/funnel/platform.ts`).
+ * and create-if-absent. `play`, `song_shared`, and `x_post` are a new auto-id
+ * doc each time. `x_post` is server-only. `platform` is `web`, `ios`, or
+ * `unknown` (`lib/funnel/platform.ts`).
  * Anonymous share-page plays are auto-id docs with `uid: null`, `visitorId`,
  * and `source: 'share_page'`. Signed-in plays from that page set the same source.
  */
@@ -33,7 +34,10 @@ export const FIRST_FUNNEL_EVENTS = [
   'x_connected',
 ] as const;
 
-export const REPEAT_FUNNEL_EVENTS = ['play', 'song_shared'] as const;
+export const REPEAT_FUNNEL_EVENTS = ['play', 'song_shared', 'x_post'] as const;
+
+/** Repeat events the browser may report. `x_post` stays server-only. */
+const CLIENT_REPEAT_EVENTS = ['play', 'song_shared'] as const;
 
 export const FUNNEL_EVENTS = [...FIRST_FUNNEL_EVENTS, ...REPEAT_FUNNEL_EVENTS] as const;
 
@@ -49,7 +53,7 @@ export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];
  */
 export const CLIENT_CREATE_EVENTS = ['create_started', 'face_set', 'create_submitted'] as const;
 
-export const CLIENT_FUNNEL_EVENTS = [...CLIENT_CREATE_EVENTS, ...REPEAT_FUNNEL_EVENTS] as const;
+export const CLIENT_FUNNEL_EVENTS = [...CLIENT_CREATE_EVENTS, ...CLIENT_REPEAT_EVENTS] as const;
 
 export type ClientCreateEvent = (typeof CLIENT_CREATE_EVENTS)[number];
 export type ClientFunnelEvent = (typeof CLIENT_FUNNEL_EVENTS)[number];
@@ -314,8 +318,8 @@ function eventData(
 }
 
 /**
- * First-time events create `${uid}_${event}` once. `play` and `song_shared`
- * always add a new doc. Throws on an unknown event, platform, or uid.
+ * First-time events create `${uid}_${event}` once. `play`, `song_shared`, and
+ * `x_post` always add a new doc. Throws on an unknown event, platform, or uid.
  */
 export async function trackFunnelEvent(
   uid: string,

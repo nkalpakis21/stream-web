@@ -4,8 +4,9 @@ import { getArtist } from '@/lib/services/artists';
 import { errorResponse, HttpError, requireUserId } from '@/lib/api/requireAuth';
 import { noStoreJson } from '@/lib/http/noStore';
 import { isXConfigured } from '@/lib/x/config';
+import { resolveAutoPost, timestampMillis } from '@/lib/x/autoPost';
 import { getArtistAdmin, publicXConnection } from '@/lib/x/artistStore';
-import { emptyXConnection, type XPostLogEntry } from '@/types/firestore';
+import { emptyXConnection, type XPendingDeferred, type XPostLogEntry } from '@/types/firestore';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -28,11 +29,19 @@ function serializePost(entry: XPostLogEntry) {
 }
 
 function serializeTs(value: { toMillis?: () => number } | null | undefined) {
-  if (!value) return null;
-  if (typeof (value as { toMillis?: () => number }).toMillis === 'function') {
-    return (value as { toMillis: () => number }).toMillis();
-  }
-  return null;
+  return timestampMillis(value);
+}
+
+function serializeDeferred(
+  value: XPendingDeferred | null | undefined
+): XPendingDeferred | null {
+  if (!value || typeof value.songId !== 'string' || typeof value.title !== 'string') return null;
+  if (typeof value.notBeforeMs !== 'number' || !Number.isFinite(value.notBeforeMs)) return null;
+  return {
+    songId: value.songId,
+    title: value.title,
+    notBeforeMs: value.notBeforeMs,
+  };
 }
 
 /**
@@ -70,6 +79,13 @@ export async function GET(
     }
 
     const x = publicXConnection(artist);
+    const posts = (x.posts || []).map(serializePost);
+    const pendingDeferred = serializeDeferred(x.pendingDeferred);
+    const lastFromPosts = posts.reduce<number | null>((best, post) => {
+      if (!post.createdAt) return best;
+      if (best == null || post.createdAt > best) return post.createdAt;
+      return best;
+    }, null);
     return noStoreJson({
       available: true,
       message: null,
@@ -82,7 +98,14 @@ export async function GET(
         lastError: x.lastError,
         lastErrorAt: serializeTs(x.lastErrorAt),
         profileSyncedAt: serializeTs(x.profileSyncedAt),
-        posts: (x.posts || []).map(serializePost),
+        posts,
+        autoPost: resolveAutoPost(x),
+        autoPostEnabledAt: serializeTs(x.autoPostEnabledAt),
+        lastPostedAt: timestampMillis(x.lastPostedAt) ?? lastFromPosts,
+        nextPostAtMs: timestampMillis(x.nextPostAtMs) ?? pendingDeferred?.notBeforeMs ?? null,
+        pendingDeferred,
+        lastSkippedTitle: x.lastSkippedTitle ?? null,
+        lastSkippedAtMs: timestampMillis(x.lastSkippedAtMs),
       },
     });
   } catch (error) {
