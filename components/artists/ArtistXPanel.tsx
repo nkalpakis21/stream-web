@@ -156,6 +156,29 @@ export function ArtistXPanel({
     }
   };
 
+  const disconnect = async () => {
+    if (!user) return;
+    if (!confirm('Disconnect X for this artist? Posting will stop until you connect again.')) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/x/disconnect', {
+        method: 'POST',
+        headers: await authHeaders(user),
+        body: JSON.stringify({ artistId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(visibleXMessage(data.error) || 'Could not disconnect X.');
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not disconnect X.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const setEnabled = async (enabled: boolean) => {
     if (!user || paused) return;
     const previous = x.autoPost;
@@ -193,6 +216,7 @@ export function ArtistXPanel({
       error={error}
       onToggle={setEnabled}
       onConnect={startConnect}
+      onDisconnect={disconnect}
     />
   );
 }

@@ -404,6 +404,32 @@ describe('auto-post status line', () => {
     );
     assert.equal(isXAuthPaused({ status: 'paused', lastError: 'X authentication failed. Reconnect this artist’s X account.' }), true);
     assert.equal(isXAuthPaused({ status: 'paused', lastError: 'X rate-limited this account.' }), false);
+    assert.deepEqual(
+      xAutoPostStatusLine({
+        paused: false,
+        autoPost: false,
+        username: 'nova',
+        lastPostedAt: NOW - 2 * HOUR,
+        pendingTitle: null,
+        pendingNotBeforeMs: null,
+        lastSkippedTitle: null,
+        nowMs: NOW,
+      }),
+      { tone: 'handle', text: '@nova', href: 'https://x.com/nova' }
+    );
+    assert.deepEqual(
+      xAutoPostStatusLine({
+        paused: false,
+        autoPost: true,
+        username: 'nova',
+        lastPostedAt: null,
+        pendingTitle: null,
+        pendingNotBeforeMs: null,
+        lastSkippedTitle: null,
+        nowMs: NOW,
+      }),
+      { tone: 'handle', text: '@nova', href: 'https://x.com/nova' }
+    );
   });
 });
 
@@ -415,16 +441,22 @@ describe('auto-post row', () => {
         paused: false,
         autoPost: false,
         busy: false,
-        status: { tone: 'none', text: '' },
+        status: { tone: 'handle', text: '@nova', href: 'https://x.com/nova' },
         error: null,
         onToggle() {},
         onConnect() {},
+        onDisconnect() {},
       })
     );
     assert.match(off, /Auto-post new songs to X/);
     assert.match(off, /Up to 3 a day/);
     assert.match(off, /aria-checked="false"/);
     assert.match(off, /data-on="false"/);
+    assert.match(off, /class="x-auto-handle"/);
+    assert.match(off, /href="https:\/\/x.com\/nova"/);
+    assert.match(off, />@nova</);
+    assert.match(off, /class="x-auto-disconnect"/);
+    assert.match(off, />Disconnect</);
     assert.doesNotMatch(off, /coin|token|crypto|pump|lime/i);
 
     const on = renderToStaticMarkup(
@@ -437,6 +469,7 @@ describe('auto-post row', () => {
         error: null,
         onToggle() {},
         onConnect() {},
+        onDisconnect() {},
       })
     );
     assert.match(on, /data-on="true"/);
@@ -452,10 +485,12 @@ describe('auto-post row', () => {
         error: null,
         onToggle() {},
         onConnect() {},
+        onDisconnect() {},
       })
     );
     assert.match(connect, /Connect X/);
     assert.doesNotMatch(connect, /role="switch"/);
+    assert.doesNotMatch(connect, /Disconnect/);
 
     const paused = renderToStaticMarkup(
       createElement(XAutoPostRow, {
@@ -467,10 +502,12 @@ describe('auto-post row', () => {
         error: null,
         onToggle() {},
         onConnect() {},
+        onDisconnect() {},
       })
     );
     assert.match(paused, /Reconnect X/);
     assert.match(paused, /data-on="false"/);
+    assert.match(paused, /class="x-auto-disconnect"/);
     assert.doesNotMatch(paused, /role="switch"/);
 
     const skipped = renderToStaticMarkup(
@@ -483,6 +520,7 @@ describe('auto-post row', () => {
         error: null,
         onToggle() {},
         onConnect() {},
+        onDisconnect() {},
       })
     );
     assert.match(skipped, /x-auto-status is-skipped/);
@@ -497,8 +535,16 @@ describe('auto-post row', () => {
     assert.match(css, /background:\s*#E8E6F2/);
     assert.match(css, /background:\s*#0A0A10/);
     assert.match(css, /background:\s*#8B8896/);
+    assert.match(css, /\.x-auto-reconnect\s*\{[^}]*min-height:\s*44px/);
     assert.match(css, /\.x-auto-reconnect[\s\S]*color:\s*#FF4D6A/);
+    assert.match(css, /\.x-auto-handle\s*\{[^}]*color:\s*#8B8896/);
     assert.match(css, /\.x-auto-status\.is-skipped[\s\S]*color:\s*#8B8896/);
+    const panel = readFileSync('components/artists/ArtistXPanel.tsx', 'utf8');
+    assert.match(panel, /\/api\/x\/disconnect/);
+    assert.match(
+      panel,
+      /Disconnect X for this artist\? Posting will stop until you connect again\./
+    );
     assert.doesNotMatch(css.slice(css.indexOf('.x-auto-row')), /#C8F542|#6ee7b7|lime/i);
   });
 });

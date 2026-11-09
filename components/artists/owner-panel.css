@@ -484,8 +484,8 @@
 .x-auto-reconnect {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
-  margin: 0 20px 14px;
+  min-height: 44px;
+  margin: 0 20px 0;
   padding: 0;
   border: 0;
   background: none;
@@ -497,6 +497,42 @@
   cursor: pointer;
 }
 
+.x-auto-handle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0 20px;
+  color: #8B8896;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  text-decoration: none;
+}
+
+.x-auto-handle:hover {
+  text-decoration: underline;
+}
+
+.x-auto-disconnect {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0 20px 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #8B8896;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.x-auto-disconnect:hover {
+  color: var(--ink, #f5f4f8);
+}
+
 .x-auto-error {
   margin: 0;
   padding: 0 20px 14px;
@@ -506,7 +542,9 @@
 }
 
 .x-auto-row:focus-visible,
-.x-auto-reconnect:focus-visible {
+.x-auto-reconnect:focus-visible,
+.x-auto-handle:focus-visible,
+.x-auto-disconnect:focus-visible {
   outline: 2px solid #E8E6F2;
   outline-offset: 2px;
 }

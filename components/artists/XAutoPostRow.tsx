@@ -34,6 +34,7 @@ export function XAutoPostRow({
   error,
   onToggle,
   onConnect,
+  onDisconnect,
 }: {
   connected: boolean;
   paused: boolean;
@@ -43,6 +44,7 @@ export function XAutoPostRow({
   error: string | null;
   onToggle: (enabled: boolean) => void;
   onConnect: () => void;
+  onDisconnect: () => void;
 }) {
   const canToggle = connected && !paused;
 
@@ -82,6 +84,16 @@ export function XAutoPostRow({
       ) : null}
       {status.tone === 'skipped' ? (
         <p className="x-auto-status is-skipped">{status.text}</p>
+      ) : null}
+      {status.tone === 'handle' ? (
+        <a className="x-auto-handle" href={status.href} target="_blank" rel="noreferrer">
+          {status.text}
+        </a>
+      ) : null}
+      {connected ? (
+        <button type="button" className="x-auto-disconnect" onClick={onDisconnect} disabled={busy}>
+          Disconnect
+        </button>
       ) : null}
       {error ? (
         <p className="x-auto-error" role="alert">
