@@ -10,23 +10,22 @@ import {
   adminGetSongVersions,
 } from '@/lib/server/songsAdmin';
 import { verifiedViewerIdFromPage } from '@/lib/server/viewer';
-import { hiddenSongPageMetadata, rejectHiddenSong } from '@/lib/songs/visibility';
+import { rejectHiddenSong } from '@/lib/songs/visibility';
 import { ClearOwnerRecovery } from '@/components/states/ClearOwnerRecovery';
 import { toPlain, type Plain } from '@/lib/serialize/toPlain';
 import { VersionCards } from '@/components/songs/VersionCards';
 import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
-import { SITE_NAME, publicUrl, coverArtAlt, shareImageUrl, brandOgImageUrl } from '@/lib/brand/site';
+import { publicUrl } from '@/lib/brand/site';
 import { coverFieldsFromSong, resolveCoverPoster } from '@/lib/covers/resolve';
-import { ArtistCoinBuy } from '@/components/artists/ArtistCoinBuy';
 import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
 import { SongStage } from '@/components/songs/SongStage';
 import { SongStageSkeleton } from '@/components/songs/SongStageSkeleton';
 import { getLyricsForSong } from '@/lib/services/lyrics';
 import { CommentsSection } from '@/components/comments/CommentsSection';
-import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
-import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import type { SongDocument, SongVersionDocument } from '@/types/firestore';
 import { playableAudioUrl } from '@/lib/songs/audioAvailability';
+import { loadSongShareFacts } from '@/lib/server/songShareFacts';
+import { metadataFromShareFacts, sharePageGate } from '@/lib/songs/shareCard';
 
 function primaryVersion(
   song: { currentVersionId?: string },
@@ -53,53 +52,11 @@ interface SongPageProps {
 
 export async function generateMetadata({ params }: SongPageProps): Promise<Metadata> {
   noStore();
-  const [viewerId, song] = await Promise.all([
-    verifiedViewerIdFromPage(),
-    adminGetSong(params.id),
-  ]);
-  rejectHiddenSong(song, viewerId);
-  // The owner can open a private song. The title still stays out of the tags.
-  if (song.isPublic !== true) {
-    return hiddenSongPageMetadata();
-  }
-
-  const artistContext = await getArtistCardContext([song.artistId]);
-  const artist = artistContext.displays.get(song.artistId) ?? null;
-
-  const ogImageUrl = shareImageUrl(resolveCoverPoster(song));
-  const usingBrandOg = ogImageUrl === brandOgImageUrl();
-
-  const title = song.title;
-  const artistName = artist?.name || 'Unknown Artist';
-  const description = `Listen to ${title} by ${artistName} on Streamstar`;
-  const pageUrl = publicUrl(`/songs/${params.id}`);
-  const cardDescription = `by ${artistName}`;
-
-  return {
-    title,
-    description,
-    alternates: { canonical: pageUrl },
-    openGraph: {
-      title,
-      description: cardDescription,
-      type: 'music.song',
-      url: pageUrl,
-      images: [
-        {
-          url: ogImageUrl,
-          width: 1200,
-          height: usingBrandOg ? 630 : 1200,
-          alt: usingBrandOg ? SITE_NAME : coverArtAlt(title),
-        },
-      ],
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description: cardDescription,
-      images: [ogImageUrl],
-    },
-  };
+  const viewerId = await verifiedViewerIdFromPage();
+  const facts = await loadSongShareFacts(params.id, viewerId);
+  const resolved = metadataFromShareFacts(facts);
+  if (resolved.notFound) notFound();
+  return resolved.metadata;
 }
 
 async function SongPageBody({
@@ -114,7 +71,6 @@ async function SongPageBody({
     adminGetSongGenerations(song.id),
   ]);
   const artist = artistContext.displays.get(song.artistId) ?? null;
-  const coinHint = artistContext.coins.get(song.artistId);
   const hasPendingGeneration = generations.some(
     generation => generation.status === 'pending' || generation.status === 'processing'
   );
@@ -126,10 +82,6 @@ async function SongPageBody({
   const primaryAudioUrl = playableAudioUrl(allVersions);
   const lyrics = getLyricsForSong(generations);
 
-  const mint = coinHint?.mint?.trim() || '';
-  const quotes = mint ? await fetchCoinQuotes([mint]) : new Map<string, ArtistCoinQuote>();
-  const coin = mint ? quotes.get(mint) ?? null : null;
-  const buyUrl = coinHint?.buyUrl ?? null;
   const shareUrl = publicUrl(`/songs/${song.id}`);
   const artistLinkable = artist?.isPublic === true;
 
@@ -149,10 +101,6 @@ async function SongPageBody({
           audioUrl={primaryAudioUrl}
           pending={hasPendingGeneration}
           durationSeconds={song.duration ?? null}
-          ticker={coinHint?.ticker}
-          coinIcon={coinHint?.coinIcon}
-          coin={coin}
-          buyUrl={buyUrl}
           shareUrl={shareUrl}
           versions={allVersions.map(version => ({
             id: version.id,
@@ -176,7 +124,6 @@ async function SongPageBody({
         </SongStage>
         <div className="mt-6 mb-10 flex flex-col items-start gap-3">
           <SongOwnerActions songId={song.id} songTitle={song.title} ownerId={song.ownerId} />
-          <ArtistCoinBuy url={buyUrl} />
           <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3">
             Created {timeAgo}
           </p>
@@ -206,6 +153,7 @@ export default async function SongPage({ params }: SongPageProps) {
     adminGetSong(params.id),
   ]);
   rejectHiddenSong(song, viewerId);
+  if (sharePageGate(song, viewerId) === 'not-found') notFound();
 
   const allVersions = await adminGetSongVersions(song.id);
   if (!primaryVersion(song, allVersions)) {

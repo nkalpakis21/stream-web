@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { PlayerCoinChip } from './PlayerCoinChip';
 import { CoverMedia } from '@/components/media/CoverMedia';
 import { coverFieldsFromSong, type CoverFields } from '@/lib/covers/resolve';
+import { bindPlayerAudio } from '@/lib/player/boundAudio';
 import './listen-player.css';
 
 interface PlayingTrack extends CoverFields {
@@ -24,6 +25,7 @@ interface ListenPlayerProps {
   onNext: () => void;
   onEnded: () => void;
   onPlaybackError: () => void;
+  showCoin?: boolean;
 }
 
 function formatTime(seconds: number): string {
@@ -50,6 +52,7 @@ export function ListenPlayer({
   onNext,
   onEnded,
   onPlaybackError,
+  showCoin = true,
 }: ListenPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -57,6 +60,11 @@ export function ListenPlayer({
   const [volume, setVolume] = useState(1);
 
   const audioUrl = nowPlaying?.audioUrl ?? '';
+
+  useEffect(() => {
+    bindPlayerAudio(audioRef.current);
+    return () => bindPlayerAudio(null);
+  }, []);
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
   const hasTrack = Boolean(nowPlaying);
 
@@ -180,7 +188,7 @@ export function ListenPlayer({
             <p className="listen-player-artist" data-entity="artist">
               {nowPlaying?.artistName || ''}
             </p>
-            <PlayerCoinChip artistId={nowPlaying?.artistId} />
+            {showCoin ? <PlayerCoinChip artistId={nowPlaying?.artistId} /> : null}
           </div>
         </div>
 

@@ -311,6 +311,12 @@ html.listen [role='button']:focus-visible {
   outline-offset: 3px;
 }
 
+.song-play-orb {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+}
+
 .song-stage-chip.is-selected {
   background: var(--surface-2, #1c1c28);
   border-color: transparent;

@@ -932,7 +932,8 @@ service cloud.firestore {
     }
 
     // Funnel events. First-time docs are `${uid}_${event}`. play and
-    // song_shared are auto ids. Admin SDK only, including nested docs.
+    // song_shared are auto ids. Anonymous share-page plays are auto ids too.
+    // Admin SDK only, including nested docs. No client access.
     match /funnelEvents/{eventId} {
       allow read, write: if false;
       match /{document=**} {

@@ -5,6 +5,8 @@
  * the MusicGPT webhook. First-time milestones use doc id `${uid}_${event}`
  * and create-if-absent. `play` and `song_shared` are a new auto-id doc each
  * time. `platform` is `web`, `ios`, or `unknown` (`lib/funnel/platform.ts`).
+ * Anonymous share-page plays are auto-id docs with `uid: null`, `visitorId`,
+ * and `source: 'share_page'`. Signed-in plays from that page set the same source.
  */
 
 import { waitUntil } from '@vercel/functions';
@@ -12,6 +14,7 @@ import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import { getAdminDb, isFirebaseAdminConfigured } from '@/lib/firebase/admin';
+import { canonicalVisitorId } from '@/lib/analytics/visitorId';
 import {
   platformFromRequest,
   type FunnelPlatform,
@@ -43,6 +46,12 @@ export type ClientFunnelEvent = RepeatFunnelEvent;
 
 /** Ignore another play of the same song by the same user inside this window. */
 export const PLAY_REPEAT_WINDOW_MS = 30_000;
+
+/** Anonymous share-page plays allowed per visitor and per IP in this window. */
+export const ANONYMOUS_PLAY_HOUR_MS = 60 * 60 * 1000;
+export const ANONYMOUS_PLAY_HOUR_MAX = 60;
+
+export const SHARE_PAGE_SOURCE = 'share_page' as const;
 
 /** Auth user created within this window counts as signed_up. Older sessions do not. */
 export const SIGNED_UP_WINDOW_MS = 60 * 60 * 1000;
@@ -229,17 +238,23 @@ function keepAlive(task: Promise<unknown>): void {
 }
 
 function eventData(
-  uid: string,
+  uid: string | null,
   event: FunnelEvent,
   props: Record<string, unknown> | null | undefined,
-  platform: FunnelPlatform
+  platform: FunnelPlatform,
+  extra?: { source?: typeof SHARE_PAGE_SOURCE; visitorId?: string }
 ): Record<string, unknown> {
+  const safeProps = sanitizeFunnelProps(props);
   return {
     uid,
     event,
     at: FieldValue.serverTimestamp(),
-    props: sanitizeFunnelProps(props),
+    props: safeProps,
     platform,
+    ...(extra?.source === SHARE_PAGE_SOURCE ? { source: SHARE_PAGE_SOURCE } : {}),
+    ...(extra?.visitorId ? { visitorId: extra.visitorId } : {}),
+    ...(extra?.visitorId && safeProps.songId ? { songId: safeProps.songId } : {}),
+    ...(extra?.visitorId && safeProps.artistId ? { artistId: safeProps.artistId } : {}),
   };
 }
 
@@ -251,7 +266,8 @@ export async function trackFunnelEvent(
   uid: string,
   event: string,
   props?: Record<string, unknown> | null,
-  platform: FunnelPlatform = 'unknown'
+  platform: FunnelPlatform = 'unknown',
+  source?: typeof SHARE_PAGE_SOURCE
 ): Promise<{ created: boolean }> {
   if (!isFunnelEvent(event)) {
     throw new Error('Invalid funnel event');
@@ -264,7 +280,8 @@ export async function trackFunnelEvent(
     return { created: false };
   }
 
-  const data = eventData(safeUid, event, props, platform);
+  const shareSource = source === SHARE_PAGE_SOURCE && event === 'play' ? SHARE_PAGE_SOURCE : undefined;
+  const data = eventData(safeUid, event, props, platform, shareSource ? { source: shareSource } : undefined);
   const store = testStore ?? adminStore();
   if (isFirstFunnelEvent(event)) {
     try {
@@ -275,6 +292,38 @@ export async function trackFunnelEvent(
       throw error;
     }
   }
+  await store.add(data);
+  return { created: true };
+}
+
+/**
+ * Anonymous play from /songs/[id]. Auto-id. uid is null.
+ * Caller has already checked the visitor id, the public song, and the rate limit.
+ */
+export async function trackAnonymousSharePlay(input: {
+  visitorId: string;
+  songId: string;
+  artistId?: string | null;
+  platform: FunnelPlatform;
+}): Promise<{ created: boolean }> {
+  if (!isFunnelPlatform(input.platform)) {
+    throw new Error('Invalid funnel platform');
+  }
+  const visitorId = canonicalVisitorId(input.visitorId);
+  if (!visitorId) {
+    throw new Error('Invalid visitor');
+  }
+  if (inUnitTest() && !testStore) {
+    return { created: false };
+  }
+  const store = testStore ?? adminStore();
+  const data = eventData(
+    null,
+    'play',
+    { songId: input.songId, artistId: input.artistId },
+    input.platform,
+    { source: SHARE_PAGE_SOURCE, visitorId }
+  );
   await store.add(data);
   return { created: true };
 }

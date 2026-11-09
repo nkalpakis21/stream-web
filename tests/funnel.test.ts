@@ -273,11 +273,45 @@ describe('funnel counts', () => {
     assert.match(text, /first_song_ready users=0 web_users=0 ios_users=0 unknown_users=0/);
     assert.match(
       text,
-      /play events=3 users=2 web_events=2 web_users=1 ios_events=0 ios_users=0 unknown_events=1 unknown_users=1/
+      /play events=3 users=2 web_events=2 web_users=1 ios_events=0 ios_users=0 unknown_events=1 unknown_users=1 source_none_events=3 source_none_users=2/
     );
     assert.match(
       text,
       /song_shared events=1 users=1 web_events=0 web_users=0 ios_events=1 ios_users=1 unknown_events=0 unknown_users=0/
     );
+  });
+
+  it('breaks plays down by source, counting a visitor when uid is null', () => {
+    const range = parseFunnelRange('2026-03-01', '2026-03-01');
+    assert.ok(range);
+    const counts = countFunnelRows(
+      [
+        { event: 'play', uid: 'alice', platform: 'web', source: 'share_page', atMs: range.fromMs },
+        {
+          event: 'play',
+          uid: null,
+          visitorId: 'ssv_11111111-1111-4111-8111-111111111111',
+          platform: 'web',
+          source: 'share_page',
+          atMs: range.fromMs + 1,
+        },
+        { event: 'play', uid: 'alice', platform: 'ios', atMs: range.fromMs + 2 },
+      ],
+      range.fromMs,
+      range.toMs
+    );
+    assert.equal(counts.play.events, 3);
+    assert.equal(counts.play.users, 1);
+    assert.equal(counts.play.bySource.share_page?.events, 2);
+    assert.equal(counts.play.bySource.share_page?.users, 2);
+    assert.equal(counts.play.bySource.none?.events, 1);
+    assert.equal(counts.play.bySource.none?.users, 1);
+    const text = formatFunnelCounts({
+      projectId: 'stream-dev-48098',
+      from: '2026-03-01',
+      to: '2026-03-01',
+      counts,
+    });
+    assert.match(text, /source_none_events=1 source_none_users=1 source_share_page_events=2 source_share_page_users=2/);
   });
 });

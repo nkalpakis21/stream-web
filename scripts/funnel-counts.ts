@@ -3,7 +3,8 @@
  * Print funnelEvents counts for one Firebase project and a UTC date range.
  * First-time events print unique users. play and song_shared print total
  * events and unique users. Each line also splits those numbers by platform
- * (web, ios, unknown). Read-only: it only runs a query.
+ * (web, ios, unknown). Play lines also split events and actors by source
+ * (`share_page`, or `none`). Read-only: it only runs a query.
  *
  * Credentials must be for the project you name. A mismatched project_id
  * refuses to run.
@@ -220,6 +221,8 @@ async function main(): Promise<void> {
       atMs,
       uid: doc.get('uid'),
       platform: doc.get('platform'),
+      source: doc.get('source'),
+      visitorId: doc.get('visitorId'),
     };
   });
   const counts = countFunnelRows(rows, range.fromMs, range.toMs);
