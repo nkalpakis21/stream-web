@@ -7,15 +7,18 @@ import { artistPageClientProps } from '@/lib/artists/pageProps';
 import { artistHeroFaceSources } from '@/lib/images/artistFace';
 import { ClearOwnerRecovery } from '@/components/states/ClearOwnerRecovery';
 import { isArtistOwner, selectArtistPageSongs } from '@/lib/artists/ownerSongs';
+import { songAudioExpired } from '@/lib/songs/audioAvailability';
+import { coverFieldsFromSong } from '@/lib/covers/resolve';
 import { adminGetArtist } from '@/lib/server/artistsAdmin';
 import { adminCountFollowers } from '@/lib/server/followsCount';
 import { isXConfigured } from '@/lib/x/config';
-import { adminListOwnerArtistSongs } from '@/lib/server/songsAdmin';
+import { adminListOwnerArtistSongs, adminListVersionsForSongs } from '@/lib/server/songsAdmin';
 import { getArtistCardContext } from '@/lib/server/artistDisplay';
 import { verifiedViewerIdFromPage } from '@/lib/server/viewer';
 import { SITE_NAME, publicUrl, isDefaultTempoRange, shareImageUrl, brandOgImageUrl } from '@/lib/brand/site';
 import { getArtistSongs } from '@/lib/services/songs';
 import { SongCard } from '@/components/songs/SongCard';
+import { UnavailableAudioRow } from '@/components/songs/UnavailableAudioRow';
 import { ArtistHero } from '@/components/artists/ArtistHero';
 import { coinBadgeFromArtist, hasLaunchedCoin } from '@/lib/brand/coin';
 import { ArtistPageSkeleton } from '@/components/artists/ArtistPageSkeleton';
@@ -90,14 +93,21 @@ async function ArtistPageBody({
     getArtistCardContext([artist.id]),
     adminCountFollowers(artist.id),
   ]);
+  const versionsBySong = await adminListVersionsForSongs(fetchedSongs.map(song => song.id));
+  const audioExpired = (song: { id: string }) =>
+    songAudioExpired(versionsBySong.get(song.id) ?? []);
   const songs = selectArtistPageSongs(
     fetchedSongs,
     ownerView ? viewerId : null,
     artist.ownerId,
-    artist.id
-  );
+    artist.id,
+    audioExpired
+  ).map(song => ({
+    ...song,
+    audioUnavailable: ownerView && audioExpired(song),
+  }));
 
-  const faceSongs = songs.filter(song => song.isPublic === true);
+  const faceSongs = songs.filter(song => song.isPublic === true && !song.audioUnavailable);
   const faceSources = artistHeroFaceSources({
     lockedLookUrl: cards.displays.get(artist.id)?.photoUrl ?? null,
     avatarURL: artist.avatarURL,
@@ -191,16 +201,25 @@ async function ArtistPageBody({
           </div>
           {songs.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {clientProps.songs.map(song => (
-                <SongCard
-                  key={song.id}
-                  song={song}
-                  artistName={view.name}
-                  ticker={coinBadge?.ticker}
-                  coinIcon={coinBadge?.iconSrc}
-                  ownerCatalog={ownerView}
-                />
-              ))}
+              {clientProps.songs.map(song =>
+                song.audioUnavailable ? (
+                  <UnavailableAudioRow
+                    key={song.id}
+                    songId={song.id}
+                    title={song.title}
+                    cover={coverFieldsFromSong(song)}
+                  />
+                ) : (
+                  <SongCard
+                    key={song.id}
+                    song={song}
+                    artistName={view.name}
+                    ticker={coinBadge?.ticker}
+                    coinIcon={coinBadge?.iconSrc}
+                    ownerCatalog={ownerView}
+                  />
+                )
+              )}
             </div>
           ) : (
             <div className="rounded-xl border-2 border-dashed border-border bg-muted/30 p-12 text-center">

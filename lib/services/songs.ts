@@ -34,6 +34,7 @@ import type {
 import { getArtist } from './artists';
 import { getNotificationsBySong } from './notifications';
 import { SITE_ORIGIN } from '@/lib/brand/site';
+import { songAudioExpired } from '@/lib/songs/audioAvailability';
 
 /**
  * Create a new song
@@ -357,14 +358,44 @@ export async function getArtistSongs(
 }
 
 /**
+ * Song ids whose playable version is audioExpired and nothing else can play.
+ * A failed version read keeps the song (the player still skips a dead file).
+ */
+export async function expiredSongIds(songIds: readonly string[]): Promise<Set<string>> {
+  const expired = new Set<string>();
+  await Promise.all(
+    songIds.map(async songId => {
+      try {
+        const versions = await getSongVersions(songId);
+        if (songAudioExpired(versions)) expired.add(songId);
+      } catch (error) {
+        console.warn('[expiredSongIds] version lookup failed', songId, error);
+      }
+    })
+  );
+  return expired;
+}
+
+/** Heat, Discover, and search drop these. Order of the input list is kept. */
+export async function omitExpiredAudioSongs<T extends { id: string }>(
+  songs: readonly T[]
+): Promise<T[]> {
+  if (songs.length === 0) return [];
+  const expired = await expiredSongIds(songs.map(song => song.id));
+  return songs.filter(song => !expired.has(song.id));
+}
+
+/**
  * Get top songs ranked by play count
  * 
  * Uses composite index: (isPublic, deletedAt, playCount)
  * This allows direct querying by playCount for accurate top songs.
+ * Over-fetches so expired audio does not consume a Heat slot.
  */
 export async function getTopSongs(
   limitCount: number = 12
 ): Promise<SongDocument[]> {
+  const fetchCount = Math.min(Math.max(limitCount * 5, limitCount), 100);
   try {
     // Query directly by playCount using the composite index
     const q = query(
@@ -372,13 +403,14 @@ export async function getTopSongs(
       where('isPublic', '==', true),
       where('deletedAt', '==', null),
       orderBy('playCount', 'desc'),
-      limit(limitCount)
+      limit(fetchCount)
     );
     const snapshot = await getDocs(q);
     
-    return snapshot.docs
+    const ranked = snapshot.docs
       .map(doc => doc.data() as SongDocument)
       .filter(song => !song.deletedAt); // Double-check filter for safety
+    return (await omitExpiredAudioSongs(ranked)).slice(0, limitCount);
   } catch (error: any) {
     // Fallback if composite index doesn't exist yet
     if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
@@ -394,11 +426,11 @@ export async function getTopSongs(
       );
       const snapshot = await getDocs(q);
       
-      return snapshot.docs
+      const ranked = snapshot.docs
         .map(doc => doc.data() as SongDocument)
         .filter(song => !song.deletedAt)
-        .sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0))
-        .slice(0, limitCount);
+        .sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0));
+      return (await omitExpiredAudioSongs(ranked)).slice(0, limitCount);
     }
     throw error;
   }

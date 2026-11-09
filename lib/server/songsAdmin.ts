@@ -51,6 +51,40 @@ export async function adminListOwnerArtistSongs(
   return selectArtistPageSongs(docs, ownerId, ownerId, artistId).slice(0, limitCount);
 }
 
+/** Versions for many songs. Used to tell expired audio from playable audio. */
+export async function adminListVersionsForSongs(
+  songIds: readonly string[]
+): Promise<Map<string, SongVersionDocument[]>> {
+  const ids = [...new Set(songIds.filter(id => typeof id === 'string' && id.length > 0))];
+  const map = new Map<string, SongVersionDocument[]>();
+  if (ids.length === 0) return map;
+  const versions = getAdminDb().collection(COLLECTIONS.songVersions);
+  try {
+    for (let i = 0; i < ids.length; i += 30) {
+      const chunk = ids.slice(i, i + 30);
+      const snap = await versions.where('songId', 'in', chunk).get();
+      for (const doc of snap.docs) {
+        const data = doc.data() as SongVersionDocument;
+        const songId = typeof data.songId === 'string' ? data.songId : '';
+        if (!songId) continue;
+        const list = map.get(songId) ?? [];
+        list.push(data.id ? data : { ...data, id: doc.id });
+        map.set(songId, list);
+      }
+    }
+    return map;
+  } catch (error) {
+    console.warn('[adminListVersionsForSongs] batch read failed, reading per song', error);
+    const filled = new Map<string, SongVersionDocument[]>();
+    await Promise.all(
+      ids.map(async songId => {
+        filled.set(songId, await adminGetSongVersions(songId));
+      })
+    );
+    return filled;
+  }
+}
+
 export async function adminGetSong(songId: string): Promise<SongDocument | null> {
   const snap = await getAdminDb().collection(COLLECTIONS.songs).doc(songId).get();
   if (!snap.exists) return null;

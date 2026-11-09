@@ -10,6 +10,7 @@ import {
   type CoverFields,
 } from '@/lib/covers/resolve';
 import { getSongVersions } from '@/lib/services/songs';
+import { playableAudioUrl } from '@/lib/songs/audioAvailability';
 import { createDebouncedPlayTracker } from '@/lib/utils/playTracking';
 
 function formatClock(total: number): string {
@@ -62,30 +63,29 @@ export function PlayableArt({
       : null;
 
   const startPlayback = async () => {
-    let url = resolvedAudio;
-    if (!url) {
-      setLoading(true);
+    setLoading(true);
+    try {
+      let url: string | null = null;
       try {
         const versions = await getSongVersions(songId);
-        url =
-          versions.find(v => v.isPrimary && v.audioURL)?.audioURL ||
-          versions.find(v => v.audioURL)?.audioURL ||
-          null;
-        setResolvedAudio(url);
-      } finally {
-        setLoading(false);
+        url = versions.length > 0 ? playableAudioUrl(versions) : audioUrlProp ?? resolvedAudio;
+      } catch {
+        url = audioUrlProp ?? resolvedAudio;
       }
+      setResolvedAudio(url);
+      if (!url) return;
+      play({
+        songId,
+        songTitle: title,
+        artistName,
+        artistId,
+        ...playerCoverPayload(coverFields),
+        audioUrl: url,
+      });
+      trackPlay(songId);
+    } finally {
+      setLoading(false);
     }
-    if (!url) return;
-    play({
-      songId,
-      songTitle: title,
-      artistName,
-      artistId,
-      ...playerCoverPayload(coverFields),
-      audioUrl: url,
-    });
-    trackPlay(songId);
   };
 
   const onPlay = () => {

@@ -10,6 +10,7 @@ import { createDebouncedPlayTracker } from '@/lib/utils/playTracking';
 import { formatCoinCluster, formatHeatCoinCluster, type ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { EmptyAction } from '@/components/states/EmptyAction';
 import { playerCoverPayload, type CoverFields } from '@/lib/covers/resolve';
+import { playableAudioUrl } from '@/lib/songs/audioAvailability';
 import { artistFaceSources, songCoverCandidates } from '@/lib/images/artistFace';
 import './heat.css';
 
@@ -89,16 +90,12 @@ function HeatRow({ track, rank, queue }: { track: HeatTrack; rank: number; queue
       setLoading(true);
       try {
         const versions = await getSongVersions(track.id);
-        url =
-          versions.find(v => v.isPrimary && v.audioURL)?.audioURL ||
-          versions.find(v => v.audioURL)?.audioURL ||
-          null;
+        url = playableAudioUrl(versions);
         setAudioUrl(url);
       } finally {
         setLoading(false);
       }
     }
-    if (!url) return;
     play(
       {
         songId: track.id,
@@ -106,11 +103,11 @@ function HeatRow({ track, rank, queue }: { track: HeatTrack; rank: number; queue
         artistName: track.artistName,
         artistId: track.artistId,
         ...playerCoverPayload(track.cover),
-        audioUrl: url,
+        audioUrl: url ?? '',
       },
       queue.map(toQueueItem)
     );
-    trackPlay(track.id);
+    if (url) trackPlay(track.id);
   };
 
   const onPlay = () => {
