@@ -135,6 +135,17 @@ describe('song share metadata', () => {
       assert.deepEqual(coverOnly.face, { type: 'initials', initials: 'NL' });
     }
 
+    const oneWord = selectShareArt({
+      shareable: true,
+      coverUrl: 'https://cdn.example/cover.jpg',
+      faceUrl: null,
+      artistName: 'Jimmy',
+    });
+    assert.equal(oneWord.kind, 'card');
+    if (oneWord.kind === 'card') {
+      assert.deepEqual(oneWord.face, { type: 'initials', initials: 'J' });
+    }
+
     assert.deepEqual(
       selectShareArt({ shareable: true, coverUrl: null, faceUrl: null, artistName: 'Nova' }),
       { kind: 'brand' }

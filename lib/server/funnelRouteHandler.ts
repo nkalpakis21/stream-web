@@ -11,6 +11,7 @@ import { songIsSharePublic } from '@/lib/songs/shareCard';
 import {
   ANONYMOUS_PLAY_HOUR_MAX,
   ANONYMOUS_PLAY_HOUR_MS,
+  clientCreateFunnelError,
   isClientFunnelEvent,
   isPlayRateLimited,
   playRateKey,
@@ -37,6 +38,10 @@ const bodySchema = z
     artistId: idSchema.optional(),
     visitorId: z.string().trim().min(1).max(80).optional(),
     source: z.literal(SHARE_PAGE_SOURCE).optional(),
+    /** face_set only. skip and none are rejected after parse. */
+    method: z.string().trim().min(1).max(32).optional(),
+    /** create_submitted only. */
+    face: z.string().trim().min(1).max(32).optional(),
   })
   .strict();
 
@@ -151,7 +156,8 @@ function anonymousActor(visitorId: string): string {
 
 /**
  * POST /api/funnel
- * Signed-in client events: play and song_shared.
+ * Signed-in client events: play, song_shared, create_started, face_set,
+ * and create_submitted. face_set requires method upload or generate.
  * An unauthenticated body may only be a share-page play:
  * `{ event: 'play', songId, visitorId, source: 'share_page' }`.
  * play is limited to one per song per 30s. Anonymous plays are also
@@ -225,6 +231,13 @@ export async function POST(request: NextRequest) {
     const uid = await requireUser(request, {
       verifyToken: verifyForTests ?? undefined,
     });
+    const createError = clientCreateFunnelError(event, {
+      method: parsed.data.method,
+      face: parsed.data.face,
+    });
+    if (createError) {
+      return noStoreJson({ error: createError }, 400);
+    }
     if (event === 'play' && isPlayRateLimited(recentPlays, uid, parsed.data.songId, now)) {
       return noStoreJson({ ok: true });
     }
@@ -236,6 +249,8 @@ export async function POST(request: NextRequest) {
         sanitizeFunnelProps({
           songId: parsed.data.songId,
           artistId: parsed.data.artistId,
+          ...(event === 'face_set' ? { method: parsed.data.method } : {}),
+          ...(event === 'create_submitted' ? { face: parsed.data.face } : {}),
         }),
         platform,
         event === 'play' && parsed.data.source === SHARE_PAGE_SOURCE ? SHARE_PAGE_SOURCE : undefined

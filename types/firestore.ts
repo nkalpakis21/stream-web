@@ -277,6 +277,11 @@ export interface SongDocument {
   createPrompt?: string | null;
   /** Optional lyrics from the create attempt. */
   createLyrics?: string | null;
+  /**
+   * Client time of the create submit. The webhook measures first_song_ready
+   * elapsedMs from this. Clients may set it once and cannot change it.
+   */
+  createSubmittedAt?: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   deletedAt: Timestamp | null;

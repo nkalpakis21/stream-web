@@ -4,6 +4,7 @@ import type { AIArtistDocument, SongDocument } from '@/types/firestore';
 import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
 import { StudioArtistTiles } from '@/components/dashboard/StudioArtistTile';
 import Link from 'next/link';
+import { CREATE_ARTIST_HREF } from '@/lib/create/paths';
 
 interface UserArtistsSectionProps {
   artists: AIArtistDocument[];
@@ -36,7 +37,7 @@ export function UserArtistsSection({
             Create your first AI artist to start making music
           </p>
           <Link
-            href="/dashboard?tab=artists"
+            href={CREATE_ARTIST_HREF}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent-cta text-accent-ink hover:opacity-90 transition-opacity font-medium text-sm"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

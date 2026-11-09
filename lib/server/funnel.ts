@@ -24,8 +24,10 @@ export { platformFromRequest, type FunnelPlatform };
 
 export const FIRST_FUNNEL_EVENTS = [
   'signed_up',
+  'create_started',
   'artist_created',
   'face_set',
+  'create_submitted',
   'first_song_started',
   'first_song_ready',
   'x_connected',
@@ -39,10 +41,24 @@ export type FirstFunnelEvent = (typeof FIRST_FUNNEL_EVENTS)[number];
 export type RepeatFunnelEvent = (typeof REPEAT_FUNNEL_EVENTS)[number];
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];
 
-/** Browser actions the signed-in client may report. Everything else is server-side. */
-export const CLIENT_FUNNEL_EVENTS = REPEAT_FUNNEL_EVENTS;
+/**
+ * Signed-in browser actions. create_started, face_set, and create_submitted
+ * are first-time milestones. play and song_shared are written every time.
+ * Everything else is server-side. Anonymous callers may only report a
+ * share-page play.
+ */
+export const CLIENT_CREATE_EVENTS = ['create_started', 'face_set', 'create_submitted'] as const;
 
-export type ClientFunnelEvent = RepeatFunnelEvent;
+export const CLIENT_FUNNEL_EVENTS = [...CLIENT_CREATE_EVENTS, ...REPEAT_FUNNEL_EVENTS] as const;
+
+export type ClientCreateEvent = (typeof CLIENT_CREATE_EVENTS)[number];
+export type ClientFunnelEvent = (typeof CLIENT_FUNNEL_EVENTS)[number];
+
+export const FACE_SET_METHODS = ['upload', 'generate'] as const;
+export const CREATE_SUBMITTED_FACES = ['upload', 'generate', 'none'] as const;
+
+export type FaceSetMethod = (typeof FACE_SET_METHODS)[number];
+export type CreateSubmittedFace = (typeof CREATE_SUBMITTED_FACES)[number];
 
 /** Ignore another play of the same song by the same user inside this window. */
 export const PLAY_REPEAT_WINDOW_MS = 30_000;
@@ -63,6 +79,8 @@ const CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 const PROP_KEYS = ['artistId', 'songId', 'taskId'] as const;
 const PROP_VALUE = /^[A-Za-z0-9_-]{1,128}$/;
+/** Drop a clock that is negative or longer than a month. */
+const MAX_ELAPSED_MS = 30 * 24 * 60 * 60 * 1000;
 
 export type FunnelStore = {
   create(id: string, data: Record<string, unknown>): Promise<void>;
@@ -124,13 +142,14 @@ export function isPlayRateLimited(
 }
 
 /**
- * Keep ids only. Drop emails, urls, and anything that is not a short id.
+ * Keep ids, the create-flow enums, and a bounded elapsedMs.
+ * Drop emails, urls, skip/none on face_set, and anything else.
  */
 export function sanitizeFunnelProps(
   props?: Record<string, unknown> | null
-): Record<string, string> {
+): Record<string, string | number> {
   if (!props) return {};
-  const out: Record<string, string> = {};
+  const out: Record<string, string | number> = {};
   for (const key of PROP_KEYS) {
     const value = props[key];
     if (typeof value !== 'string') continue;
@@ -138,7 +157,43 @@ export function sanitizeFunnelProps(
     if (!PROP_VALUE.test(trimmed)) continue;
     out[key] = trimmed;
   }
+  if (isFaceSetMethod(props.method)) out.method = props.method;
+  if (isCreateSubmittedFace(props.face)) out.face = props.face;
+  if (
+    typeof props.elapsedMs === 'number' &&
+    Number.isInteger(props.elapsedMs) &&
+    props.elapsedMs >= 0 &&
+    props.elapsedMs <= MAX_ELAPSED_MS
+  ) {
+    out.elapsedMs = props.elapsedMs;
+  }
   return out;
+}
+
+export function isFaceSetMethod(value: unknown): value is FaceSetMethod {
+  return value === 'upload' || value === 'generate';
+}
+
+export function isCreateSubmittedFace(value: unknown): value is CreateSubmittedFace {
+  return value === 'upload' || value === 'generate' || value === 'none';
+}
+
+/**
+ * Signed-in create events. face_set accepts only upload or generate.
+ * skip and none are rejected. create_submitted requires a face value,
+ * and none is allowed there because skip is a real submit.
+ */
+export function clientCreateFunnelError(
+  event: string,
+  input: { method?: unknown; face?: unknown }
+): string | null {
+  if (event === 'face_set' && !isFaceSetMethod(input.method)) {
+    return 'Invalid funnel event';
+  }
+  if (event === 'create_submitted' && !isCreateSubmittedFace(input.face)) {
+    return 'Invalid funnel event';
+  }
+  return null;
 }
 
 export function shouldRecordSignedUp(creationTimeMs: number, nowMs: number): boolean {

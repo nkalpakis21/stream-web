@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { CREATE_ARTIST_HREF } from '@/lib/create/paths';
 import { StudioCreateCards } from '@/components/dashboard/StudioCreateCards';
 import { UserArtistsSection } from '@/components/profile/UserArtistsSection';
 import { UserSongsSection } from '@/components/profile/UserSongsSection';
@@ -72,7 +73,7 @@ export function OverviewTab({
         <div className="text-center py-16 rounded-xl border border-white/10 bg-card/40">
           <div className="max-w-md mx-auto">
             <Link
-              href="/dashboard?tab=artists&new=1"
+              href={CREATE_ARTIST_HREF}
               className="inline-flex items-center gap-2 px-6 py-3 bg-accent-cta text-accent-ink rounded-xl hover:opacity-90 transition-opacity font-medium"
             >
               Create your first artist

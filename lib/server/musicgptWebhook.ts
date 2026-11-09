@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
+import { notifyOwnerSongReady } from '@/lib/server/expoPush';
 import { recordFunnelEvent, type FunnelPlatform } from '@/lib/server/funnel';
+import { firstSongReadyProps } from '@/lib/server/songReady';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import type { GenerationDocument, MusicGptUsageRecord, SongDocument, SongVersionDocument } from '@/types/firestore';
 import { getConversionDataByConversionID } from '@/lib/ai/providers/musicgpt';
@@ -407,11 +409,7 @@ export async function processMusicGptWebhook(
       recordFunnelEvent(
         song.ownerId,
         'first_song_ready',
-        {
-          songId: song.id,
-          taskId: body.task_id,
-          ...(typeof song.artistId === 'string' && song.artistId ? { artistId: song.artistId } : {}),
-        },
+        firstSongReadyProps(song, body.task_id, Date.now()),
         platform
       );
     } catch (error) {
@@ -419,6 +417,14 @@ export async function processMusicGptWebhook(
         '[funnel] first_song_ready',
         error instanceof Error ? error.message : 'failed'
       );
+    }
+    if (!hasExistingAudio && typeof song.artistId === 'string' && song.artistId) {
+      notifyOwnerSongReady({
+        ownerId: song.ownerId,
+        title: song.title,
+        songId: song.id,
+        artistId: song.artistId,
+      });
     }
   }
 

@@ -321,6 +321,7 @@ service cloud.firestore {
         && fieldUnchanged('generationAttemptAt')
         && fieldUnchanged('createPrompt')
         && fieldUnchanged('createLyrics')
+        && fieldUnchanged('createSubmittedAt')
         && sameCoverProvider()
         && request.resource.data.keys().hasOnly([
           'id',
@@ -336,6 +337,7 @@ service cloud.firestore {
           'generationAttemptAt',
           'createPrompt',
           'createLyrics',
+          'createSubmittedAt',
           'createdAt',
           'updatedAt',
           'deletedAt',
@@ -406,7 +408,9 @@ service cloud.firestore {
         && (!('createLyrics' in request.resource.data) || (
           request.resource.data.createLyrics is string
           && request.resource.data.createLyrics.size() <= 2000
-        ));
+        ))
+        && (!('createSubmittedAt' in request.resource.data)
+          || request.resource.data.createSubmittedAt is timestamp);
     }
 
     function coinMetadataClean() {
@@ -502,6 +506,13 @@ service cloud.firestore {
       allow delete: if isOwner(uid);
 
       match /private/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      // Expo push tokens. POST /api/push/register writes these with Admin.
+      // The owner can read their own tokens. Clients cannot write them.
+      match /pushTokens/{tokenId} {
         allow read: if isOwner(uid);
         allow write: if false;
       }

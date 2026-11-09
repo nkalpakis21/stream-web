@@ -13,6 +13,7 @@ import { fetchArtistCardDisplays } from '@/lib/artists/fetchCardDisplay';
 import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
 import type { SongDocument, AIArtistDocument } from '@/types/firestore';
 import { authHref, currentReturnTo } from '@/lib/auth/returnTo';
+import { legacyArtistCreateHref } from '@/lib/create/paths';
 import { DashboardPageSkeleton } from '@/components/dashboard/DashboardPageSkeleton';
 
 type DashboardTab = 'overview' | 'artists' | 'songs';
@@ -33,6 +34,12 @@ function DashboardContent() {
 
   useEffect(() => {
     if (authLoading) return;
+
+    const legacyCreate = legacyArtistCreateHref(searchParams);
+    if (legacyCreate) {
+      router.replace(legacyCreate);
+      return;
+    }
 
     if (!user) {
       const search = searchParams.toString();
@@ -114,15 +121,7 @@ function DashboardContent() {
             />
           )}
           {activeTab === 'artists' && (
-            <ArtistsTab
-              artists={artists}
-              songs={songs}
-              displays={artistDisplays}
-              onArtistCreated={() => {
-                // Reload artists when one is created
-                getUserArtists(user.uid).then(setArtists);
-              }}
-            />
+            <ArtistsTab artists={artists} songs={songs} displays={artistDisplays} />
           )}
           {activeTab === 'songs' && (
             <SongsTab

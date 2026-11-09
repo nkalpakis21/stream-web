@@ -428,3 +428,48 @@ describe('POST /api/artists/[id]/funnel', () => {
     assert.equal(memory.list().length, 0);
   });
 });
+
+describe('POST /api/funnel create milestones', () => {
+  it('requires sign-in and rejects face_set skip or none', async () => {
+    const memory = memoryStore();
+    setFunnelStoreForTests(memory.store);
+    setFunnelRouteAuthForTests(async () => ({ uid: 'alice' }));
+
+    const loggedOut = await POST(postFunnel({ event: 'create_started' }));
+    assert.equal(loggedOut.status, 401);
+
+    for (const method of ['skip', 'none', 'photo']) {
+      const response = await POST(
+        postFunnel({ event: 'face_set', method }, 'Bearer token')
+      );
+      assert.equal(response.status, 400, method);
+      assert.equal((await response.json()).error, 'Invalid funnel event');
+    }
+    const missing = await POST(postFunnel({ event: 'face_set' }, 'Bearer token'));
+    assert.equal(missing.status, 400);
+
+    const upload = await POST(postFunnel({ event: 'face_set', method: 'upload' }, 'Bearer token', 'web'));
+    const generate = await POST(postFunnel({ event: 'face_set', method: 'generate' }, 'Bearer token'));
+    assert.equal(upload.status, 200);
+    assert.equal(generate.status, 200);
+    const stored = memory.list().find(row => row.id === 'alice_face_set');
+    assert.equal(stored?.data.event, 'face_set');
+    assert.deepEqual(stored?.data.props, { method: 'upload' });
+
+    const started = await POST(postFunnel({ event: 'create_started' }, 'Bearer token', 'web'));
+    assert.equal(started.status, 200);
+    assert.equal(memory.list().some(row => row.id === 'alice_create_started'), true);
+
+    const skippedFace = await POST(
+      postFunnel({ event: 'create_submitted', face: 'skip' }, 'Bearer token')
+    );
+    assert.equal(skippedFace.status, 400);
+    const submitted = await POST(
+      postFunnel({ event: 'create_submitted', face: 'none' }, 'Bearer token', 'ios')
+    );
+    assert.equal(submitted.status, 200);
+    const created = memory.list().find(row => row.id === 'alice_create_submitted');
+    assert.deepEqual(created?.data.props, { face: 'none' });
+    assert.equal(created?.data.platform, 'ios');
+  });
+});
