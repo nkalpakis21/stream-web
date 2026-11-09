@@ -33,6 +33,7 @@ import {
 import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
 import { redactForLog } from '@/lib/webhooks/redactUrl';
 import { revalidateHomepage } from '@/lib/webhooks/revalidate';
+import { persistConversionAudio } from '@/lib/server/songAudioStorage';
 
 export interface MusicGPTWebhookPayload {
   success: boolean;
@@ -298,6 +299,16 @@ export async function processMusicGptWebhook(
   const versionId = versionRef.id;
   const hasExistingAudio = existingVersions.some((v) => Boolean(v.audioURL));
 
+  // MusicGPT deletes conversion_path after about 90 days. Copy the MP3 into
+  // our bucket first. A failed copy still saves their URL so the song plays,
+  // with audioPersisted false for the backfill. Retries reuse the same object.
+  // v1 and v2 completion both arrive here; audio_streaming returns above.
+  const persisted = await persistConversionAudio({
+    songId: song.id,
+    conversionId: body.conversion_id,
+    sourceUrl: body.conversion_path,
+  });
+
   const version: SongVersionDocument = {
     id: versionId,
     songId: song.id,
@@ -306,7 +317,9 @@ export async function processMusicGptWebhook(
     createdBy: song.ownerId,
     createdAt: now as unknown as SongVersionDocument['createdAt'],
     parentVersionId: song.currentVersionId,
-    audioURL: body.conversion_path,
+    audioURL: persisted.audioURL,
+    musicgptAudioUrl: persisted.musicgptAudioUrl,
+    audioPersisted: persisted.audioPersisted,
     providerOutputId,
     isPrimary: !hasExistingAudio,
   };
@@ -362,6 +375,8 @@ export async function processMusicGptWebhook(
 
   const conversionMetadata: Record<string, unknown> = {
     conversion_path: body.conversion_path,
+    storedAudioURL: persisted.audioURL,
+    audioPersisted: persisted.audioPersisted,
   };
   if (body.title) conversionMetadata.title = body.title;
   if (body.conversion_path_wav) conversionMetadata.conversion_path_wav = body.conversion_path_wav;
@@ -430,7 +445,7 @@ export async function processMusicGptWebhook(
       completedAt: shouldMarkCompleted ? now : generation.completedAt,
       ...(musicGptUsage ? { musicGptUsage } : {}),
       output: {
-        audioURL: shouldMarkCompleted ? body.conversion_path : generation.output?.audioURL || null,
+        audioURL: shouldMarkCompleted ? persisted.audioURL : generation.output?.audioURL || null,
         stems: body.conversion_path_wav ? [body.conversion_path_wav] : null,
         metadata: {
           ...(generation.output?.metadata || {}),
