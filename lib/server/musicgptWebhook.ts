@@ -7,7 +7,7 @@ import { firstSongReadyProps } from '@/lib/server/songReady';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import type { GenerationDocument, MusicGptUsageRecord, SongDocument, SongVersionDocument } from '@/types/firestore';
 import { getConversionDataByConversionID } from '@/lib/ai/providers/musicgpt';
-import { maybePostSongLive } from '@/lib/x/postSong';
+import { maybePostSongLive, sweepDeferredXPosts } from '@/lib/x/postSong';
 import { isFalCoverPipeline, shouldWriteMusicGptAlbumCover } from '@/lib/covers/config';
 import { musicGptAlbumCoverSongUpdates } from '@/lib/covers/musicgptAlbum';
 import { enqueueSongCoverGeneration } from '@/lib/covers/enqueue';
@@ -134,6 +134,11 @@ async function tryPostSongLive(songId: string, reason: string): Promise<void> {
     }
   } catch (error) {
     console.error(`[MusicGPT Webhook] X song-live post failed (${reason}):`, error);
+  }
+  try {
+    await sweepDeferredXPosts(8);
+  } catch (error) {
+    console.error('[MusicGPT Webhook] X deferred sweep failed:', error);
   }
 }
 

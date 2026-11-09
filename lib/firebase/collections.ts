@@ -71,7 +71,8 @@ export const COLLECTIONS = {
   blocks: 'blocks',
   /**
    * Funnel events. First-time milestones use doc id `${uid}_${event}`.
-   * play and song_shared use an auto id and are written every time.
+   * play, song_shared, and x_post use an auto id and are written every time.
+   * x_post is server-only.
    * Admin SDK only. Clients cannot read or write this collection.
    */
   funnelEvents: 'funnelEvents',

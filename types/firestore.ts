@@ -110,6 +110,22 @@ export interface XPostLogEntry {
   createdAt: Timestamp;
 }
 
+/** Soonest cap-deferred song. Shown on the owner auto-post row. */
+export interface XPendingDeferred {
+  songId: string;
+  title: string;
+  notBeforeMs: number;
+}
+
+/**
+ * In-flight post slot. Counted toward the cap until the post lands or it expires.
+ * Server-only. Not part of the client create shape.
+ */
+export interface XPostReservation {
+  songId: string;
+  atMs: number;
+}
+
 export interface XConnectionPublic {
   status: XConnectionStatus;
   /** X handle without @. Null until OAuth completes. */
@@ -127,6 +143,31 @@ export interface XConnectionPublic {
   recentPostTexts: string[];
   /** Activity log of posts we made (newest first, capped). */
   posts: XPostLogEntry[];
+  /**
+   * Owner opt-in for song-live posts. Absent on connections made before the
+   * flag. `resolveAutoPost` treats status `connected` with no field as on.
+   * New connects write false. Not part of the client create shape.
+   */
+  autoPost?: boolean;
+  /**
+   * Server time of the last switch-on, or the migration stamp for a
+   * grandfathered connection. Songs ready earlier are never posted.
+   */
+  autoPostEnabledAt?: Timestamp | null;
+  /** Milliseconds of the latest successful post. */
+  lastPostedAt?: number | null;
+  /** When the next deferred song may post. Null when nothing is waiting. */
+  nextPostAtMs?: number | null;
+  /** Soonest deferred song for the owner status line. */
+  pendingDeferred?: XPendingDeferred | null;
+  /**
+   * Title of the last song dropped because it missed the 24h post window.
+   * Cleared on the next successful post.
+   */
+  lastSkippedTitle?: string | null;
+  lastSkippedAtMs?: number | null;
+  /** Short-lived claim slots so two songs cannot pass the cap together. */
+  reservations?: XPostReservation[];
 }
 
 export function emptyXConnection(): XConnectionPublic {

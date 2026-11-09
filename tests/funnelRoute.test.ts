@@ -116,7 +116,7 @@ describe('POST /api/funnel', () => {
     setFunnelStoreForTests(memory.store);
     setFunnelRouteAuthForTests(async () => ({ uid: 'alice' }));
 
-    for (const event of ['signed_up', 'artist_created', 'face_set', 'first_song_ready', 'first_play', 'x_connected', 'nope']) {
+    for (const event of ['signed_up', 'artist_created', 'face_set', 'first_song_ready', 'first_play', 'x_connected', 'x_post', 'nope']) {
       const response = await POST(postFunnel({ event }, 'Bearer token'));
       assert.equal(response.status, 400, event);
     }

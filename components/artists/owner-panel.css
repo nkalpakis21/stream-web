@@ -394,6 +394,161 @@
   cursor: not-allowed;
 }
 
+/* Auto-post row. Ice when on. No lime. The row is the tap target. */
+.x-auto-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 48px;
+  padding: 14px 20px;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.x-auto-row.is-static,
+.x-auto-row:disabled {
+  cursor: default;
+}
+
+.x-auto-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.x-auto-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: #2A2A38;
+}
+
+.x-auto-switch[data-on='true'] {
+  background: #E8E6F2;
+}
+
+.x-auto-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #8B8896;
+  transition: transform 0.15s ease;
+}
+
+.x-auto-switch[data-on='true'] .x-auto-switch-knob {
+  transform: translateX(20px);
+  background: #0A0A10;
+}
+
+.x-auto-switch.is-disabled {
+  opacity: 0.55;
+}
+
+.x-auto-connect {
+  flex-shrink: 0;
+  color: #E8E6F2;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.x-auto-status {
+  margin: 0;
+  padding: 0 20px 14px;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--mute, #8B8896);
+}
+
+.x-auto-status.is-skipped {
+  color: #8B8896;
+}
+
+.x-auto-reconnect {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0 20px 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #FF4D6A;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.x-auto-handle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0 20px;
+  color: #8B8896;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  text-decoration: none;
+}
+
+.x-auto-handle:hover {
+  text-decoration: underline;
+}
+
+.x-auto-disconnect {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0 20px 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #8B8896;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.x-auto-disconnect:hover {
+  color: var(--ink, #f5f4f8);
+}
+
+.x-auto-error {
+  margin: 0;
+  padding: 0 20px 14px;
+  color: #FF4D6A;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.x-auto-row:focus-visible,
+.x-auto-reconnect:focus-visible,
+.x-auto-handle:focus-visible,
+.x-auto-disconnect:focus-visible {
+  outline: 2px solid #E8E6F2;
+  outline-offset: 2px;
+}
+
 @media (min-width: 768px) {
   .owner-panel-top {
     flex-direction: row;

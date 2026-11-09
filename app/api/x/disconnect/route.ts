@@ -4,8 +4,7 @@ import { noStoreJson } from '@/lib/http/noStore';
 import { artistIsVisible } from '@/lib/artists/visibility';
 import { getArtist } from '@/lib/services/artists';
 import { isXConfigured } from '@/lib/x/config';
-import { emptyXConnection } from '@/types/firestore';
-import { getArtistAdmin, updateArtistX } from '@/lib/x/artistStore';
+import { clearedXConnection, getArtistAdmin, updateArtistX } from '@/lib/x/artistStore';
 import { deleteXAuth, loadXAuth } from '@/lib/x/tokens';
 import { revokeToken } from '@/lib/x/oauth';
 
@@ -58,7 +57,7 @@ export async function POST(request: NextRequest) {
       console.warn('[X] disconnect token cleanup', err);
     }
 
-    await updateArtistX(artistId, emptyXConnection());
+    await updateArtistX(artistId, clearedXConnection());
 
     return noStoreJson({ ok: true, status: 'disconnected' });
   } catch (error) {

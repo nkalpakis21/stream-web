@@ -113,6 +113,14 @@ export function getPublicAppUrl(): string {
   );
 }
 
+/**
+ * Public song share page. `/songs/{id}` serves the share card as its
+ * twitter:image (`app/songs/[id]/twitter-image`).
+ */
+export function songSharePageUrl(songId: string): string {
+  return `${getPublicAppUrl()}/songs/${songId}`;
+}
+
 export function basicAuthHeader(): string {
   const raw = `${getXClientId()}:${getXClientSecret()}`;
   return `Basic ${Buffer.from(raw).toString('base64')}`;
