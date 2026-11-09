@@ -12,6 +12,7 @@ import {
   type SongAudioFile,
 } from '../lib/server/songAudioStorage';
 import type { GenerationDocument, SongDocument } from '../types/firestore';
+import { isListedOnPublicShelf } from '../lib/songs/catalogAudio';
 
 const TASK_ID = 'task-audio-1';
 const SONG_ID = 'song-1';
@@ -264,7 +265,11 @@ afterEach(() => {
   }
 });
 
-async function seed(memory: ReturnType<typeof createMemoryAdminDb>, conversionIds: string[]) {
+async function seed(
+  memory: ReturnType<typeof createMemoryAdminDb>,
+  conversionIds: string[],
+  songOverrides?: DocData
+) {
   setEnv('MUSICGPT_BASE_URL', 'https://api.musicgpt.com/api/public/v1');
   setEnv('MUSICGPT_API_KEY', 'test-musicgpt-key');
   setEnv('MUSICGPT_WEBHOOK_SECRET', 'webhook-secret');
@@ -273,7 +278,10 @@ async function seed(memory: ReturnType<typeof createMemoryAdminDb>, conversionId
   setEnv('X_CLIENT_SECRET', undefined);
   setEnv('NEXT_PUBLIC_APP_URL', undefined);
   globalThis.fetch = (async () => new Response('no', { status: 404 })) as typeof fetch;
-  await memory.db.collection(COLLECTIONS.songs).doc(SONG_ID).set(song() as unknown as DocData);
+  await memory.db.collection(COLLECTIONS.songs).doc(SONG_ID).set({
+    ...(song() as unknown as DocData),
+    ...songOverrides,
+  });
   await memory.db
     .collection(COLLECTIONS.generations)
     .doc('gen-1')
@@ -465,5 +473,146 @@ describe('MusicGPT webhook audio persistence', { concurrency: false }, () => {
     );
     assert.equal(versions(memory)[0]?.data.audioPersisted, true);
     assert.equal(versions(memory)[0]?.data.musicgptAudioUrl, audioUrl(CONV_A));
+  });
+
+  it('makes a held song visible on the first stored audio and revalidates New', async () => {
+    const memory = createMemoryAdminDb();
+    const bucket = createBucket();
+    const calls: string[] = [];
+    setSongAudioStorageDepsForTests({ bucket, fetchImpl: mp3Fetch() });
+    await seed(memory, [CONV_A], {
+      isPublic: false,
+      audioReady: false,
+      publicOnReady: true,
+    });
+    setEnv('NEXT_PUBLIC_APP_URL', 'https://preview.example.com');
+    setEnv('REVALIDATE_SECRET', 'revalidate-header-secret');
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.includes('cdn1.musicgpt.com')) {
+        return new Response('mp3', { status: 200 });
+      }
+      return new Response('ok', { status: 200 });
+    }) as typeof fetch;
+
+    const before = memory.list(COLLECTIONS.songs).find((row) => row.id === SONG_ID);
+    assert.equal(
+      isListedOnPublicShelf(
+        {
+          isPublic: before?.data?.isPublic === true,
+          audioReady: before?.data?.audioReady === false ? false : undefined,
+          deletedAt: before?.data?.deletedAt ?? null,
+        },
+        []
+      ),
+      false
+    );
+
+    const response = await processMusicGptWebhook({
+      success: true,
+      conversion_type: 'MUSIC_AI',
+      task_id: TASK_ID,
+      conversion_id: CONV_A,
+      conversion_path: audioUrl(CONV_A),
+    });
+    assert.equal(response.status, 200);
+
+    const after = memory.list(COLLECTIONS.songs).find((row) => row.id === SONG_ID);
+    assert.equal(after?.data.audioReady, true);
+    assert.equal(after?.data.isPublic, true);
+    const versionRows = versions(memory).map((row) => ({
+      audioURL: typeof row.data.audioURL === 'string' ? row.data.audioURL : null,
+      isPrimary: row.data.isPrimary === true,
+      audioExpired: row.data.audioExpired === true,
+    }));
+    assert.equal(versionRows.length, 1);
+    assert.equal(
+      isListedOnPublicShelf(
+        {
+          isPublic: after?.data?.isPublic === true,
+          audioReady: after?.data?.audioReady === true,
+          deletedAt: after?.data?.deletedAt ?? null,
+        },
+        versionRows
+      ),
+      true
+    );
+    assert.equal(calls.includes('https://preview.example.com/api/revalidate'), true);
+  });
+
+  it('marks a shell failed when MusicGPT reports failure and does not publish it', async () => {
+    const memory = createMemoryAdminDb();
+    const bucket = createBucket();
+    setSongAudioStorageDepsForTests({ bucket, fetchImpl: mp3Fetch() });
+    await seed(memory, [CONV_A], {
+      isPublic: false,
+      audioReady: false,
+      publicOnReady: true,
+    });
+
+    const response = await processMusicGptWebhook({
+      success: false,
+      conversion_type: 'MUSIC_AI',
+      task_id: TASK_ID,
+      reason: 'provider failed',
+    });
+    assert.equal(response.status, 200);
+    const songDoc = memory.list(COLLECTIONS.songs).find((row) => row.id === SONG_ID);
+    assert.equal(songDoc?.data.generationStatus, 'failed');
+    assert.equal(songDoc?.data.isPublic, false);
+    assert.equal(songDoc?.data.audioReady, false);
+    assert.equal(versions(memory).length, 0);
+    const generationDoc = memory.list(COLLECTIONS.generations).find((row) => row.id === 'gen-1');
+    assert.equal(generationDoc?.data.status, 'failed');
+    assert.equal(bucket.saves.length, 0);
+  });
+
+  it('publishes the first audio after a timeout failure unless the song was deleted', async () => {
+    const memory = createMemoryAdminDb();
+    const bucket = createBucket();
+    setSongAudioStorageDepsForTests({ bucket, fetchImpl: mp3Fetch() });
+    await seed(memory, [CONV_A], {
+      isPublic: false,
+      audioReady: false,
+      publicOnReady: true,
+      generationStatus: 'failed',
+      createdAt: Timestamp.fromMillis(0),
+    });
+
+    const late = await processMusicGptWebhook({
+      success: true,
+      conversion_type: 'MUSIC_AI',
+      task_id: TASK_ID,
+      conversion_id: CONV_A,
+      conversion_path: audioUrl(CONV_A),
+    });
+    assert.equal(late.status, 200);
+    const songDoc = memory.list(COLLECTIONS.songs).find((row) => row.id === SONG_ID);
+    assert.equal(songDoc?.data.audioReady, true);
+    assert.equal(songDoc?.data.isPublic, true);
+    assert.notEqual(songDoc?.data.generationStatus, 'failed');
+    assert.equal(versions(memory).length, 1);
+
+    const deleted = createMemoryAdminDb();
+    setSongAudioStorageDepsForTests({ bucket: createBucket(), fetchImpl: mp3Fetch() });
+    await seed(deleted, [CONV_A], {
+      isPublic: false,
+      audioReady: false,
+      publicOnReady: true,
+      deletedAt: Timestamp.fromMillis(50),
+    });
+    const skipped = await processMusicGptWebhook({
+      success: true,
+      conversion_type: 'MUSIC_AI',
+      task_id: TASK_ID,
+      conversion_id: CONV_A,
+      conversion_path: audioUrl(CONV_A),
+    });
+    assert.equal(skipped.status, 200);
+    const gone = deleted.list(COLLECTIONS.songs).find((row) => row.id === SONG_ID);
+    assert.equal(gone?.data.audioReady, false);
+    assert.equal(gone?.data.isPublic, false);
+    assert.equal(versions(deleted).length, 0);
   });
 });

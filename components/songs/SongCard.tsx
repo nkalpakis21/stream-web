@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { doc, onSnapshot } from 'firebase/firestore';
 import type { Plain } from '@/lib/serialize/toPlain';
 import type { SongDocument } from '@/types/firestore';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
@@ -12,8 +14,50 @@ import { MaybeArtistLink } from '@/components/songs/MaybeArtistLink';
 import { coverFieldsFromSong } from '@/lib/covers/resolve';
 import { artistFaceSources, songCoverCandidates } from '@/lib/images/artistFace';
 import { songShowsPrivateTag } from '@/lib/artists/ownerSongs';
+import { db } from '@/lib/firebase/config';
+import { getSongPath } from '@/lib/firebase/collections';
+import {
+  GENERATION_TIMEOUT_MS,
+  attachOwnerSongListener,
+  generationStartedAtMs,
+  mergeOwnerSongSnapshot,
+  ownerSongTileState,
+  shouldListenForOwnerSong,
+  type OwnerSongSnapshot,
+  type OwnerTileSong,
+} from '@/lib/songs/ownerTile';
 import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
 import { PrivateSongTag } from '@/components/songs/PrivateSongTag';
+import { UnavailableAudioRow } from '@/components/songs/UnavailableAudioRow';
+
+function useLiveOwnerSong<T extends OwnerTileSong & { id: string }>(
+  song: T,
+  ownerCatalog: boolean
+): T {
+  const [live, setLive] = useState(song);
+  const listen = shouldListenForOwnerSong(live, ownerCatalog);
+
+  useEffect(() => {
+    setLive(song);
+  }, [song]);
+
+  useEffect(() => {
+    if (!listen) return;
+    return attachOwnerSongListener(
+      true,
+      (onSnap) =>
+        onSnapshot(doc(db, getSongPath(song.id)), (snap) => {
+          if (!snap.exists()) return;
+          onSnap(snap.data() as OwnerSongSnapshot);
+        }),
+      (snap) => {
+        setLive((current) => mergeOwnerSongSnapshot(current, snap));
+      }
+    );
+  }, [listen, song.id]);
+
+  return live;
+}
 
 interface SongCardProps {
   song: SongDocument | Plain<SongDocument>;
@@ -38,34 +82,63 @@ export function SongCard({
   coin = null,
   ownerCatalog = false,
 }: SongCardProps) {
+  const shown = useLiveOwnerSong(song, ownerCatalog);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const isCompact = size === 'compact';
   const showTicker = Boolean(ticker?.trim());
   const name = artist?.name || artistName;
   const linkable = artist?.isPublic === true;
   const photoUrl = artist?.photoUrl ?? null;
-  const showPrivate = songShowsPrivateTag(song, ownerCatalog);
+  const showPrivate = songShowsPrivateTag(shown, ownerCatalog);
+
+  useEffect(() => {
+    if (!shouldListenForOwnerSong(shown, ownerCatalog)) return;
+    const started = generationStartedAtMs(shown);
+    if (started == null) return;
+    const delay = started + GENERATION_TIMEOUT_MS - Date.now();
+    if (delay <= 0) return;
+    const timer = window.setTimeout(() => setNowMs(Date.now()), delay);
+    return () => window.clearTimeout(timer);
+  }, [shown, ownerCatalog]);
+
+  const waiting = ownerSongTileState(shown, ownerCatalog, nowMs);
+  if (!ownerCatalog && shown.audioReady === false && !shown.deletedAt) return null;
+  if (waiting) {
+    return (
+      <UnavailableAudioRow
+        songId={shown.id}
+        title={shown.title}
+        cover={coverFieldsFromSong(shown)}
+        state={waiting}
+        prompt={shown.createPrompt}
+        lyrics={shown.createLyrics}
+        artistId={shown.artistId}
+        artistVersionId={shown.artistVersionId}
+      />
+    );
+  }
 
   return (
     <article className="block rounded-[12px] bg-card">
       <PlayableArt
-        songId={song.id}
-        title={song.title}
+        songId={shown.id}
+        title={shown.title}
         artistName={name || 'Artist'}
-        artistId={song.artistId}
-        cover={coverFieldsFromSong(song)}
+        artistId={shown.artistId}
+        cover={coverFieldsFromSong(shown)}
         playback="visibility"
-        durationSeconds={song.duration}
-        href={`/songs/${song.id}`}
+        durationSeconds={shown.duration}
+        href={`/songs/${shown.id}`}
       />
       <div className={isCompact ? 'p-2' : 'p-3'}>
         <div className={showPrivate ? 'flex min-w-0 items-center gap-2' : undefined}>
-          <Link href={`/songs/${song.id}`} className={showPrivate ? 'block min-w-0' : 'block'}>
+          <Link href={`/songs/${shown.id}`} className={showPrivate ? 'block min-w-0' : 'block'}>
             <h3
               className={showPrivate ? 'truncate font-semibold' : 'font-semibold line-clamp-2'}
               style={{ fontSize: 14, lineHeight: '20px', color: 'var(--ink)' }}
               data-entity="track"
             >
-              {song.title}
+              {shown.title}
             </h3>
           </Link>
           {showPrivate ? <PrivateSongTag /> : null}
@@ -76,11 +149,11 @@ export function SongCard({
               <>
                 <ArtistFace
                   name={name}
-                  sources={artistFaceSources(photoUrl, songCoverCandidates(song))}
+                  sources={artistFaceSources(photoUrl, songCoverCandidates(shown))}
                   size="card"
                 />
                 <MaybeArtistLink
-                  artistId={song.artistId}
+                  artistId={shown.artistId}
                   linkable={linkable}
                   className="min-w-0 truncate"
                   style={{ fontSize: 12, lineHeight: '16px', color: 'var(--mute)' }}
@@ -93,7 +166,7 @@ export function SongCard({
             <CoinBadge ticker={ticker} iconSrc={coinIcon} />
           </div>
         ) : null}
-        {coin ? <ArtistCoinRow artistId={song.artistId} quote={coin} linkable={linkable} /> : null}
+        {coin ? <ArtistCoinRow artistId={shown.artistId} quote={coin} linkable={linkable} /> : null}
       </div>
     </article>
   );

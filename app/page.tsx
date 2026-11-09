@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { getPublicSongs, getTopSongs, getSongVersions, omitExpiredAudioSongs } from '@/lib/services/songs';
+import { getPublicSongs, getTopSongs, getSongVersions } from '@/lib/services/songs';
 import { playableAudioUrl } from '@/lib/songs/audioAvailability';
 import { getArtistCardContext } from '@/lib/server/artistDisplay';
 import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
@@ -28,7 +28,7 @@ async function firstPlayableAudio(songs: SongDocument[]): Promise<{ song: SongDo
 
 async function HomeListenContent() {
   const [latestSongs, topSongs] = await Promise.all([
-    getPublicSongs(LIVE_FETCH).then(songs => omitExpiredAudioSongs(songs)),
+    getPublicSongs(LIVE_FETCH),
     getTopSongs(HEAT_LIMIT),
   ]);
 

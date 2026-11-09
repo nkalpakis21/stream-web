@@ -1,13 +1,41 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getUserArtists } from '@/lib/services/artists';
-import { createSong } from '@/lib/services/songs';
+import { abandonFailedSongCreate, createSong } from '@/lib/services/songs';
 import { createGeneration } from '@/lib/services/generations';
+import { runSongCreateAttempt, SongCreateFailed } from '@/lib/songs/songCreate';
 import type { AIArtistDocument } from '@/types/firestore';
 import { useToast, ToastContainer } from '@/components/ui/toast';
+
+export function SongCreateFailureNotice({
+  onRetry,
+  disabled,
+}: {
+  onRetry: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <div role="alert" className="rounded-xl border border-[#FF4D6A]/40 bg-card px-4 py-3">
+      <p
+        className="text-sm font-medium"
+        style={{ color: '#FF4D6A', fontFamily: 'var(--font-figtree), system-ui, sans-serif' }}
+      >
+        Generation failed. Try again.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        disabled={disabled}
+        className="mt-3 inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-[#E8E6F2] px-4 text-sm font-medium text-[#0A0A10] disabled:opacity-50"
+      >
+        Retry
+      </button>
+    </div>
+  );
+}
 
 interface CreativeSongFormProps {
   preselectedArtistId?: string;
@@ -19,6 +47,9 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
   const { user } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [generationFailed, setGenerationFailed] = useState(false);
+  const submitLock = useRef(false);
+  const idempotencyKeyRef = useRef<string | null>(null);
   const [artists, setArtists] = useState<AIArtistDocument[]>([]);
   const [loadingArtists, setLoadingArtists] = useState(true);
   const { toasts, showToast, dismissToast } = useToast();
@@ -54,8 +85,8 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
     }
   }, [user, loadArtists]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitSong = async () => {
+    if (submitLock.current) return;
     if (!user) return;
 
     if (artists.length === 0) {
@@ -79,39 +110,63 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
       return;
     }
 
+    setGenerationFailed(false);
+    submitLock.current = true;
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `k${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+    }
+    const idempotencyKey = idempotencyKeyRef.current;
     setLoading(true);
     try {
-      const song = await createSong(user.uid, {
-        artistId: formData.artistId,
-        artistVersionId: selectedArtist.currentVersionId,
-        title: formData.title,
-        isPublic: true,
+      const created = await runSongCreateAttempt({
+        createSong: async () => {
+          const result = await createSong(user.uid, {
+            artistId: formData.artistId,
+            artistVersionId: selectedArtist.currentVersionId,
+            title: formData.title,
+            isPublic: true,
+            idempotencyKey,
+            prompt: formData.prompt,
+            lyrics: formData.lyrics,
+          });
+          return { id: result.song.id, reused: result.reused };
+        },
+        createGeneration: async songId => {
+          const { getArtistVersion } = await import('@/lib/services/artists');
+          const artistVersion = await getArtistVersion(selectedArtist.currentVersionId);
+          if (!artistVersion) {
+            throw new Error('Artist version not found');
+          }
+          await createGeneration(songId, selectedArtist.currentVersionId, {
+            prompt: {
+              structured: {},
+              freeText: formData.prompt,
+            },
+            parameters: {
+              quality: 'medium',
+            },
+            provider: formData.provider,
+            artistId: selectedArtist.id,
+            artistContext: {
+              styleDNA: artistVersion.styleDNA,
+              lore: artistVersion.lore,
+              vocalIdentity: artistVersion.vocalIdentity ?? selectedArtist.vocalIdentity ?? null,
+            },
+            lyrics: formData.lyrics.trim() || undefined,
+          });
+        },
+        abandon: songId =>
+          abandonFailedSongCreate(songId, {
+            prompt: formData.prompt,
+            lyrics: formData.lyrics,
+          }),
       });
 
-      const { getArtistVersion } = await import('@/lib/services/artists');
-      const artistVersion = await getArtistVersion(selectedArtist.currentVersionId);
-      if (!artistVersion) {
-        throw new Error('Artist version not found');
-      }
-
-      await createGeneration(song.id, selectedArtist.currentVersionId, {
-        prompt: {
-          structured: {},
-          freeText: formData.prompt,
-        },
-        parameters: {
-          quality: 'medium',
-        },
-        provider: formData.provider,
-        artistId: selectedArtist.id,
-        artistContext: {
-          styleDNA: artistVersion.styleDNA,
-          lore: artistVersion.lore,
-          vocalIdentity: artistVersion.vocalIdentity ?? selectedArtist.vocalIdentity ?? null,
-        },
-        lyrics: formData.lyrics.trim() || undefined,
-      });
-
+      idempotencyKeyRef.current = null;
+      setGenerationFailed(false);
       setFormData({
         title: '',
         artistId: artists[0]?.id || '',
@@ -120,14 +175,28 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
         provider: 'musicgpt',
       });
 
-      onSuccess?.(song.id);
-      router.push(`/songs/${song.id}`);
+      onSuccess?.(created.id);
+      router.push(`/songs/${created.id}`);
     } catch (error) {
       console.error('Failed to create song:', error);
-      showToast('Failed to create song. Please try again.', 'error');
+      const failedCreate = error instanceof SongCreateFailed ? error : null;
+      if (!failedCreate || !failedCreate.keepIdempotencyKey) {
+        idempotencyKeyRef.current = null;
+      }
+      if (failedCreate?.stage === 'generation') {
+        setGenerationFailed(true);
+      } else {
+        showToast('Failed to create song. Please try again.', 'error');
+      }
     } finally {
+      submitLock.current = false;
       setLoading(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void submitSong();
   };
 
   if (loadingArtists) {
@@ -306,9 +375,14 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
             />
           </div>
 
+          {generationFailed ? (
+            <SongCreateFailureNotice onRetry={() => { void submitSong(); }} disabled={loading} />
+          ) : null}
+
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
+              aria-busy={loading}
               disabled={loading || formData.prompt.length > 300 || formData.prompt.trim().length === 0 || formData.lyrics.length > 2000}
               className="flex-1 px-6 py-3 bg-gradient-to-r from-accent-cta to-accent-cta/90 text-accent-ink rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-lg hover:shadow-xl"
             >

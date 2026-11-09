@@ -16,6 +16,9 @@ describe('song visibility', () => {
     assert.equal(songIsVisible(PRIVATE, 'owner-bob'), false);
     assert.equal(songIsVisible(PRIVATE, 'owner-alice'), true);
     assert.equal(songIsVisible({ ...PRIVATE, isPublic: true }, null), true);
+    assert.equal(songIsVisible({ ...PRIVATE, isPublic: true, audioReady: false }, null), false);
+    assert.equal(songIsVisible({ ...PRIVATE, isPublic: true, audioReady: false }, 'owner-alice'), true);
+    assert.equal(songIsVisible({ ...PRIVATE, audioReady: false }, 'owner-alice'), true);
     assert.equal(songIsVisible({ ...PRIVATE, deletedAt: 1 }, 'owner-alice'), false);
     assert.equal(songIsVisible(null, 'owner-alice'), false);
   });

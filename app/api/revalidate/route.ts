@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
+import { CATALOG_REVALIDATE_PATHS } from '@/lib/webhooks/revalidate';
 
 export async function POST(request: NextRequest) {
   const secret = request.headers.get('x-revalidate-secret');
@@ -20,8 +21,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Revalidate the homepage
-    revalidatePath('/');
+    for (const path of CATALOG_REVALIDATE_PATHS) {
+      revalidatePath(path);
+    }
     return NextResponse.json({ revalidated: true, now: Date.now() });
   } catch (err) {
     return NextResponse.json({ message: 'Error revalidating' }, { status: 500 });
