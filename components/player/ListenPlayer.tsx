@@ -23,6 +23,7 @@ interface ListenPlayerProps {
   onPrev: () => void;
   onNext: () => void;
   onEnded: () => void;
+  onPlaybackError: () => void;
 }
 
 function formatTime(seconds: number): string {
@@ -48,6 +49,7 @@ export function ListenPlayer({
   onPrev,
   onNext,
   onEnded,
+  onPlaybackError,
 }: ListenPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -76,6 +78,10 @@ export function ListenPlayer({
       setCurrentTime(0);
       onEnded();
     };
+    const handleError = () => {
+      if (!audioUrl) return;
+      onPlaybackError();
+    };
     const handleLyricsSeek = (e: Event) => {
       const customEvent = e as CustomEvent<{ timestamp: number }>;
       if (audio && Number.isFinite(customEvent.detail.timestamp)) {
@@ -87,15 +93,17 @@ export function ListenPlayer({
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
     audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
     window.addEventListener('lyrics-seek', handleLyricsSeek);
 
     return () => {
       audio.removeEventListener('timeupdate', updateTime);
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
       window.removeEventListener('lyrics-seek', handleLyricsSeek);
     };
-  }, [audioUrl, onEnded]);
+  }, [audioUrl, onEnded, onPlaybackError]);
 
   useEffect(() => {
     const audio = audioRef.current;

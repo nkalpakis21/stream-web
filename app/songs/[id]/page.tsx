@@ -26,6 +26,7 @@ import { CommentsSection } from '@/components/comments/CommentsSection';
 import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import type { SongDocument, SongVersionDocument } from '@/types/firestore';
+import { playableAudioUrl } from '@/lib/songs/audioAvailability';
 
 function primaryVersion(
   song: { currentVersionId?: string },
@@ -114,8 +115,6 @@ async function SongPageBody({
   ]);
   const artist = artistContext.displays.get(song.artistId) ?? null;
   const coinHint = artistContext.coins.get(song.artistId);
-  const primaryWithAudio = primaryVersion(song, allVersions);
-
   const hasPendingGeneration = generations.some(
     generation => generation.status === 'pending' || generation.status === 'processing'
   );
@@ -124,7 +123,7 @@ async function SongPageBody({
 
   const coverImageUrl = resolveCoverPoster(song);
   const cover = coverFieldsFromSong(song);
-  const primaryAudioUrl = primaryWithAudio?.audioURL || null;
+  const primaryAudioUrl = playableAudioUrl(allVersions);
   const lyrics = getLyricsForSong(generations);
 
   const mint = coinHint?.mint?.trim() || '';
@@ -159,6 +158,7 @@ async function SongPageBody({
             id: version.id,
             audioURL: version.audioURL,
             isPrimary: version.isPrimary,
+            audioExpired: version.audioExpired === true,
             duration: song.duration ?? null,
           }))}
         >

@@ -3,6 +3,7 @@
  * Fans and signed-out viewers only receive public songs.
  * The verified owner receives every non-deleted song they own, public and private,
  * in the same newest-first order. Private rows are tagged only on that owner view.
+ * Expired audio stays in that order for the owner and is omitted for everyone else.
  */
 
 export interface ArtistSongVisibility {
@@ -52,10 +53,11 @@ export function selectArtistPageSongs<T extends ArtistSongVisibility>(
   songs: readonly T[],
   viewerId: string | null | undefined,
   ownerId: string,
-  artistId?: string
+  artistId?: string,
+  isAudioExpired?: (song: T) => boolean
 ): T[] {
   const ownerView = isArtistOwner(viewerId, ownerId);
-  return songs
+  const visible = songs
     .filter(song => {
       if (song.deletedAt) return false;
       if (artistId && song.artistId != null && song.artistId !== artistId) return false;
@@ -64,6 +66,8 @@ export function selectArtistPageSongs<T extends ArtistSongVisibility>(
       return song.isPublic === true;
     })
     .sort((a, b) => createdAtMillis(b.createdAt) - createdAtMillis(a.createdAt));
+  if (!isAudioExpired || ownerView) return visible;
+  return visible.filter(song => !isAudioExpired(song));
 }
 
 /** Tag only on an owner surface, and only for a song marked private. */

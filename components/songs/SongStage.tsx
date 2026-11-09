@@ -17,6 +17,7 @@ interface VersionOption {
   id: string;
   audioURL: string | null;
   isPrimary: boolean;
+  audioExpired?: boolean;
   duration?: number | null;
 }
 
@@ -79,7 +80,7 @@ export function SongStage({
   children,
 }: SongStageProps) {
   const playable = useMemo(
-    () => versions.filter(v => v.audioURL),
+    () => versions.filter(v => v.audioURL && v.audioExpired !== true),
     [versions]
   );
   const { play } = useSongPlayer();
