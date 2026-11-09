@@ -1,9 +1,13 @@
 /**
  * GET /api/cron/x-posts
  *
- * Vercel cron. Authorization: Bearer CRON_SECRET.
+ * Vercel cron, once a day at 15:00 UTC. Hobby plans reject a schedule that
+ * runs more than once a day, which fails the whole deployment.
+ * Authorization: Bearer CRON_SECRET.
  * Posts cap-deferred songs whose quiet period has opened, and marks
  * skipped_stale when a song missed the 24h window. One post per song.
+ * The MusicGPT webhook also runs a short sweep when a song finishes, so a
+ * deferred post does not have to wait for the daily run.
  *
  * CRON_SECRET  Required. Unset rejects every request.
  */

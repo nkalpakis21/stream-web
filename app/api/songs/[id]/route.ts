@@ -12,7 +12,7 @@ import {
 import { verifiedViewerIdFromRequest } from '@/lib/server/viewer';
 import { songIsVisible } from '@/lib/songs/visibility';
 import { toPlain } from '@/lib/serialize/toPlain';
-import { maybePostSongLive } from '@/lib/x/postSong';
+import { maybePostSongLive, sweepDeferredXPosts } from '@/lib/x/postSong';
 import { hasObjectionableContent } from '@/lib/server/objectionable';
 
 export const dynamic = 'force-dynamic';
@@ -146,6 +146,7 @@ export async function PATCH(
         const updated = await adminGetSong(songId);
         if (updated?.isPublic) {
           await maybePostSongLive(songId);
+          await sweepDeferredXPosts(8);
         }
       } catch (error) {
         console.error('[API /songs] X song-live post failed:', error);
