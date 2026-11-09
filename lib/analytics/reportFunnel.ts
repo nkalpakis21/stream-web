@@ -7,10 +7,12 @@
  * Web always sends `x-streamstar-platform: web`.
  */
 
+import { readOrCreateVisitorId } from '@/lib/analytics/visitorId';
 import { auth } from '@/lib/firebase/config';
 import { webPlatformHeaders } from '@/lib/funnel/platform';
 
 export type ClientFunnelEvent = 'play' | 'song_shared';
+export type FunnelPlaySource = 'share_page';
 
 function logFailure(event: string, error: unknown): void {
   console.error('[funnel]', event, error instanceof Error ? error.message : 'failed');
@@ -18,11 +20,28 @@ function logFailure(event: string, error: unknown): void {
 
 export function reportClientFunnelEvent(
   event: ClientFunnelEvent,
-  props?: { songId?: string; artistId?: string }
+  props?: { songId?: string; artistId?: string; source?: FunnelPlaySource }
 ): void {
   try {
     const user = auth.currentUser;
-    if (!user) return;
+    const sharePlay = event === 'play' && props?.source === 'share_page' && Boolean(props.songId);
+    if (!user) {
+      if (!sharePlay || !props?.songId) return;
+      const visitorId = readOrCreateVisitorId();
+      if (!visitorId) return;
+      void fetch('/api/funnel', {
+        method: 'POST',
+        keepalive: true,
+        headers: webPlatformHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          event: 'play',
+          songId: props.songId,
+          visitorId,
+          source: 'share_page',
+        }),
+      }).catch(error => logFailure(event, error));
+      return;
+    }
     void (async () => {
       try {
         const token = await user.getIdToken();
@@ -37,6 +56,7 @@ export function reportClientFunnelEvent(
             event,
             ...(props?.songId ? { songId: props.songId } : {}),
             ...(props?.artistId ? { artistId: props.artistId } : {}),
+            ...(sharePlay ? { source: 'share_page' as const } : {}),
           }),
         });
       } catch (error) {

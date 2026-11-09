@@ -8,6 +8,8 @@ import { isStudioPath } from '@/lib/listen/surface';
 import { getSongVersions } from '@/lib/services/songs';
 import { audioUrlForPlayback } from '@/lib/songs/audioAvailability';
 import { advanceToPlayable } from '@/lib/player/skipQueue';
+import { startPlayerAudio } from '@/lib/player/boundAudio';
+import { isSongPagePath } from '@/lib/songs/paths';
 import type { CoverFields } from '@/lib/covers/resolve';
 
 export interface PlayerTrack extends CoverFields {
@@ -94,8 +96,15 @@ export function SongPlayerProvider({ children }: { children: ReactNode }) {
     indexRef.current = start;
     setQueue(seeded);
     setIndex(start);
+    const url = seeded[start]?.audioUrl;
+    if (url && !studio) {
+      setNowPlaying({ ...seeded[start], audioUrl: url });
+      setIsPlaying(true);
+      startPlayerAudio(url);
+      return;
+    }
     void land(start, 1, 'clear');
-  }, [land]);
+  }, [land, studio]);
 
   const pause = useCallback(() => {
     setIsPlaying(false);
@@ -179,6 +188,7 @@ export function SongPlayerProvider({ children }: { children: ReactNode }) {
           onNext={playNext}
           onEnded={skipEnded}
           onPlaybackError={skipFailed}
+          showCoin={!isSongPagePath(pathname)}
         />
       )}
     </SongPlayerContext.Provider>

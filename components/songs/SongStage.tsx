@@ -3,15 +3,14 @@
 import { useMemo, useState } from 'react';
 import { PlayableArt } from '@/components/songs/PlayableArt';
 import { ShareButton } from '@/components/songs/ShareButton';
-import { CoinBadge } from '@/components/songs/CoinBadge';
-import { SongCoinCluster } from '@/components/songs/SongCoinCluster';
 import { ArtistFace } from '@/components/artists/ArtistFace';
 import { MaybeArtistLink } from '@/components/songs/MaybeArtistLink';
 import { AiMark } from '@/components/brand/AiMark';
 import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
-import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
+import { reportSharePagePlay } from '@/lib/analytics/sharePlay';
 import { coverFieldsFromSong, playerCoverPayload, type CoverFields } from '@/lib/covers/resolve';
 import { artistFaceSources, songCoverCandidates } from '@/lib/images/artistFace';
+import { createDebouncedPlayTracker } from '@/lib/utils/playTracking';
 
 interface VersionOption {
   id: string;
@@ -33,10 +32,6 @@ interface SongStageProps {
   audioUrl: string | null;
   versions: VersionOption[];
   durationSeconds?: number | null;
-  ticker?: string | null;
-  coinIcon?: string | null;
-  coin?: ArtistCoinQuote | null;
-  buyUrl?: string | null;
   shareUrl: string;
   pending?: boolean;
   children?: React.ReactNode;
@@ -71,10 +66,6 @@ export function SongStage({
   audioUrl,
   versions,
   durationSeconds = null,
-  ticker = null,
-  coinIcon = null,
-  coin = null,
-  buyUrl = null,
   shareUrl,
   pending = false,
   children,
@@ -84,6 +75,7 @@ export function SongStage({
     [versions]
   );
   const { play } = useSongPlayer();
+  const trackPlay = useMemo(() => createDebouncedPlayTracker(500), []);
   const [activeId, setActiveId] = useState(
     playable.find(v => v.isPrimary)?.id || playable[0]?.id || null
   );
@@ -110,6 +102,7 @@ export function SongStage({
         playback="always"
         audioUrl={currentAudio}
         durationSeconds={durationSeconds}
+        sharePage
         className="w-full"
       />
       <div className="min-w-0">
@@ -138,12 +131,10 @@ export function SongStage({
           >
             {artistName}
           </MaybeArtistLink>
-          <CoinBadge ticker={ticker} iconSrc={coinIcon} />
         </div>
-        <SongCoinCluster artistId={artistId} quote={coin} buyUrl={buyUrl} linkable={artistLinkable} />
         {pending && !currentAudio && (
           <div
-            className="mt-6 rounded-xl border px-4 py-5"
+            className="mt-6 rounded-lg border px-4 py-5"
             style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}
           >
             <p className="text-sm font-medium text-foreground">Making the track</p>
@@ -172,6 +163,8 @@ export function SongStage({
                         ...playerCoverPayload(coverFields),
                         audioUrl: version.audioURL,
                       });
+                      reportSharePagePlay(songId, artistId || undefined);
+                      trackPlay(songId, { skipFunnel: true });
                     }
                   }}
                   className={`song-stage-chip ${selected ? 'is-selected' : ''}`}

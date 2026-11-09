@@ -9,6 +9,7 @@ import {
   playerCoverPayload,
   type CoverFields,
 } from '@/lib/covers/resolve';
+import { reportSharePagePlay } from '@/lib/analytics/sharePlay';
 import { getSongVersions } from '@/lib/services/songs';
 import { playableAudioUrl } from '@/lib/songs/audioAvailability';
 import { createDebouncedPlayTracker } from '@/lib/utils/playTracking';
@@ -31,6 +32,8 @@ interface PlayableArtProps {
   durationSeconds?: number | null;
   href?: string;
   className?: string;
+  /** Set on /songs/[id] so a start is a share-page play. */
+  sharePage?: boolean;
 }
 
 export function PlayableArt({
@@ -44,6 +47,7 @@ export function PlayableArt({
   durationSeconds = null,
   href,
   className = '',
+  sharePage = false,
 }: PlayableArtProps) {
   const { play, nowPlaying, isPlaying, togglePlayPause } = useSongPlayer();
   const [resolvedAudio, setResolvedAudio] = useState<string | null>(audioUrlProp ?? null);
@@ -82,7 +86,8 @@ export function PlayableArt({
         ...playerCoverPayload(coverFields),
         audioUrl: url,
       });
-      trackPlay(songId);
+      if (sharePage) reportSharePagePlay(songId, artistId);
+      trackPlay(songId, sharePage ? { skipFunnel: true } : undefined);
     } finally {
       setLoading(false);
     }
@@ -91,6 +96,20 @@ export function PlayableArt({
   const onPlay = () => {
     if (isCurrent) {
       togglePlayPause();
+      return;
+    }
+    const immediate = (audioUrlProp ?? resolvedAudio)?.trim() || '';
+    if (immediate) {
+      play({
+        songId,
+        songTitle: title,
+        artistName,
+        artistId,
+        ...playerCoverPayload(coverFields),
+        audioUrl: immediate,
+      });
+      if (sharePage) reportSharePagePlay(songId, artistId);
+      trackPlay(songId, sharePage ? { skipFunnel: true } : undefined);
       return;
     }
     void startPlayback();
@@ -123,7 +142,7 @@ export function PlayableArt({
         <button
           type="button"
           onClick={onPlay}
-          className="absolute inset-0 z-10 m-auto flex h-12 w-12 items-center justify-center rounded-full bg-black/55 text-white shadow-lg"
+          className="song-play-orb absolute inset-0 z-10 m-auto flex h-12 w-12 items-center justify-center bg-black/55 text-white shadow-lg"
           aria-label={showPause ? `Pause ${title}` : `Play ${title}`}
         >
           {loading ? (

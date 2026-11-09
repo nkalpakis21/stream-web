@@ -11,6 +11,7 @@ import { authHref } from '@/lib/auth/returnTo';
 import { ANALYTICS_EVENTS, trackEvent } from '@/lib/analytics/track';
 import { CREATE_ARTIST_HREF, STUDIO_NEW_ARTIST_HREF } from '@/lib/create/paths';
 import { isCreatePath } from '@/lib/listen/surface';
+import { isSongPagePath } from '@/lib/songs/paths';
 import { useOwnedArtistCount } from '@/hooks/useOwnedArtistCount';
 
 const navLinks = [
@@ -44,9 +45,11 @@ export function SiteHeader() {
   const { hasArtists } = useOwnedArtistCount();
   const [createOpen, setCreateOpen] = useState(false);
   const onAuthPage = pathname === '/signin' || pathname === '/signup';
-  const hideLoggedOutCreate = onAuthPage || isCreatePath(pathname);
+  const songPage = isSongPagePath(pathname);
+  const hideLoggedOutCreate = onAuthPage || isCreatePath(pathname) || songPage;
   const returnTo = onAuthPage ? '/discover' : pathname;
-  const visibleLinks = navLinks.filter((link) => !link.requireAuth || user);
+  const visibleLinks =
+    songPage && !user ? [] : navLinks.filter((link) => !link.requireAuth || user);
 
   return (
     <header

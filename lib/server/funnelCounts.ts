@@ -2,7 +2,8 @@
  * Read-only counts of funnelEvents in a UTC date range.
  * First-time events report unique users. play and song_shared report
  * total events and unique users. Every event is also split by platform
- * (`web`, `ios`, `unknown`). The script does not write.
+ * (`web`, `ios`, `unknown`). Plays are also split by `source`
+ * (`share_page`, or `none` when the field is absent). The script does not write.
  */
 
 import { FUNNEL_PLATFORMS, type FunnelPlatform } from '@/lib/funnel/platform';
@@ -20,9 +21,16 @@ export type FunnelCountRow = {
   atMs: number;
   uid?: unknown;
   platform?: unknown;
+  source?: unknown;
+  visitorId?: unknown;
 };
 
 export type PlatformTotals = {
+  events: number;
+  users: number;
+};
+
+export type SourceTotals = {
   events: number;
   users: number;
 };
@@ -31,6 +39,7 @@ export type FunnelEventCount = {
   events: number;
   users: number;
   byPlatform: Record<FunnelPlatform, PlatformTotals>;
+  bySource: Record<string, SourceTotals>;
 };
 
 function emptyPlatformTotals(): Record<FunnelPlatform, PlatformTotals> {
@@ -42,7 +51,7 @@ function emptyPlatformTotals(): Record<FunnelPlatform, PlatformTotals> {
 export function emptyFunnelCounts(): Record<FunnelEvent, FunnelEventCount> {
   const counts = {} as Record<FunnelEvent, FunnelEventCount>;
   for (const event of FUNNEL_EVENTS) {
-    counts[event] = { events: 0, users: 0, byPlatform: emptyPlatformTotals() };
+    counts[event] = { events: 0, users: 0, byPlatform: emptyPlatformTotals(), bySource: {} };
   }
   return counts;
 }
@@ -55,6 +64,20 @@ export function countPlatform(value: unknown): FunnelPlatform {
 
 export function isRepeatFunnelEvent(event: FunnelEvent): event is RepeatFunnelEvent {
   return (REPEAT_FUNNEL_EVENTS as readonly string[]).includes(event);
+}
+
+/** Missing or unusable play source counts as `none`. */
+export function countSource(value: unknown): string {
+  if (typeof value !== 'string') return 'none';
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 64 || !/^[a-z0-9_-]+$/i.test(trimmed)) return 'none';
+  return trimmed;
+}
+
+function playActor(row: FunnelCountRow): string | null {
+  if (typeof row.uid === 'string' && row.uid) return `u:${row.uid}`;
+  if (typeof row.visitorId === 'string' && row.visitorId) return `v:${row.visitorId}`;
+  return null;
 }
 
 /** Start of a UTC calendar day. Invalid calendar dates return null. */
@@ -100,6 +123,7 @@ export function countFunnelRows(
   const counts = emptyFunnelCounts();
   const users = new Map<FunnelEvent, Set<string>>();
   const platformUsers = new Map<FunnelEvent, Record<FunnelPlatform, Set<string>>>();
+  const sourceUsers = new Map<string, Set<string>>();
   for (const event of FUNNEL_EVENTS) {
     users.set(event, new Set());
     const sets = {} as Record<FunnelPlatform, Set<string>>;
@@ -118,6 +142,20 @@ export function countFunnelRows(
     if (typeof row.uid === 'string' && row.uid) {
       users.get(event)?.add(row.uid);
       platformUsers.get(event)?.[platform].add(row.uid);
+    }
+    if (event === 'play') {
+      const source = countSource(row.source);
+      const slice = counts.play.bySource[source] ?? { events: 0, users: 0 };
+      slice.events += 1;
+      counts.play.bySource[source] = slice;
+      const actor = playActor(row);
+      if (actor) {
+        const key = `${source}\n${actor}`;
+        if (!sourceUsers.has(key)) {
+          sourceUsers.set(key, new Set());
+          slice.users += 1;
+        }
+      }
     }
   }
 
@@ -148,6 +186,12 @@ export function formatFunnelCounts(input: {
         parts.push(`${platform}_events=${slice.events} ${platform}_users=${slice.users}`);
       } else {
         parts.push(`${platform}_users=${slice.users}`);
+      }
+    }
+    if (event === 'play') {
+      for (const source of Object.keys(count.bySource).sort()) {
+        const slice = count.bySource[source];
+        parts.push(`source_${source}_events=${slice?.events ?? 0} source_${source}_users=${slice?.users ?? 0}`);
       }
     }
     lines.push(parts.join(' '));

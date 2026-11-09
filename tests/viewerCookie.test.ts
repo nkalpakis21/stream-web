@@ -329,7 +329,8 @@ describe('viewer cache and private artist 404', () => {
     assert.match(song, /verifiedViewerIdFromPage\(/);
     assert.match(song, /adminGetSong\(/);
     assert.match(song, /rejectHiddenSong\(/);
-    assert.match(song, /hiddenSongPageMetadata\(/);
+    assert.match(song, /metadataFromShareFacts\(/);
+    assert.match(read('lib/songs/shareCard.ts'), /hiddenSongPageMetadata\(/);
     assert.match(song, /toPlain\(/);
     assert.equal(song.includes('requireUser'), false);
     assert.equal(song.includes('ss_viewer'), false);
