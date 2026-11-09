@@ -239,7 +239,44 @@ export interface SongDocument {
   artistId: string; // AI Artist ID
   artistVersionId: string; // Specific artist version used
   title: string;
-  isPublic: boolean; // Public by default
+  /**
+   * Public shelves query this. New songs stay false until the first audio
+   * file is stored, then the webhook sets it true when `publicOnReady` is set.
+   * A caller that passes isPublic false keeps the song private.
+   */
+  isPublic: boolean;
+  /**
+   * False until the first playable audio is stored. Missing on songs created
+   * before this field. Those stay on public shelves only when a version still
+   * has playable audio. Clients may create it as false and cannot change it.
+   */
+  audioReady?: boolean;
+  /**
+   * Set when the create caller wants the song public once audio exists.
+   * The webhook is the only writer that turns isPublic on for that case.
+   * Absent means "do not auto-publish" (older songs and private creates).
+   */
+  publicOnReady?: boolean;
+  /**
+   * Client id for one create attempt. A retry with the same key, from this
+   * owner, inside the window, returns this song. Absent on older songs.
+   */
+  idempotencyKey?: string | null;
+  /**
+   * Server-only. `failed` when MusicGPT reported a failure or a shell could
+   * not be soft-deleted. Clients cannot write it. Absent while generating.
+   */
+  generationStatus?: 'failed' | null;
+  /**
+   * Server time of the latest MusicGPT accept for this song.
+   * The owner tile's 15-minute clock uses this, then createdAt.
+   * Clients cannot write it.
+   */
+  generationAttemptAt?: Timestamp | null;
+  /** Prompt from the create attempt. Used to retry a failed shell. */
+  createPrompt?: string | null;
+  /** Optional lyrics from the create attempt. */
+  createLyrics?: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   deletedAt: Timestamp | null;

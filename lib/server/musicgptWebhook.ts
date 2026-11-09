@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { recordFunnelEvent, type FunnelPlatform } from '@/lib/server/funnel';
 import { COLLECTIONS } from '@/lib/firebase/collections';
-import type { GenerationDocument, MusicGptUsageRecord, SongVersionDocument } from '@/types/firestore';
+import type { GenerationDocument, MusicGptUsageRecord, SongDocument, SongVersionDocument } from '@/types/firestore';
 import { getConversionDataByConversionID } from '@/lib/ai/providers/musicgpt';
 import { maybePostSongLive } from '@/lib/x/postSong';
 import { isFalCoverPipeline, shouldWriteMusicGptAlbumCover } from '@/lib/covers/config';
@@ -12,6 +12,7 @@ import { enqueueSongCoverGeneration } from '@/lib/covers/enqueue';
 import {
   adminGetSong,
   adminGetSongVersions,
+  adminMarkSongGenerationFailed,
   adminSetPrimarySongVersion,
 } from '@/lib/server/songsAdmin';
 import {
@@ -62,6 +63,63 @@ export interface MusicGPTWebhookPayload {
   charged_cost?: number | string;
   credits_used?: number | string;
   credit_used?: number | string;
+  /** Present when MusicGPT reports a failed task instead of a file. */
+  status?: string;
+}
+
+/** A completion that must not publish audio. Streaming and cover events are not failures. */
+export function isMusicGptFailureEvent(body: MusicGPTWebhookPayload): boolean {
+  if (body.success === false) return true;
+  if (body.is_flagged === true) return true;
+  const status = typeof body.status === 'string' ? body.status.trim().toLowerCase() : '';
+  return status === 'failed' || status === 'error' || status === 'failure';
+}
+
+/**
+ * First stored audio makes a held song visible and refreshes New.
+ * `publicOnReady` is the only signal that isPublic should flip on.
+ * Songs that were already public keep isPublic and gain `audioReady`.
+ * Returns true when a public shelf can newly include the song.
+ */
+async function publishFirstAudio(song: SongDocument): Promise<boolean> {
+  if (song.deletedAt) return false;
+  const updates: Record<string, unknown> = {};
+  const becameVisible =
+    song.audioReady === false || (song.publicOnReady === true && song.isPublic !== true);
+  if (song.audioReady !== true) updates.audioReady = true;
+  if (song.publicOnReady === true && song.isPublic !== true) updates.isPublic = true;
+  if (song.generationStatus === 'failed') updates.generationStatus = FieldValue.delete();
+  if (Object.keys(updates).length === 0) return false;
+  updates.updatedAt = Timestamp.now();
+  await getAdminDb().collection(COLLECTIONS.songs).doc(song.id).set(updates, { merge: true });
+  return becameVisible;
+}
+
+function versionHasAudio(version: { audioURL?: string | null }): boolean {
+  return typeof version.audioURL === 'string' && version.audioURL.trim().length > 0;
+}
+
+/** Provider said the job failed and no playable file should be published. */
+async function recordMusicGptFailure(body: MusicGPTWebhookPayload): Promise<void> {
+  const generation = await loadAuthorizedGeneration(body.task_id);
+  const binding = generation ? null : await getMusicGptTaskBinding(body.task_id);
+  const songId =
+    generation?.songId ?? (typeof binding?.songId === 'string' ? binding.songId : null);
+  if (!songId) return;
+  const marked = await adminMarkSongGenerationFailed(songId);
+  if (!marked || !generation) return;
+  const reason =
+    typeof body.reason === 'string' && body.reason.trim()
+      ? body.reason.trim().slice(0, 300)
+      : 'MusicGPT reported a failure';
+  await getAdminDb().collection(COLLECTIONS.generations).doc(generation.id).set(
+    {
+      status: 'failed',
+      error: reason,
+      completedAt: Timestamp.now(),
+    },
+    { merge: true }
+  );
 }
 
 async function tryPostSongLive(songId: string, reason: string): Promise<void> {
@@ -222,6 +280,11 @@ export async function processMusicGptWebhook(
     return NextResponse.json({ ok: true, ignored: 'audio_streaming' });
   }
 
+  if (isMusicGptFailureEvent(body)) {
+    await recordMusicGptFailure(body);
+    return NextResponse.json({ ok: true, failed: true });
+  }
+
   if (!body.conversion_id) {
     console.error(
       '[MusicGPT Webhook] Invalid payload structure: conversion_id required for conversion completion webhook:',
@@ -269,6 +332,11 @@ export async function processMusicGptWebhook(
   if (!song) {
     return NextResponse.json({ error: 'Parent song not found' }, { status: 400 });
   }
+  // A soft-deleted shell does not come back. A timed-out or failed shell still
+  // accepts the first audio and clears that state inside publishFirstAudio.
+  if (song.deletedAt) {
+    return NextResponse.json({ ok: true, ignored: 'deleted' });
+  }
 
   const existingVersions = await adminGetSongVersions(song.id);
   const existingProviderOutputIds = new Set(
@@ -289,6 +357,10 @@ export async function processMusicGptWebhook(
       },
       { merge: true }
     );
+    if (existingVersions.some(versionHasAudio)) {
+      const visible = await publishFirstAudio(song);
+      if (visible) await revalidateHomepage();
+    }
     await tryPostSongLive(song.id, 'version-already-exists');
     return NextResponse.json({ ok: true });
   }
@@ -348,6 +420,11 @@ export async function processMusicGptWebhook(
         error instanceof Error ? error.message : 'failed'
       );
     }
+  }
+
+  let catalogRevalidate = false;
+  if (versionHasAudio(version)) {
+    catalogRevalidate = await publishFirstAudio(song);
   }
 
   await tryPostSongLive(song.id, 'audio-written');
@@ -503,7 +580,9 @@ export async function processMusicGptWebhook(
     }
 
     await tryPostSongLive(song.id, 'generation-completed');
+  }
 
+  if (catalogRevalidate || shouldMarkCompleted) {
     await revalidateHomepage();
   }
 

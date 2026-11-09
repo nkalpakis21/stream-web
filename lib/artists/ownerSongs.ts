@@ -13,6 +13,10 @@ export interface ArtistSongVisibility {
   isPublic?: unknown;
   deletedAt?: unknown;
   createdAt?: unknown;
+  /** False while the first audio file is still on the way. */
+  audioReady?: unknown;
+  /** True when a held song should become public with its first audio. */
+  publicOnReady?: unknown;
 }
 
 export function isArtistOwner(
@@ -63,6 +67,7 @@ export function selectArtistPageSongs<T extends ArtistSongVisibility>(
       if (artistId && song.artistId != null && song.artistId !== artistId) return false;
       if (typeof song.ownerId === 'string' && song.ownerId !== ownerId) return false;
       if (ownerView) return song.ownerId === ownerId;
+      if (song.audioReady === false) return false;
       return song.isPublic === true;
     })
     .sort((a, b) => createdAtMillis(b.createdAt) - createdAtMillis(a.createdAt));
@@ -70,12 +75,17 @@ export function selectArtistPageSongs<T extends ArtistSongVisibility>(
   return visible.filter(song => !isAudioExpired(song));
 }
 
-/** Tag only on an owner surface, and only for a song marked private. */
+/**
+ * Tag only on an owner surface, and only for a song marked private.
+ * A public song held until its first audio is in progress, not private.
+ */
 export function songShowsPrivateTag(
-  song: { isPublic?: unknown },
+  song: { isPublic?: unknown; audioReady?: unknown; publicOnReady?: unknown },
   ownerCatalog: boolean
 ): boolean {
-  return ownerCatalog && song.isPublic === false;
+  if (!ownerCatalog || song.isPublic !== false) return false;
+  if (song.audioReady === false && song.publicOnReady === true) return false;
+  return true;
 }
 
 /**

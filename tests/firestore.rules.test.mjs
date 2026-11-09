@@ -514,6 +514,71 @@ test('owner can create a song for their artist only, with no cover or token fiel
   })));
 });
 
+test('a client can hold a song for audio and cannot mark that song ready', async () => {
+  await seedCatalog();
+  const alice = dbFor('alice');
+  await assertSucceeds(setDoc(doc(alice, 'songs/held'), songData({
+    id: 'held',
+    isPublic: false,
+    audioReady: false,
+    publicOnReady: true,
+    idempotencyKey: 'idem-key-1',
+    currentVersionId: 'heldVer',
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/readyNow'), songData({
+    id: 'readyNow',
+    audioReady: true,
+    currentVersionId: 'readyVer',
+  })));
+  await assertFails(updateDoc(doc(alice, 'songs/held'), { audioReady: true }));
+  await assertFails(updateDoc(doc(alice, 'songs/held'), { publicOnReady: false }));
+  await assertFails(updateDoc(doc(alice, 'songs/held'), { idempotencyKey: 'other-key-9' }));
+  await assertSucceeds(setDoc(doc(alice, 'songs/heldPrompt'), songData({
+    id: 'heldPrompt',
+    isPublic: false,
+    audioReady: false,
+    createPrompt: 'a rainy chorus',
+    createLyrics: 'line one',
+    currentVersionId: 'heldPromptVer',
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/clientFailed'), songData({
+    id: 'clientFailed',
+    generationStatus: 'failed',
+    currentVersionId: 'clientFailedVer',
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/clientAttempt'), songData({
+    id: 'clientAttempt',
+    generationAttemptAt: now,
+    currentVersionId: 'clientAttemptVer',
+  })));
+  await assertFails(updateDoc(doc(alice, 'songs/held'), { generationStatus: 'failed' }));
+  await assertSucceeds(updateDoc(doc(alice, 'songs/held'), {
+    title: 'Held renamed',
+    updatedAt: now,
+  }));
+});
+
+test('a server-marked failed shell can be retitled and the client cannot clear the flag', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'songs/failedShell'), songData({
+      id: 'failedShell',
+      isPublic: false,
+      audioReady: false,
+      generationStatus: 'failed',
+      createPrompt: 'a rainy chorus',
+      currentVersionId: 'failedVer',
+    }));
+  });
+  const alice = dbFor('alice');
+  await assertSucceeds(updateDoc(doc(alice, 'songs/failedShell'), {
+    title: 'Still mine',
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/failedShell'), { generationStatus: null }));
+  await assertFails(updateDoc(doc(alice, 'songs/failedShell'), { createPrompt: 'rewritten' }));
+  await assertFails(updateDoc(doc(alice, 'songs/failedShell'), { generationAttemptAt: now }));
+});
+
 test('owner can retitle or soft-delete a song and cannot change ownerId or covers', async () => {
   await seedCatalog();
   const alice = dbFor('alice');

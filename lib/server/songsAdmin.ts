@@ -196,6 +196,73 @@ export async function adminSoftDeleteSong(songId: string): Promise<void> {
   await batch.commit();
 }
 
+function versionHasPlayableUrl(version: { audioURL?: string | null }): boolean {
+  return typeof version.audioURL === 'string' && version.audioURL.trim().length > 0;
+}
+
+/**
+ * Server-only failed mark. No-op once the song has playable audio.
+ * Returns true when the flag was written.
+ */
+export async function adminMarkSongGenerationFailed(
+  songId: string,
+  input?: { prompt?: string | null; lyrics?: string | null }
+): Promise<boolean> {
+  const song = await adminGetSong(songId);
+  if (!song || song.deletedAt) return false;
+  if (song.audioReady === true) return false;
+  const versions = await adminGetSongVersions(songId);
+  if (versions.some(versionHasPlayableUrl)) return false;
+  const updates: Record<string, unknown> = {
+    generationStatus: 'failed',
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  const prompt = typeof input?.prompt === 'string' ? input.prompt.trim() : '';
+  const lyrics = typeof input?.lyrics === 'string' ? input.lyrics.trim() : '';
+  if (prompt) updates.createPrompt = prompt.slice(0, 300);
+  if (lyrics) updates.createLyrics = lyrics.slice(0, 2000);
+  await getAdminDb().collection(COLLECTIONS.songs).doc(songId).set(updates, { merge: true });
+  return true;
+}
+
+/**
+ * MusicGPT accepted a job for this song. Clears a failed or timed-out flag
+ * and restarts the owner tile's 15-minute clock. Does not delete the song.
+ */
+export async function adminNoteSongGenerationAccepted(songId: string): Promise<void> {
+  const song = await adminGetSong(songId);
+  if (!song || song.deletedAt) return;
+  await getAdminDb().collection(COLLECTIONS.songs).doc(songId).set(
+    {
+      generationAttemptAt: FieldValue.serverTimestamp(),
+      generationStatus: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+/**
+ * Soft-delete a song that never received audio, the same write as
+ * adminSoftDeleteSong. Marks the shell failed first so a delete that does
+ * not land still shows Failed instead of Generating. A song that already
+ * has audio is left in place.
+ */
+export async function adminAbandonOrphanSong(
+  songId: string,
+  input?: { prompt?: string | null; lyrics?: string | null }
+): Promise<'deleted' | 'has-audio' | 'missing'> {
+  const song = await adminGetSong(songId);
+  if (!song) return 'missing';
+  if (song.deletedAt != null) return 'deleted';
+  if (song.audioReady === true) return 'has-audio';
+  const versions = await adminGetSongVersions(songId);
+  if (versions.some(versionHasPlayableUrl)) return 'has-audio';
+  await adminMarkSongGenerationFailed(songId, input);
+  await adminSoftDeleteSong(songId);
+  return 'deleted';
+}
+
 export async function adminSetPrimarySongVersion(
   songId: string,
   versionId: string

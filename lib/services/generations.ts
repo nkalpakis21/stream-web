@@ -28,6 +28,14 @@ import { aiService } from '@/lib/ai/providers';
 import { hashGeneration } from '@/lib/utils/hash';
 import { redactForLog, redactUrl } from '@/lib/webhooks/redactUrl';
 
+/** The existing MusicGPT task is still in flight. Do not start another one. */
+export class GenerationStillRunning extends Error {
+  constructor() {
+    super('still_generating');
+    this.name = 'GenerationStillRunning';
+  }
+}
+
 /**
  * Create a generation request.
  *
@@ -111,6 +119,9 @@ export async function createGeneration(
       }
 
       const result = await apiResponse.json();
+      if (result.stillGenerating === true) {
+        throw new GenerationStillRunning();
+      }
       providerTaskId = result.taskId || null;
 
       if (!providerTaskId) {
@@ -128,8 +139,10 @@ export async function createGeneration(
       (data as { providerConversionIds?: string[]; providerMetadata?: Record<string, unknown> }).providerConversionIds = conversionIds;
       (data as { providerMetadata?: Record<string, unknown> }).providerMetadata = metadata;
     } catch (error) {
-      // Don't create generation document if API call fails
-      // The song still exists, but user can retry generation
+      if (error instanceof GenerationStillRunning) throw error;
+      // Don't create a generation document if the API call fails.
+      // The create form soft-deletes the song it just wrote so a retry
+      // does not leave an empty public shell.
       console.error('[createGeneration] MusicGPT request failed', redactForLog(error));
       throw new Error(
         `Failed to initiate MusicGPT generation: ${

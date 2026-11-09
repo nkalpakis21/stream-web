@@ -308,6 +308,7 @@ export function FeedPageClient() {
                   deletedAt: data.deletedAt instanceof Timestamp ? data.deletedAt.toMillis() : null,
                 };
               })
+              .filter(song => song.audioReady !== false)
               .filter(song => {
                 // Only add songs that aren't already in the list
                 return !songs.some(existing => existing.id === song.id);

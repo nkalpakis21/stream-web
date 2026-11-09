@@ -21,7 +21,7 @@ import { db } from '@/lib/firebase/config';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import type { SongDocument, AIArtistDocument, DiscoveryQuery } from '@/types/firestore';
 import { searchArtistsByName } from '@/lib/services/artists';
-import { expiredSongIds, getArtistSongs, omitExpiredAudioSongs } from '@/lib/services/songs';
+import { getArtistSongs, omitExpiredAudioSongs, unplayablePublicSongIds } from '@/lib/services/songs';
 import { takePlayablePage } from '@/lib/songs/audioAvailability';
 
 /**
@@ -39,7 +39,7 @@ export async function searchSongsByPrompt(
     collection(db, COLLECTIONS.songs),
     where('isPublic', '==', true),
     orderBy('createdAt', 'desc'),
-    limit(limitCount * 4) // Extra rows so expired audio does not shrink the page
+    limit(limitCount * 4) // Extra rows so unplayable audio does not shrink the page
   );
   
   const snapshot = await getDocs(q);
@@ -66,7 +66,7 @@ export async function getSongsByGenres(
     collection(db, COLLECTIONS.songs),
     where('isPublic', '==', true),
     orderBy('createdAt', 'desc'),
-    limit(limitCount)
+    limit(Math.min(limitCount * 4, 80))
   );
   
   const snapshot = await getDocs(q);
@@ -75,7 +75,7 @@ export async function getSongsByGenres(
   const songs = snapshot.docs
     .map(doc => doc.data() as SongDocument)
     .filter(song => !song.deletedAt);
-  return omitExpiredAudioSongs(songs);
+  return (await omitExpiredAudioSongs(songs)).slice(0, limitCount);
 }
 
 /**
@@ -90,7 +90,7 @@ export async function getSongsByArtist(
     where('artistId', '==', artistId),
     where('isPublic', '==', true),
     orderBy('createdAt', 'desc'),
-    limit(limitCount)
+    limit(Math.min(limitCount * 4, 80))
   );
   
   const snapshot = await getDocs(q);
@@ -99,7 +99,7 @@ export async function getSongsByArtist(
   const songs = snapshot.docs
     .map(doc => doc.data() as SongDocument)
     .filter(song => !song.deletedAt);
-  return omitExpiredAudioSongs(songs);
+  return (await omitExpiredAudioSongs(songs)).slice(0, limitCount);
 }
 
 /**
@@ -112,7 +112,7 @@ export async function getRecentSongs(
     collection(db, COLLECTIONS.songs),
     where('isPublic', '==', true),
     orderBy('createdAt', 'desc'),
-    limit(limitCount)
+    limit(Math.min(limitCount * 4, 80))
   );
   
   const snapshot = await getDocs(q);
@@ -121,7 +121,7 @@ export async function getRecentSongs(
   const songs = snapshot.docs
     .map(doc => doc.data() as SongDocument)
     .filter(song => !song.deletedAt);
-  return omitExpiredAudioSongs(songs);
+  return (await omitExpiredAudioSongs(songs)).slice(0, limitCount);
 }
 
 const PUBLIC_WINDOW_CAP = 100;
@@ -203,8 +203,10 @@ async function fetchPublicSongBatch(
 
 /**
  * Get paginated public songs with cursor-based pagination
- * Uses the composite index: (isPublic, deletedAt, createdAt)
- * Expired audio is omitted and does not occupy a page slot.
+ * Uses the composite index: (isPublic, deletedAt, createdAt).
+ * Shells and expired audio are omitted and do not occupy a page slot.
+ * `audioReady` is not an equality filter: older songs omit it and stay
+ * listed when a version still has playable audio.
  */
 export async function getPaginatedPublicSongs(
   limitCount: number = 20,
@@ -228,10 +230,10 @@ export async function getPaginatedPublicSongs(
     }
     const full = docs.length > window;
     const batch = full ? docs.slice(0, window) : docs;
-    const expired = await expiredSongIds(batch.map(song => song.id));
+    const blocked = await unplayablePublicSongIds(batch);
     const page = takePlayablePage(
       batch,
-      song => expired.has(song.id),
+      song => blocked.has(song.id),
       limitCount - collected.length,
       full
     );

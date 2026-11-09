@@ -8,7 +8,13 @@ import {
 import type { AIGenerationRequest } from '@/lib/ai/types';
 import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
 import { adminGetArtist } from '@/lib/server/artistsAdmin';
-import { adminGetSong } from '@/lib/server/songsAdmin';
+import {
+  adminGetSong,
+  adminMarkSongGenerationFailed,
+  adminNoteSongGenerationAccepted,
+} from '@/lib/server/songsAdmin';
+import { gateSongGenerationRetry } from '@/lib/server/songRetryGate';
+import { GENERATION_TIMEOUT_MS } from '@/lib/songs/ownerTile';
 import {
   musicGptTaskLogId,
   saveMusicGptTaskBinding,
@@ -30,6 +36,7 @@ export type MusicGptGenerationDeps = {
   getSong?: (songId: string) => Promise<SongDocument | null>;
   createMusic?: typeof createMusicGPTSong;
   saveTaskBinding?: typeof saveMusicGptTaskBinding;
+  gateRetry?: typeof gateSongGenerationRetry;
 };
 
 let depsForTests: MusicGptGenerationDeps | null = null;
@@ -65,6 +72,7 @@ export function readOptionalSongId(
  * task id is returned to the client.
  */
 export async function postMusicGptGeneration(request: NextRequest): Promise<NextResponse> {
+  let failureSong: { id: string; prompt: string; lyrics?: string } | null = null;
   try {
     // Fail before auth or MusicGPT. A generation with no callback hangs, and
     // the request Host is not a safe base for a URL that carries the token.
@@ -139,6 +147,46 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
 
     const style = buildMusicGPTStyleFromArtistContext(artistContext);
 
+    if (songId) {
+      let gate: 'resubmit' | 'still_generating' = 'resubmit';
+      try {
+        gate = await (deps.gateRetry ?? gateSongGenerationRetry)(songId);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (!message.includes('Firebase Admin') && !message.includes('not initialized')) throw error;
+      }
+      if (gate === 'still_generating') {
+        return NextResponse.json({ stillGenerating: true });
+      }
+      const current = await (deps.getSong ?? adminGetSong)(songId);
+      const createdAtMs =
+        current?.createdAt && typeof current.createdAt.toMillis === 'function'
+          ? current.createdAt.toMillis()
+          : 0;
+      if (
+        current &&
+        current.audioReady !== true &&
+        !current.deletedAt &&
+        current.generationStatus !== 'failed' &&
+        Date.now() - createdAtMs >= GENERATION_TIMEOUT_MS
+      ) {
+        try {
+          await adminMarkSongGenerationFailed(songId, {
+            prompt,
+            lyrics: typeof lyrics === 'string' ? lyrics : undefined,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : '';
+          if (!message.includes('Firebase Admin') && !message.includes('not initialized')) throw error;
+        }
+      }
+      failureSong = {
+        id: songId,
+        prompt,
+        ...(typeof lyrics === 'string' ? { lyrics } : {}),
+      };
+    }
+
     const createMusic = deps.createMusic ?? createMusicGPTSong;
     const response = await createMusic({
       prompt,
@@ -182,6 +230,17 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
       throw bindingError;
     }
 
+    if (songId) {
+      try {
+        await adminNoteSongGenerationAccepted(songId);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (!message.includes('Firebase Admin') && !message.includes('not initialized')) {
+          console.error('[MusicGPT API Route] Could not clear generation failure', error);
+        }
+      }
+    }
+
     try {
       recordFunnelEvent(
         userId,
@@ -206,6 +265,19 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
       raw: redactForLog(response, musicGptWebhookSecret()),
     });
   } catch (error) {
+    if (!(error instanceof HttpError) && failureSong) {
+      try {
+        await adminMarkSongGenerationFailed(failureSong.id, {
+          prompt: failureSong.prompt,
+          lyrics: failureSong.lyrics,
+        });
+      } catch (markError) {
+        const message = markError instanceof Error ? markError.message : '';
+        if (!message.includes('Firebase Admin') && !message.includes('not initialized')) {
+          console.error('[MusicGPT API Route] Could not mark song failed', markError);
+        }
+      }
+    }
     if (error instanceof HttpError) return errorResponse(error);
     const secret = musicGptWebhookSecret();
     const errorMessage = redactSecrets(
