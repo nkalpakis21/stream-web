@@ -320,9 +320,26 @@ export interface SongVersionDocument {
   parentVersionId: string | null; // Previous version ID (null for v1)
   /**
    * URL to the generated audio for this specific version.
-   * Once set, this must never be mutated.
+   * Clients cannot set or change it. The MusicGPT webhook writes a Firebase
+   * Storage download URL. scripts/backfill-song-audio.ts may replace a
+   * MusicGPT conversion_path with that Storage URL.
    */
   audioURL: string | null;
+  /**
+   * Original MusicGPT conversion_path. Kept for provenance. Playback uses audioURL.
+   * Absent on versions written before durable copies.
+   */
+  musicgptAudioUrl?: string | null;
+  /**
+   * True when audioURL is a copy in our Storage bucket.
+   * False when the copy failed and audioURL is still the MusicGPT URL.
+   */
+  audioPersisted?: boolean;
+  /**
+   * True when the backfill could not fetch the MusicGPT file.
+   * audioURL is left unchanged. Written only by the backfill in --apply mode.
+   */
+  audioExpired?: boolean;
   /**
    * Provider-specific identifier for this output.
    * Used for idempotency in webhook handlers.
