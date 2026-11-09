@@ -40,6 +40,9 @@ serviceAccountKey.dev.json
 *.tsbuildinfo
 next-env.d.ts
 
+# song-audio backfill logs (ids and provider URLs)
+/backfill-logs/
+
 # firebase emulator logs
 firestore-debug.log
 firebase-debug.log
