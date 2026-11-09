@@ -218,7 +218,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
         <p className="text-muted-foreground mb-4">Create an artist first, then generate a song.</p>
         <button
           type="button"
-          onClick={() => router.push('/dashboard?tab=artists&new=1')}
+          onClick={() => router.push('/create')}
           className="text-primary hover:opacity-80 transition-opacity font-medium"
         >
           Create an artist →

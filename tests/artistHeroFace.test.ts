@@ -129,7 +129,7 @@ describe('artist hero face', () => {
     assert.match(html, /artist-face-hero/);
     assert.match(html, /#14141C/);
     assert.match(html, /artist-index-face-initials/);
-    assert.match(html, />L\.</);
+    assert.match(html, />L</);
     assert.doesNotMatch(html, /<img/);
     assert.doesNotMatch(html, /CoverPlaceholder|bg-muted/);
   });
@@ -141,7 +141,7 @@ const LOADED = 'https://cdn.example/ok.jpg';
 describe('mounted artist face', { concurrency: 1 }, () => {
   it('advances an image that already failed before hydration, then initials', async () => {
     await mountFace([THUMB, COVER], (host, seen) => {
-      assert.match(host.textContent || '', /GU/);
+      assert.equal((host.textContent || '').trim(), 'G');
       assert.equal(host.querySelector('img'), null);
       assert.deepEqual(uniqueSrcs(seen), [THUMB, COVER]);
     });

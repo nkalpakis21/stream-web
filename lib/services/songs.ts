@@ -133,6 +133,7 @@ export async function createSong(
           ...(idempotencyKey ? { idempotencyKey } : {}),
           ...(createPrompt ? { createPrompt } : {}),
           ...(createLyrics ? { createLyrics } : {}),
+          createSubmittedAt: now,
           createdAt: now,
           updatedAt: now,
           deletedAt: null,

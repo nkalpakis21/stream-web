@@ -6,6 +6,7 @@ import {
   SIGNED_UP_WINDOW_MS,
   artistFunnelPlan,
   artistHasFace,
+  clientCreateFunnelError,
   funnelEventDocId,
   isClientFunnelEvent,
   isFunnelEvent,
@@ -88,6 +89,9 @@ describe('trackFunnelEvent', () => {
     assert.equal(isFunnelEvent('first_play'), false);
     assert.equal(isClientFunnelEvent('play'), true);
     assert.equal(isClientFunnelEvent('signed_up'), false);
+    assert.equal(isClientFunnelEvent('create_started'), true);
+    assert.equal(isClientFunnelEvent('face_set'), true);
+    assert.equal(isClientFunnelEvent('create_submitted'), true);
   });
 
   it('writes each event once per user and keeps only id props', async () => {
@@ -148,6 +152,36 @@ describe('trackFunnelEvent', () => {
       }),
       {}
     );
+  });
+
+  it('keeps face method, submitted face, and a bounded elapsedMs', () => {
+    assert.deepEqual(
+      sanitizeFunnelProps({
+        method: 'upload',
+        face: 'none',
+        elapsedMs: 1200,
+        email: 'a@b.c',
+      }),
+      { method: 'upload', face: 'none', elapsedMs: 1200 }
+    );
+    assert.deepEqual(sanitizeFunnelProps({ method: 'skip' }), {});
+    assert.deepEqual(sanitizeFunnelProps({ method: 'none' }), {});
+    assert.deepEqual(sanitizeFunnelProps({ face: 'skip' }), {});
+    assert.deepEqual(sanitizeFunnelProps({ elapsedMs: -1 }), {});
+    assert.deepEqual(sanitizeFunnelProps({ elapsedMs: 1.5 }), {});
+  });
+
+  it('rejects face_set skip and none, and allows create_submitted none', () => {
+    assert.equal(clientCreateFunnelError('face_set', { method: 'skip' }), 'Invalid funnel event');
+    assert.equal(clientCreateFunnelError('face_set', { method: 'none' }), 'Invalid funnel event');
+    assert.equal(clientCreateFunnelError('face_set', {}), 'Invalid funnel event');
+    assert.equal(clientCreateFunnelError('face_set', { method: 'upload' }), null);
+    assert.equal(clientCreateFunnelError('face_set', { method: 'generate' }), null);
+    assert.equal(clientCreateFunnelError('create_submitted', { face: 'skip' }), 'Invalid funnel event');
+    assert.equal(clientCreateFunnelError('create_submitted', { face: 'none' }), null);
+    assert.equal(clientCreateFunnelError('create_submitted', { face: 'upload' }), null);
+    assert.equal(clientCreateFunnelError('create_submitted', { face: 'generate' }), null);
+    assert.equal(clientCreateFunnelError('create_started', { method: 'skip' }), null);
   });
 });
 

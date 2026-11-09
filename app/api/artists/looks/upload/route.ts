@@ -127,12 +127,18 @@ export async function POST(request: NextRequest) {
 
     try {
       const rawArtistId = form?.get('artistId');
-      const artistId =
+      const sanitized =
         typeof rawArtistId === 'string' ? sanitizeFunnelProps({ artistId: rawArtistId }).artistId : undefined;
+      const artistId = typeof sanitized === 'string' ? sanitized : undefined;
       if (artistId) {
         const artist = await adminGetArtist(artistId);
         if (artist && !artist.deletedAt && artist.ownerId === userId) {
-          recordFunnelEvent(userId, 'face_set', { artistId }, platformFromRequest(request));
+          recordFunnelEvent(
+            userId,
+            'face_set',
+            { artistId, method: 'upload' },
+            platformFromRequest(request)
+          );
         }
       }
     } catch (error) {

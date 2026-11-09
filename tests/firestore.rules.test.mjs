@@ -556,6 +556,25 @@ test('a client can hold a song for audio and cannot mark that song ready', async
     title: 'Held renamed',
     updatedAt: now,
   }));
+  await assertSucceeds(setDoc(doc(alice, 'songs/submitted'), songData({
+    id: 'submitted',
+    isPublic: false,
+    audioReady: false,
+    createSubmittedAt: now,
+    currentVersionId: 'submittedVer',
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/badStamp'), songData({
+    id: 'badStamp',
+    createSubmittedAt: 'yesterday',
+    currentVersionId: 'badStampVer',
+  })));
+  await assertFails(updateDoc(doc(alice, 'songs/submitted'), {
+    createSubmittedAt: new Date('2026-02-01T00:00:00.000Z'),
+  }));
+  await assertSucceeds(updateDoc(doc(alice, 'songs/submitted'), {
+    title: 'Still held',
+    updatedAt: now,
+  }));
 });
 
 test('a server-marked failed shell can be retitled and the client cannot clear the flag', async () => {
@@ -933,6 +952,28 @@ test('public user docs omit email and wallet; the private profile is owner-only'
   await assertFails(getDoc(doc(dbFor('bob'), 'users/alice/private/profile')));
   await assertFails(getDocs(collection(dbFor('bob'), 'users/alice/private')));
   await assertFails(getDocs(collection(dbFor('alice'), 'users/bob/private')));
+});
+
+test('expo push tokens are readable only by the owner and not writable by clients', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'users/alice/pushTokens/token1'), {
+      token: 'ExponentPushToken[abc12345]',
+      platform: 'ios',
+      updatedAt: now,
+    });
+  });
+  const own = await assertSucceeds(getDoc(doc(dbFor('alice'), 'users/alice/pushTokens/token1')));
+  assert.equal(own.data().platform, 'ios');
+  await assertFails(getDoc(doc(dbFor('bob'), 'users/alice/pushTokens/token1')));
+  await assertFails(getDoc(doc(dbFor(null), 'users/alice/pushTokens/token1')));
+  await assertFails(setDoc(doc(dbFor('alice'), 'users/alice/pushTokens/token2'), {
+    token: 'ExponentPushToken[zzzzzzzz]',
+    platform: 'ios',
+  }));
+  await assertFails(updateDoc(doc(dbFor('alice'), 'users/alice/pushTokens/token1'), {
+    token: 'ExponentPushToken[changed1]',
+  }));
+  await assertFails(getDocs(collection(dbFor('bob'), 'users/alice/pushTokens')));
 });
 
 test('follows are public to read and only the follower can write', async () => {

@@ -1,11 +1,12 @@
 import Link from 'next/link';
+import { CREATE_ARTIST_HREF, STUDIO_NEW_SONG_HREF } from '@/lib/create/paths';
 
 /** Static studio actions. Shown in the skeleton and the loaded overview so the cards do not move. */
 export function StudioCreateCards() {
   return (
     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
       <Link
-        href="/dashboard?tab=artists&new=1"
+        href={CREATE_ARTIST_HREF}
         className="group rounded-xl border border-white/10 bg-card/60 p-6 transition-colors hover:border-primary/40 sm:p-8"
       >
         <p className="text-xs font-medium uppercase tracking-wide text-primary">Create</p>
@@ -22,7 +23,7 @@ export function StudioCreateCards() {
       </Link>
 
       <Link
-        href="/dashboard?tab=songs&new=1"
+        href={STUDIO_NEW_SONG_HREF}
         className="group rounded-xl border border-white/10 bg-card/60 p-6 transition-colors hover:border-primary/40 sm:p-8"
       >
         <p className="text-xs font-medium uppercase tracking-wide text-primary">Generate</p>
