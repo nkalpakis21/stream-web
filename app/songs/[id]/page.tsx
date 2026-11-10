@@ -27,6 +27,14 @@ import type { SongDocument, SongVersionDocument } from '@/types/firestore';
 import { playableAudioUrl } from '@/lib/songs/audioAvailability';
 import { loadSongShareFacts } from '@/lib/server/songShareFacts';
 import { metadataFromShareFacts, sharePageGate } from '@/lib/songs/shareCard';
+import { SongTakesPanel } from '@/components/songs/SongTakesPanel';
+import {
+  buildTakeSlots,
+  generationTakeInput,
+  listenerVersions,
+  shouldShowTakePicker,
+  takeSeedFromParts,
+} from '@/lib/songs/takes';
 
 function primaryVersion(
   song: { currentVersionId?: string },
@@ -94,6 +102,20 @@ async function SongPageBody({
 
   const shareUrl = publicUrl(`/songs/${song.id}`);
   const artistLinkable = artist?.isPublic === true;
+  const takeSeed = takeSeedFromParts({
+    currentVersionId: song.currentVersionId,
+    versions: allVersions.map((version) => ({
+      id: version.id,
+      audioURL: version.audioURL,
+      providerOutputId: version.providerOutputId,
+      isPrimary: version.isPrimary,
+      versionNumber: version.versionNumber,
+    })),
+    generations: generations.map((generation) => generationTakeInput(generation)),
+  });
+  const showTakePicker =
+    viewerId === song.ownerId && shouldShowTakePicker(buildTakeSlots(takeSeed));
+  const heardVersions = listenerVersions(allVersions, song.currentVersionId);
 
   return (
     <div className="min-h-screen bg-background">
@@ -114,7 +136,7 @@ async function SongPageBody({
           pending={hasPendingGeneration}
           durationSeconds={song.duration ?? null}
           shareUrl={shareUrl}
-          versions={allVersions.map(version => ({
+          versions={heardVersions.map(version => ({
             id: version.id,
             audioURL: version.audioURL,
             isPrimary: version.isPrimary,
@@ -141,16 +163,20 @@ async function SongPageBody({
           </p>
         </div>
 
-        <VersionCards
-          songTitle={song.title}
-          artistName={artistName}
-          artistId={artist?.id}
-          albumCoverUrl={coverImageUrl}
-          initialVersions={allVersions}
-          hasPendingGeneration={hasPendingGeneration}
-          songId={song.id}
-          ownerId={song.ownerId}
-        />
+        {showTakePicker && takeSeed ? (
+          <SongTakesPanel songId={song.id} initial={takeSeed} />
+        ) : (
+          <VersionCards
+            songTitle={song.title}
+            artistName={artistName}
+            artistId={artist?.id}
+            albumCoverUrl={coverImageUrl}
+            initialVersions={allVersions}
+            hasPendingGeneration={hasPendingGeneration}
+            songId={song.id}
+            ownerId={song.ownerId}
+          />
+        )}
 
         <CommentsSection targetType="song" targetId={song.id} />
       </main>

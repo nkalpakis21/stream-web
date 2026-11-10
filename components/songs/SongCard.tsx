@@ -29,8 +29,14 @@ import {
   type OwnerTileSong,
 } from '@/lib/songs/ownerTile';
 import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
+import type { ComponentType } from 'react';
 import { PrivateSongTag } from '@/components/songs/PrivateSongTag';
 import { UnavailableAudioRow } from '@/components/songs/UnavailableAudioRow';
+import { SWITCH_TAKE_LABEL, seedHasTwoTakes } from '@/lib/songs/takes';
+import { useTakeSeed } from '@/components/songs/useTakeSeed';
+import '@/components/songs/pick-your-take.css';
+
+type TakeSheetType = ComponentType<{ songId: string; onClose: () => void }>;
 
 function useLiveOwnerSong<T extends OwnerTileSong & { id: string }>(
   song: T,
@@ -72,6 +78,11 @@ interface SongCardProps {
   coin?: ArtistCoinQuote | null;
   /** Owner catalogs only. Fans never pass this, so a private song cannot grow a tag. */
   ownerCatalog?: boolean;
+  /**
+   * Known take count for the studio switch control.
+   * Omit it and the card reads versions itself. A single take stays hidden.
+   */
+  takeCount?: number;
 }
 
 export function SongCard({
@@ -83,11 +94,17 @@ export function SongCard({
   coinIcon = null,
   coin = null,
   ownerCatalog = false,
+  takeCount,
 }: SongCardProps) {
   const moderationEnabled = useCoverModerationEnabled();
   const shown = useLiveOwnerSong(song, ownerCatalog);
   const [statusOverride, setStatusOverride] = useState<CoverModerationStatus | null>(null);
+  const liveTakes = useTakeSeed(shown.id, null, ownerCatalog && takeCount == null);
+  const showSwitchTake =
+    ownerCatalog && (takeCount != null ? takeCount >= 2 : seedHasTwoTakes(liveTakes));
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [takesOpen, setTakesOpen] = useState(false);
+  const [TakeSheetView, setTakeSheetView] = useState<TakeSheetType | null>(null);
   const isCompact = size === 'compact';
   const showTicker = Boolean(ticker?.trim());
   const name = artist?.name || artistName;
@@ -208,7 +225,28 @@ export function SongCard({
           </div>
         ) : null}
         {coin ? <ArtistCoinRow artistId={shown.artistId} quote={coin} linkable={linkable} /> : null}
+        {showSwitchTake ? (
+          <button
+            type="button"
+            className="take-switch"
+            onClick={() => {
+              if (!TakeSheetView) {
+                void import('@/components/songs/TakeSheet').then((mod) => {
+                  setTakeSheetView(() => mod.TakeSheet);
+                  setTakesOpen(true);
+                });
+                return;
+              }
+              setTakesOpen(true);
+            }}
+          >
+            {SWITCH_TAKE_LABEL}
+          </button>
+        ) : null}
       </div>
+      {takesOpen && TakeSheetView ? (
+        <TakeSheetView songId={shown.id} onClose={() => setTakesOpen(false)} />
+      ) : null}
     </article>
   );
 }

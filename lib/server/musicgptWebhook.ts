@@ -40,6 +40,7 @@ import { musicGptWebhookSecret } from '@/lib/webhooks/musicgptAuth';
 import { redactForLog } from '@/lib/webhooks/redactUrl';
 import { revalidateHomepage } from '@/lib/webhooks/revalidate';
 import { persistConversionAudio } from '@/lib/server/songAudioStorage';
+import { conversionIdsAfterLateTake } from '@/lib/songs/takes';
 
 export interface MusicGPTWebhookPayload {
   success: boolean;
@@ -103,6 +104,184 @@ function versionHasAudio(version: { audioURL?: string | null }): boolean {
   return typeof version.audioURL === 'string' && version.audioURL.trim().length > 0;
 }
 
+function webhookConversionId(body: MusicGPTWebhookPayload): string {
+  return typeof body.conversion_id === 'string' ? body.conversion_id.trim() : '';
+}
+
+/**
+ * A conversion that arrives after the generation is already completed.
+ * Saves a non-primary version and nothing else: no primary flip, no
+ * currentVersionId write, no notifications, X posts, covers, or counts.
+ * A repeat of the same conversion id does not create another version.
+ */
+async function saveLateTake(
+  generation: GenerationDocument,
+  body: MusicGPTWebhookPayload
+): Promise<NextResponse> {
+  const conversionId = webhookConversionId(body);
+  const db = getAdminDb();
+  const song = await adminGetSong(generation.songId);
+  if (!song) {
+    return NextResponse.json({ error: 'Parent song not found' }, { status: 400 });
+  }
+  if (song.deletedAt) {
+    return NextResponse.json({ ok: true, ignored: 'deleted' });
+  }
+
+  const existingVersions = await adminGetSongVersions(song.id);
+  const already = existingVersions.find((version) => version.providerOutputId === conversionId);
+  let storedAudioURL: string | null = null;
+  let audioPersisted: boolean | null = null;
+
+  if (!already) {
+    const sourceUrl = typeof body.conversion_path === 'string' ? body.conversion_path : '';
+    if (!sourceUrl) {
+      return NextResponse.json(
+        { error: 'Invalid payload: conversion_path is required for conversion completion webhooks' },
+        { status: 400 }
+      );
+    }
+    const maxVersionNumber =
+      existingVersions.reduce((max, version) => (version.versionNumber > max ? version.versionNumber : max), 0) ||
+      0;
+    const now = Timestamp.now();
+    const versionRef = db.collection(COLLECTIONS.songVersions).doc();
+    const persisted = await persistConversionAudio({
+      songId: song.id,
+      conversionId,
+      sourceUrl,
+    });
+    storedAudioURL = persisted.audioURL;
+    audioPersisted = persisted.audioPersisted;
+    const version: SongVersionDocument = {
+      id: versionRef.id,
+      songId: song.id,
+      versionNumber: maxVersionNumber + 1,
+      title: song.title,
+      createdBy: song.ownerId,
+      createdAt: now as unknown as SongVersionDocument['createdAt'],
+      parentVersionId: song.currentVersionId || null,
+      audioURL: persisted.audioURL,
+      musicgptAudioUrl: persisted.musicgptAudioUrl,
+      audioPersisted: persisted.audioPersisted,
+      providerOutputId: conversionId,
+      isPrimary: false,
+    };
+    await versionRef.set(version);
+    console.log(
+      `[MusicGPT Webhook] Saved late take ${conversionId} for song ${song.id} without changing the current take`
+    );
+  }
+
+  const processed = [...(generation.providerProcessedConversions || [])];
+  if (conversionId && !processed.includes(conversionId)) processed.push(conversionId);
+  const conversionIds = conversionIdsAfterLateTake(
+    generation.providerConversionIds,
+    existingVersions,
+    conversionId
+  );
+  const failed = (generation.providerFailedConversions || []).filter((id) => id !== conversionId);
+  const priorOutput = generation.output || { audioURL: null, stems: null, metadata: {} };
+  const conversionMetadata: Record<string, unknown> = {
+    conversion_path: body.conversion_path,
+    lateTake: true,
+  };
+  if (storedAudioURL) conversionMetadata.storedAudioURL = storedAudioURL;
+  if (audioPersisted != null) conversionMetadata.audioPersisted = audioPersisted;
+  if (body.conversion_duration !== undefined) {
+    conversionMetadata.conversion_duration = body.conversion_duration;
+  }
+
+  await db.collection(COLLECTIONS.generations).doc(generation.id).set(
+    {
+      providerProcessedConversions: processed,
+      providerConversionIds: conversionIds,
+      providerFailedConversions: failed,
+      output: {
+        audioURL: priorOutput.audioURL ?? null,
+        stems: priorOutput.stems ?? null,
+        metadata: {
+          ...(priorOutput.metadata || {}),
+          [`conversion_${conversionId}`]: conversionMetadata,
+        },
+      },
+    },
+    { merge: true }
+  );
+
+  return NextResponse.json({ ok: true, lateTake: true });
+}
+
+/**
+ * One named take failed, or a failure arrived after another take already has audio.
+ * Records the failed conversion and, the first time every take is accounted for,
+ * runs completion once. Does not move currentVersionId or isPrimary.
+ * Returns false when the whole job should still use the no-audio failure path.
+ */
+async function recordPartialTakeFailure(
+  generation: GenerationDocument,
+  body: MusicGPTWebhookPayload
+): Promise<boolean> {
+  const ids = (generation.providerConversionIds || []).filter((id) => id.trim());
+  const explicit = webhookConversionId(body);
+  const knownExplicit = Boolean(explicit) && ids.includes(explicit);
+  const song = await adminGetSong(generation.songId);
+  if (!song || song.deletedAt) return false;
+  const versions = await adminGetSongVersions(song.id);
+  const hasAudio = versions.some(versionHasAudio);
+  if (!knownExplicit && !hasAudio) return false;
+  if (knownExplicit && ids.length < 2 && !hasAudio) return false;
+
+  const processed = new Set(generation.providerProcessedConversions || []);
+  const alreadyFailed = new Set(generation.providerFailedConversions || []);
+  const failedIds = knownExplicit
+    ? [explicit]
+    : ids.filter((id) => !processed.has(id) && !alreadyFailed.has(id));
+  const providerFailedConversions = [...alreadyFailed];
+  for (const id of failedIds) {
+    if (!providerFailedConversions.includes(id)) providerFailedConversions.push(id);
+  }
+
+  const db = getAdminDb();
+  await db.collection(COLLECTIONS.generations).doc(generation.id).set(
+    { providerFailedConversions },
+    { merge: true }
+  );
+
+  const accounted =
+    ids.length > 0 &&
+    ids.every((id) => processed.has(id) || providerFailedConversions.includes(id));
+  if (hasAudio && accounted && generation.status !== 'completed') {
+    const now = Timestamp.now();
+    await db.collection(COLLECTIONS.generations).doc(generation.id).set(
+      { status: 'completed', completedAt: now },
+      { merge: true }
+    );
+    try {
+      await adminCreateSongReadyNotification({
+        userId: song.ownerId,
+        songId: song.id,
+        generationId: generation.id,
+      });
+    } catch (error) {
+      console.error('[MusicGPT Webhook] Failed to create song-ready notification:', error);
+    }
+    try {
+      await adminCreateArtistNewSongNotification({
+        artistId: song.artistId,
+        songId: song.id,
+        generationId: generation.id,
+      });
+    } catch (error) {
+      console.error('[MusicGPT Webhook] Failed to create follower notifications:', error);
+    }
+    await tryPostSongLive(song.id, 'generation-completed');
+    await revalidateHomepage();
+  }
+
+  return true;
+}
+
 /** Provider said the job failed and no playable file should be published. */
 async function recordMusicGptFailure(body: MusicGPTWebhookPayload): Promise<void> {
   const generation = await loadAuthorizedGeneration(body.task_id);
@@ -110,6 +289,7 @@ async function recordMusicGptFailure(body: MusicGPTWebhookPayload): Promise<void
   const songId =
     generation?.songId ?? (typeof binding?.songId === 'string' ? binding.songId : null);
   if (!songId) return;
+  if (generation && (await recordPartialTakeFailure(generation, body))) return;
   const marked = await adminMarkSongGenerationFailed(songId);
   if (!marked || !generation) return;
   const reason =
@@ -350,8 +530,7 @@ export async function processMusicGptWebhook(
   }
 
   if (generation.status === 'completed') {
-    await tryPostSongLive(generation.songId, 'generation-already-completed');
-    return NextResponse.json({ ok: true });
+    return saveLateTake(generation, body);
   }
 
   const song = await adminGetSong(generation.songId);
@@ -495,10 +674,13 @@ export async function processMusicGptWebhook(
     body.conversion_id,
   ];
   const allConversionIds = generation.providerConversionIds || [];
-  const allProcessed =
+  const failedConversionIds = new Set(generation.providerFailedConversions || []);
+  const allAccounted =
     allConversionIds.length > 0 &&
-    allConversionIds.every((id) => updatedProcessedConversions.includes(id));
-  const shouldMarkCompleted = allProcessed || allConversionIds.length === 0;
+    allConversionIds.every(
+      (id) => updatedProcessedConversions.includes(id) || failedConversionIds.has(id)
+    );
+  const shouldMarkCompleted = allAccounted || allConversionIds.length === 0;
 
   const conversionDetailsResponse = await getConversionDataByConversionID(body.conversion_id);
   if (conversionDetailsResponse && conversionDetailsResponse.success) {

@@ -3,10 +3,10 @@
  *
  * Client Firebase Analytics records page views and CTA clicks. It cannot see
  * the MusicGPT webhook. First-time milestones use doc id `${uid}_${event}`
- * and create-if-absent. `play`, `song_shared`, `x_post`, and
- * `create_options_used` are a new auto-id doc each time. `x_post` and
- * `create_options_used` are server-only. `platform` is `web`, `ios`, or
- * `unknown` (`lib/funnel/platform.ts`).
+ * and create-if-absent. `play`, `song_shared`, `x_post`, `create_options_used`,
+ * and `take_picked` are a new auto-id doc each time. `x_post`,
+ * `create_options_used`, and `take_picked` are server-only. `platform` is
+ * `web`, `ios`, or `unknown` (`lib/funnel/platform.ts`).
  * Anonymous share-page plays are auto-id docs with `uid: null`, `visitorId`,
  * and `source: 'share_page'`. Signed-in plays from that page set the same source.
  */
@@ -35,9 +35,15 @@ export const FIRST_FUNNEL_EVENTS = [
   'x_connected',
 ] as const;
 
-export const REPEAT_FUNNEL_EVENTS = ['play', 'song_shared', 'x_post', 'create_options_used'] as const;
+export const REPEAT_FUNNEL_EVENTS = [
+  'play',
+  'song_shared',
+  'x_post',
+  'create_options_used',
+  'take_picked',
+] as const;
 
-/** Repeat events the browser may report. `x_post` and `create_options_used` stay server-only. */
+/** Repeat events the browser may report. `x_post`, `create_options_used`, and `take_picked` stay server-only. */
 const CLIENT_REPEAT_EVENTS = ['play', 'song_shared'] as const;
 
 export const FUNNEL_EVENTS = [...FIRST_FUNNEL_EVENTS, ...REPEAT_FUNNEL_EVENTS] as const;
@@ -150,14 +156,15 @@ export function isPlayRateLimited(
 }
 
 /**
- * Keep ids, the create-flow enums, and a bounded elapsedMs.
- * Drop emails, urls, skip/none on face_set, and anything else.
+ * Keep ids, the create-flow enums, a bounded elapsedMs, create option tags,
+ * and take_picked fields (take, changedFromDefault, msToPick). Drop emails,
+ * urls, skip/none on face_set, and anything else.
  */
 export function sanitizeFunnelProps(
   props?: Record<string, unknown> | null
-): Record<string, string | number> {
+): Record<string, string | number | boolean> {
   if (!props) return {};
-  const out: Record<string, string | number> = {};
+  const out: Record<string, string | number | boolean> = {};
   for (const key of PROP_KEYS) {
     const value = props[key];
     if (typeof value !== 'string') continue;
@@ -180,6 +187,18 @@ export function sanitizeFunnelProps(
     const unique = new Set(parts);
     const known = parts.every(part => (CREATE_OPTION_TAGS as readonly string[]).includes(part));
     if (known && unique.size === parts.length) out.options = props.options;
+  }
+  if (props.take === 1 || props.take === 2) out.take = props.take;
+  if (typeof props.changedFromDefault === 'boolean') {
+    out.changedFromDefault = props.changedFromDefault;
+  }
+  if (
+    typeof props.msToPick === 'number' &&
+    Number.isInteger(props.msToPick) &&
+    props.msToPick >= 0 &&
+    props.msToPick <= MAX_ELAPSED_MS
+  ) {
+    out.msToPick = props.msToPick;
   }
   return out;
 }
@@ -329,8 +348,8 @@ function eventData(
 
 /**
  * First-time events create `${uid}_${event}` once. `play`, `song_shared`,
- * `x_post`, and `create_options_used` always add a new doc. Throws on an
- * unknown event, platform, or uid.
+ * `x_post`, `create_options_used`, and `take_picked` always add a new doc.
+ * Throws on an unknown event, platform, or uid.
  */
 export async function trackFunnelEvent(
   uid: string,
