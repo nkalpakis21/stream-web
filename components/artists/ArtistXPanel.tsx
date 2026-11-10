@@ -6,6 +6,7 @@ import { webPlatformHeaders } from '@/lib/funnel/platform';
 import { useSearchParams } from 'next/navigation';
 import { XAutoPostRow } from '@/components/artists/XAutoPostRow';
 import { ownerSeesXAutoPost } from '@/lib/x/autoPost';
+import { startXConnect } from '@/lib/x/connectClient';
 import { xAutoPostStatusLine } from '@/lib/x/statusCopy';
 
 interface XState {
@@ -133,20 +134,12 @@ export function ArtistXPanel({
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch('/api/x/connect', {
-        method: 'POST',
-        headers: await authHeaders(user),
-        body: JSON.stringify({ artistId }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 503 || data.available === false) {
+      const result = await startXConnect(artistId, user);
+      if (result.status === 'unavailable') {
         setHidden(true);
         return;
       }
-      if (!res.ok || !data.authorizeUrl) {
-        throw new Error(visibleXMessage(data.error) || 'Could not start X connect.');
-      }
-      window.location.href = data.authorizeUrl;
+      if (result.status === 'error') throw new Error(result.message);
     } catch (err) {
       setError(
         visibleXMessage(err instanceof Error ? err.message : null) || 'Could not start X connect.'

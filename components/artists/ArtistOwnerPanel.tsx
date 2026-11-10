@@ -3,6 +3,7 @@
 import { Suspense } from 'react';
 import { ArtistLookPicker } from '@/components/artists/ArtistLookPicker';
 import { ArtistBioEditor } from '@/components/artists/ArtistBioEditor';
+import { ArtistOwnerStats } from '@/components/artists/ArtistOwnerStats';
 import { ArtistXPanel } from '@/components/artists/ArtistXPanel';
 import { LaunchExistingArtistCoin } from '@/components/artists/LaunchExistingArtistCoin';
 import { FollowersList } from '@/components/artists/FollowersList';
@@ -48,6 +49,7 @@ export function ArtistOwnerPanel({
 
   return (
     <section className="owner-panel">
+      <ArtistOwnerStats artistId={artist.id} ownerId={artist.ownerId} xConfigured={xConfigured} />
       <div className="owner-panel-kicker">
         <p className="owner-panel-kicker-text">
           <span className="owner-panel-kicker-lead">Artist settings</span>
