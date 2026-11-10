@@ -2,24 +2,13 @@ import { NextRequest } from 'next/server';
 import { canonicalVisitorId, VISITOR_COOKIE } from '@/lib/analytics/visitorId';
 import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
 import { noStoreJson } from '@/lib/http/noStore';
+import { artistStatsVerifyForTests } from '@/lib/server/artistStatsAuth';
 import { loadArtistOwnerStats } from '@/lib/server/artistOwnerStats';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
-
-type TokenVerifier = (idToken: string) => Promise<{ uid: string }>;
-
-let verifyForTests: TokenVerifier | null = null;
-
-/** Test-only. Production requests always verify the Firebase ID token. */
-export function setArtistStatsAuthForTests(verify: TokenVerifier | null): void {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('setArtistStatsAuthForTests is disabled in production');
-  }
-  verifyForTests = verify;
-}
 
 /**
  * GET /api/artists/[id]/stats
@@ -34,7 +23,7 @@ export async function GET(
 ) {
   try {
     const uid = await requireUser(request, {
-      verifyToken: verifyForTests ?? undefined,
+      verifyToken: artistStatsVerifyForTests(),
     });
     const ownerAnonId = canonicalVisitorId(request.cookies.get(VISITOR_COOKIE)?.value);
     const stats = await loadArtistOwnerStats({

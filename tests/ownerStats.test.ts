@@ -16,7 +16,8 @@ import {
 } from '../lib/artists/ownerStats';
 import { setAdminDbForTests } from '../lib/firebase/admin';
 import { PLAY_REPEAT_WINDOW_MS } from '../lib/server/funnel';
-import { GET, setArtistStatsAuthForTests } from '../app/api/artists/[id]/stats/route';
+import { GET } from '../app/api/artists/[id]/stats/route';
+import { setArtistStatsAuthForTests } from '../lib/server/artistStatsAuth';
 
 const NOW = 1_700_000_000_000;
 const START = NOW - ARTIST_STATS_WINDOW_MS;
