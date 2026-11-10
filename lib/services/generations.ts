@@ -72,6 +72,16 @@ export async function createGeneration(
     lyrics?: string;
     /** When set, the MusicGPT route checks this artist is owned by the caller. */
     artistId?: string;
+    /**
+     * Web create panel. Omitted by mobile, which keeps today's request.
+     * The server writes this onto the song. It is not stored on the generation.
+     */
+    createOptions?: {
+      instrumental: boolean;
+      voice: 'same' | 'female' | 'male';
+      feel: string[];
+      energy: 'Slow' | 'Steady' | 'Fast';
+    } | null;
   } & {
     /**
      * Optional provider task/job identifier for async providers.
@@ -108,6 +118,7 @@ export async function createGeneration(
           songId,
           ...(data.artistId ? { artistId: data.artistId } : {}),
           ...(data.lyrics && { lyrics: data.lyrics }),
+          ...(data.createOptions ? { createOptions: data.createOptions } : {}),
         }),
       });
 

@@ -598,6 +598,41 @@ test('a server-marked failed shell can be retitled and the client cannot clear t
   await assertFails(updateDoc(doc(alice, 'songs/failedShell'), { generationAttemptAt: now }));
 });
 
+test('clients cannot write createOptions, and a song that already has it can still be retitled', async () => {
+  await seedCatalog();
+  const alice = dbFor('alice');
+  await assertFails(setDoc(doc(alice, 'songs/clientOptions'), songData({
+    id: 'clientOptions',
+    currentVersionId: 'clientOptionsVer',
+    createOptions: { instrumental: true, voice: 'female' },
+  })));
+  await seed(async (db) => {
+    await setDoc(doc(db, 'songs/serverOptions'), songData({
+      id: 'serverOptions',
+      createOptions: {
+        instrumental: false,
+        voice: 'same',
+        feel: ['Chill'],
+        energy: 'Steady',
+        words: 'artist',
+      },
+    }));
+  });
+  await assertSucceeds(updateDoc(doc(alice, 'songs/serverOptions'), {
+    title: 'Renamed',
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/serverOptions'), {
+    createOptions: {
+      instrumental: true,
+      voice: 'female',
+      feel: ['Hype'],
+      energy: 'Fast',
+      words: 'mine',
+    },
+  }));
+});
+
 test('owner can retitle or soft-delete a song and cannot change ownerId or covers', async () => {
   await seedCatalog();
   const alice = dbFor('alice');

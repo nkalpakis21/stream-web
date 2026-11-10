@@ -3,6 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { SongCreatePreview, SongCustomizePanel } from '@/components/create/SongCustomizePanel';
+import { useSongCustomize } from '@/components/create/useSongCustomize';
+import { requestLyricsDraft } from '@/lib/create/lyricsDraftClient';
+import { SONG_LYRICS_MAX, toWireCreateOptions } from '@/lib/create/songOptions';
 import { getUserArtists } from '@/lib/services/artists';
 import { abandonFailedSongCreate, createSong } from '@/lib/services/songs';
 import { createGeneration } from '@/lib/services/generations';
@@ -57,9 +61,25 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
     title: '',
     artistId: preselectedArtistId || '',
     prompt: '',
-    lyrics: '',
     provider: 'musicgpt',
   });
+  const selectedForStyle = artists.find(artist => artist.id === formData.artistId) ?? null;
+  const customize = useSongCustomize(
+    selectedForStyle
+      ? {
+          id: selectedForStyle.id,
+          name: selectedForStyle.name,
+          moods: selectedForStyle.styleDNA?.moods ?? [],
+          tempoMin: selectedForStyle.styleDNA?.tempoRange?.min,
+          tempoMax: selectedForStyle.styleDNA?.tempoRange?.max,
+        }
+      : null
+  );
+  const requestDraft = useCallback(
+    (input: { sessionId: string; prompt: string; artistId?: string | null }) =>
+      requestLyricsDraft(input),
+    []
+  );
 
   const loadArtists = useCallback(async () => {
     if (!user) return;
@@ -105,7 +125,9 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
       return;
     }
 
-    if (formData.lyrics.length > 2000) {
+    const chosen = customize.value;
+    const customLyrics = chosen.instrumental || chosen.words !== 'mine' ? '' : chosen.lyrics.trim();
+    if (customLyrics.length > SONG_LYRICS_MAX) {
       showToast('Lyrics cannot exceed 2000 characters', 'error');
       return;
     }
@@ -130,7 +152,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
             isPublic: true,
             idempotencyKey,
             prompt: formData.prompt,
-            lyrics: formData.lyrics,
+            lyrics: customLyrics,
           });
           return { id: result.song.id, reused: result.reused };
         },
@@ -155,13 +177,14 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
               lore: artistVersion.lore,
               vocalIdentity: artistVersion.vocalIdentity ?? selectedArtist.vocalIdentity ?? null,
             },
-            lyrics: formData.lyrics.trim() || undefined,
+            lyrics: customLyrics || undefined,
+            createOptions: toWireCreateOptions(chosen),
           });
         },
         abandon: songId =>
           abandonFailedSongCreate(songId, {
             prompt: formData.prompt,
-            lyrics: formData.lyrics,
+            lyrics: customLyrics,
           }),
       });
 
@@ -171,9 +194,9 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
         title: '',
         artistId: artists[0]?.id || '',
         prompt: '',
-        lyrics: '',
         provider: 'musicgpt',
       });
+      customize.reset();
 
       onSuccess?.(created.id);
       router.push(`/songs/${created.id}`);
@@ -336,54 +359,34 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
             />
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label htmlFor="lyrics" className="block text-sm font-medium text-foreground">
-                Lyrics (optional)
-              </label>
-              <span
-                className={`text-xs font-medium transition-colors ${
-                  formData.lyrics.length > 2000
-                    ? 'text-red-500'
-                    : formData.lyrics.length > 1800
-                    ? 'text-yellow-500'
-                    : 'text-muted-foreground'
-                }`}
-              >
-                {formData.lyrics.length} / 2000
-              </span>
-            </div>
-            <textarea
-              id="lyrics"
-              rows={6}
-              maxLength={2000}
-              value={formData.lyrics}
-              onChange={e => {
-                const value = e.target.value;
-                if (value.length <= 2000) {
-                  setFormData({ ...formData, lyrics: value });
-                }
-              }}
-              placeholder="Enter your song lyrics (optional)..."
-              className={`w-full px-4 py-3 border rounded-xl bg-background/50 backdrop-blur-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all resize-none ${
-                formData.lyrics.length > 2000
-                  ? 'border-red-500 focus:ring-red-500'
-                  : formData.lyrics.length > 1800
-                  ? 'border-yellow-500 focus:ring-yellow-500'
-                  : 'border-border'
-              }`}
-            />
-          </div>
+          <SongCustomizePanel
+            key={customize.resetKey}
+            artistName={selectedForStyle?.name}
+            artistId={selectedForStyle?.id}
+            defaults={customize.defaults}
+            value={customize.value}
+            onChange={customize.setValue}
+            prompt={formData.prompt}
+            requestDraft={requestDraft}
+            disabled={loading}
+          />
 
           {generationFailed ? (
             <SongCreateFailureNotice onRetry={() => { void submitSong(); }} disabled={loading} />
           ) : null}
 
+          <SongCreatePreview
+            artistName={selectedForStyle?.name}
+            defaults={customize.defaults}
+            value={customize.value}
+            onReset={customize.reset}
+          />
+
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
               aria-busy={loading}
-              disabled={loading || formData.prompt.length > 300 || formData.prompt.trim().length === 0 || formData.lyrics.length > 2000}
+              disabled={loading || formData.prompt.length > 300 || formData.prompt.trim().length === 0 || customize.value.lyrics.length > SONG_LYRICS_MAX}
               className="flex-1 px-6 py-3 bg-gradient-to-r from-accent-cta to-accent-cta/90 text-accent-ink rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-lg hover:shadow-xl"
             >
               {loading ? (

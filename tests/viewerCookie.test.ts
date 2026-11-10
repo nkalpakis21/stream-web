@@ -58,6 +58,7 @@ const NO_STORE_ROUTES = [
   'app/api/users/link-wallet/route.ts',
   'app/api/generations/[id]/status/route.ts',
   'app/api/generations/musicgpt/route.ts',
+  'app/api/lyrics/draft/route.ts',
   'app/api/artists/looks/route.ts',
   'app/api/artists/looks/upload/route.ts',
   'app/api/artists/pump-fun/metadata/route.ts',

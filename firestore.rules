@@ -321,6 +321,7 @@ service cloud.firestore {
         && fieldUnchanged('generationAttemptAt')
         && fieldUnchanged('createPrompt')
         && fieldUnchanged('createLyrics')
+        && fieldUnchanged('createOptions')
         && fieldUnchanged('createSubmittedAt')
         && sameCoverProvider()
         && request.resource.data.keys().hasOnly([
@@ -337,6 +338,7 @@ service cloud.firestore {
           'generationAttemptAt',
           'createPrompt',
           'createLyrics',
+          'createOptions',
           'createSubmittedAt',
           'createdAt',
           'updatedAt',
@@ -409,6 +411,7 @@ service cloud.firestore {
           request.resource.data.createLyrics is string
           && request.resource.data.createLyrics.size() <= 2000
         ))
+        && !('createOptions' in request.resource.data)
         && (!('createSubmittedAt' in request.resource.data)
           || request.resource.data.createSubmittedAt is timestamp);
     }
@@ -940,6 +943,14 @@ service cloud.firestore {
           )
         );
       allow read, update, delete: if false;
+    }
+
+    // Lyrics draft counters. Doc id is the uid. Admin SDK only.
+    match /lyricsDraftQuota/{uid} {
+      allow read, write: if false;
+      match /{document=**} {
+        allow read, write: if false;
+      }
     }
 
     // Funnel events. First-time docs are `${uid}_${event}`. play and

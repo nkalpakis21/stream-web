@@ -319,6 +319,18 @@ export interface SongDocument {
   /** Optional lyrics from the create attempt. */
   createLyrics?: string | null;
   /**
+   * Web create panel choices. Written by the MusicGPT route (Admin SDK).
+   * Absent on mobile creates and on songs made before the panel.
+   * Clients cannot set or change it.
+   */
+  createOptions?: {
+    instrumental: boolean;
+    voice: 'same' | 'female' | 'male';
+    feel: string[];
+    energy: 'Slow' | 'Steady' | 'Fast';
+    words: 'artist' | 'mine';
+  } | null;
+  /**
    * Client time of the create submit. The webhook measures first_song_ready
    * elapsedMs from this. Clients may set it once and cannot change it.
    */
