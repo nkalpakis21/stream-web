@@ -13,6 +13,8 @@ interface SongOwnerActionsProps {
   song: {
     path?: string | null;
     currentVersionId?: string | null;
+    audioReady?: boolean | null;
+    duration?: number | null;
     createOptions?: { instrumental?: boolean; voice?: string | null } | null;
     beatFirst?: { stage?: string | null; chosenVersionId?: string | null } | null;
     voiceChange?: {

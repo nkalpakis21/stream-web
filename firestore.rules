@@ -284,7 +284,7 @@ service cloud.firestore {
     }
 
     // Owner edits may touch only these keys. createOptions, coverModeration,
-    // voiceChange, covers, play counts, and the other server fields stay as
+    // voiceChange, voiceSplit, covers, play counts, and the other server fields stay as
     // stored. affectedKeys stays under the rules expression limit; a per-field
     // fieldUnchanged list does not once both server maps are guarded.
     function songServerFieldsUnchanged() {
@@ -349,6 +349,7 @@ service cloud.firestore {
         && !('beatFirst' in request.resource.data)
         && !('singOver' in request.resource.data)
         && !('voiceChange' in request.resource.data)
+        && !('voiceSplit' in request.resource.data)
         && (!('createSubmittedAt' in request.resource.data)
           || request.resource.data.createSubmittedAt is timestamp);
     }

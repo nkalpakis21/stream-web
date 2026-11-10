@@ -6,12 +6,14 @@ import {
   CHANGING_VOICE_LABEL,
   CHANGE_VOICE_SUBTITLE,
   CHANGE_VOICE_TITLE,
+  SPLIT_VOCAL_CAVEAT,
   singVoiceLabel,
 } from '@/lib/songs/voiceChange';
 import './pick-your-take.css';
 
 export function ChangeVoiceSheet({
   voices,
+  splitCaveat = false,
   busy,
   error,
   onClose,
@@ -19,6 +21,8 @@ export function ChangeVoiceSheet({
 }: {
   /** One button for the other voice, or both when the current voice is unknown. */
   voices: readonly SungGender[];
+  /** Finished songs that sing over a split beat. Never set on beat-first. */
+  splitCaveat?: boolean;
   busy?: boolean;
   error?: string | null;
   onClose: () => void;
@@ -52,6 +56,11 @@ export function ChangeVoiceSheet({
           {CHANGE_VOICE_TITLE}
         </h2>
         <p className="mt-2 text-sm text-[#8B8896]">{CHANGE_VOICE_SUBTITLE}</p>
+        {splitCaveat ? (
+          <p className="mt-2 text-sm text-[#8B8896]" data-voice-split-caveat>
+            {SPLIT_VOCAL_CAVEAT}
+          </p>
+        ) : null}
         {error ? (
           <p className="take-error mt-3" role="alert">
             {error}

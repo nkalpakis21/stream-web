@@ -169,7 +169,7 @@ export function isPlayRateLimited(
  * Keep ids, the create-flow enums, a bounded elapsedMs, create option tags,
  * take_picked fields (take, changedFromDefault, msToPick), beat-first
  * fields (retriesUsed, vocalsAdded, msFromFirstBeat), and voice_change
- * fields (voice, kept, msToKeep). Drop emails, urls,
+ * fields (voice, kept, msToKeep, source, split). Drop emails, urls,
  * skip/none on face_set, and anything else.
  */
 export function sanitizeFunnelProps(
@@ -225,6 +225,8 @@ export function sanitizeFunnelProps(
     out.voice = props.voice;
   }
   if (typeof props.kept === 'boolean') out.kept = props.kept;
+  if (props.source === 'beat_first' || props.source === 'split') out.source = props.source;
+  if (typeof props.split === 'boolean') out.split = props.split;
   if (
     typeof props.msToKeep === 'number' &&
     Number.isInteger(props.msToKeep) &&
