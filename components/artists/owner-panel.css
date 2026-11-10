@@ -599,3 +599,176 @@
     max-width: 240px;
   }
 }
+
+/* Owner-only last-7-days stats. Fans never receive this block. */
+.owner-stats {
+  margin-bottom: 28px;
+}
+
+.owner-stats-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.owner-stats-head p {
+  margin: 0;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  color: #8B8896;
+}
+
+.owner-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 768px) {
+  .owner-stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.owner-stats-tile {
+  min-height: 76px;
+  padding: 14px 16px;
+  box-sizing: border-box;
+  background: #14141C;
+  border: 1px solid #2A2A38;
+  border-radius: 12px;
+}
+
+.owner-stats-label {
+  margin: 0;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 16px;
+  color: #8B8896;
+}
+
+.owner-stats-value {
+  margin: 6px 0 0;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 28px;
+  color: #F5F4F8;
+}
+
+.owner-stats-skeleton {
+  height: 28px;
+  width: 48%;
+  border-radius: 6px;
+  background: #1C1C28;
+}
+
+.owner-stats-ice,
+.owner-stats-share {
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  color: #E8E6F2;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.owner-stats-ice {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 28px;
+}
+
+.owner-stats-ice:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.owner-stats-share {
+  display: inline;
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: inherit;
+}
+
+.owner-stats-empty {
+  margin: 12px 0 0;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  color: #8B8896;
+}
+
+.owner-stats-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+@media (min-width: 640px) {
+  .owner-stats-sheet-backdrop {
+    align-items: center;
+  }
+}
+
+.owner-stats-sheet-dismiss {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.owner-stats-sheet {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 24rem;
+  border: 1px solid #2A2A38;
+  border-radius: 12px;
+  background: #14141C;
+  padding: 24px;
+}
+
+.owner-stats-sheet h2 {
+  margin: 0 0 16px;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+  color: #F5F4F8;
+}
+
+.owner-stats-sheet-close {
+  margin-top: 16px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid #2A2A38;
+  border-radius: 12px;
+  background: transparent;
+  color: #F5F4F8;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.owner-stats-share:focus-visible,
+.owner-stats-ice:focus-visible,
+.owner-stats-sheet-close:focus-visible {
+  outline: 2px solid #E8E6F2;
+  outline-offset: 2px;
+}

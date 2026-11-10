@@ -40,6 +40,7 @@ const NO_STORE_ROUTES = [
   'app/api/artists/followed/route.ts',
   'app/api/artists/[id]/name/route.ts',
   'app/api/artists/[id]/bio/route.ts',
+  'app/api/artists/[id]/stats/route.ts',
   'app/api/auth/viewer/route.ts',
   'app/api/x/connect/route.ts',
   'app/api/x/pause/route.ts',
@@ -316,6 +317,7 @@ describe('viewer cache and private artist 404', () => {
     assert.equal(covered('/api/artists/batch'), true);
     assert.equal(covered('/api/artists/followed'), true);
     assert.equal(covered('/api/artists/Far2rKTQV98sbAf1iqxw/name'), true);
+    assert.equal(covered('/api/artists/Far2rKTQV98sbAf1iqxw/stats'), true);
     assert.equal(covered('/api/auth/viewer'), true);
     assert.equal(covered('/api/artists/search'), false);
     assert.equal(covered('/api/artists/display'), false);
