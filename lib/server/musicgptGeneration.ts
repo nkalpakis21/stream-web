@@ -5,6 +5,12 @@ import {
   MUSICGPT_DEFAULT_MODEL,
   musicGptApiVersion,
 } from '@/lib/ai/providers/musicgpt';
+import {
+  artistDefaults,
+  parseCreateOptions,
+  resolveCreateRequest,
+  styleInputFromArtistContext,
+} from '@/lib/create/songOptions';
 import type { AIGenerationRequest } from '@/lib/ai/types';
 import { errorResponse, HttpError, requireUser } from '@/lib/api/requireAuth';
 import { adminGetArtist } from '@/lib/server/artistsAdmin';
@@ -12,6 +18,7 @@ import {
   adminGetSong,
   adminMarkSongGenerationFailed,
   adminNoteSongGenerationAccepted,
+  adminSaveSongCreateOptions,
 } from '@/lib/server/songsAdmin';
 import { gateSongGenerationRetry } from '@/lib/server/songRetryGate';
 import { GENERATION_TIMEOUT_MS } from '@/lib/songs/ownerTile';
@@ -37,6 +44,7 @@ export type MusicGptGenerationDeps = {
   createMusic?: typeof createMusicGPTSong;
   saveTaskBinding?: typeof saveMusicGptTaskBinding;
   gateRetry?: typeof gateSongGenerationRetry;
+  saveCreateOptions?: typeof adminSaveSongCreateOptions;
 };
 
 let depsForTests: MusicGptGenerationDeps | null = null;
@@ -84,13 +92,21 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
     const deps = generationDeps();
     const userId = await requireUser(request, { verifyToken: deps.verifyToken });
     const body = await request.json();
-    const { prompt, lyrics, artistContext, artistId, songId: songIdRaw } = body as {
-      prompt?: string;
-      lyrics?: string;
-      artistContext?: AIGenerationRequest['artistContext'];
-      artistId?: string;
-      songId?: unknown;
-    };
+    const { prompt, lyrics, artistContext, artistId, songId: songIdRaw, createOptions: createOptionsRaw } =
+      body as {
+        prompt?: string;
+        lyrics?: string;
+        artistContext?: AIGenerationRequest['artistContext'];
+        artistId?: string;
+        songId?: unknown;
+        createOptions?: unknown;
+      };
+    const resolved = resolveCreateRequest({
+      musicStyle: buildMusicGPTStyleFromArtistContext(artistContext).music_style,
+      options: parseCreateOptions(createOptionsRaw),
+      lyrics: typeof lyrics === 'string' ? lyrics : undefined,
+      defaults: artistDefaults(styleInputFromArtistContext(artistContext)),
+    });
 
     if (typeof artistId === 'string' && artistId.trim()) {
       const artist = await adminGetArtist(artistId.trim());
@@ -128,11 +144,7 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
-    assertNoObjectionableContent(
-      prompt,
-      typeof lyrics === 'string' ? lyrics : undefined,
-      songTitle
-    );
+    assertNoObjectionableContent(prompt, resolved.lyrics, songTitle);
 
     const webhookUrl = callback.webhookUrl;
     if (!musicGptWebhookSecret()) {
@@ -144,8 +156,6 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
     if (webhookUrlForLog) {
       console.log('[MusicGPT API Route] Webhook URL being set:', webhookUrlForLog);
     }
-
-    const style = buildMusicGPTStyleFromArtistContext(artistContext);
 
     if (songId) {
       let gate: 'resubmit' | 'still_generating' = 'resubmit';
@@ -173,7 +183,7 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
         try {
           await adminMarkSongGenerationFailed(songId, {
             prompt,
-            lyrics: typeof lyrics === 'string' ? lyrics : undefined,
+            lyrics: resolved.lyrics,
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : '';
@@ -183,15 +193,17 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
       failureSong = {
         id: songId,
         prompt,
-        ...(typeof lyrics === 'string' ? { lyrics } : {}),
+        ...(resolved.lyrics ? { lyrics: resolved.lyrics } : {}),
       };
     }
 
     const createMusic = deps.createMusic ?? createMusicGPTSong;
     const response = await createMusic({
       prompt,
-      lyrics,
-      ...style,
+      lyrics: resolved.lyrics,
+      music_style: resolved.music_style,
+      make_instrumental: resolved.make_instrumental,
+      ...(resolved.gender ? { gender: resolved.gender } : {}),
       webhook_url: webhookUrl,
     });
 
@@ -239,6 +251,16 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
           console.error('[MusicGPT API Route] Could not clear generation failure', error);
         }
       }
+      if (resolved.persisted) {
+        try {
+          await (deps.saveCreateOptions ?? adminSaveSongCreateOptions)(songId, resolved.persisted);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : '';
+          if (!message.includes('Firebase Admin') && !message.includes('not initialized')) {
+            console.error('[MusicGPT API Route] Could not save create options', error);
+          }
+        }
+      }
     }
 
     try {
@@ -252,6 +274,18 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
         },
         platform
       );
+      if (resolved.used.length > 0) {
+        recordFunnelEvent(
+          userId,
+          'create_options_used',
+          {
+            ...(songId ? { songId } : {}),
+            ...(trimmedArtistId ? { artistId: trimmedArtistId } : {}),
+            options: resolved.used.join(','),
+          },
+          platform
+        );
+      }
     } catch (error) {
       console.error(
         '[funnel] first_song_started',

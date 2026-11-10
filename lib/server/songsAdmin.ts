@@ -229,6 +229,20 @@ export async function adminMarkSongGenerationFailed(
  * MusicGPT accepted a job for this song. Clears a failed or timed-out flag
  * and restarts the owner tile's 15-minute clock. Does not delete the song.
  */
+/** Server-only. The create panel's choices. Clients cannot write this field. */
+export async function adminSaveSongCreateOptions(
+  songId: string,
+  createOptions: NonNullable<SongDocument['createOptions']>
+): Promise<void> {
+  await getAdminDb().collection(COLLECTIONS.songs).doc(songId).set(
+    {
+      createOptions,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
 export async function adminNoteSongGenerationAccepted(songId: string): Promise<void> {
   const song = await adminGetSong(songId);
   if (!song || song.deletedAt) return;

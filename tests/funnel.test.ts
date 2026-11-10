@@ -171,6 +171,14 @@ describe('trackFunnelEvent', () => {
     assert.deepEqual(sanitizeFunnelProps({ face: 'skip' }), {});
     assert.deepEqual(sanitizeFunnelProps({ elapsedMs: -1 }), {});
     assert.deepEqual(sanitizeFunnelProps({ elapsedMs: 1.5 }), {});
+    assert.deepEqual(
+      sanitizeFunnelProps({ options: 'voice,lyrics,feel', email: 'a@b.c' }),
+      { options: 'voice,lyrics,feel' }
+    );
+    assert.deepEqual(sanitizeFunnelProps({ options: 'bpm,key' }), {});
+    assert.deepEqual(sanitizeFunnelProps({ options: 'voice,voice' }), {});
+    assert.equal(isFunnelEvent('create_options_used'), true);
+    assert.equal(isClientFunnelEvent('create_options_used'), false);
   });
 
   it('rejects face_set skip and none, and allows create_submitted none', () => {

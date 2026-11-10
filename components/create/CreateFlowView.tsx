@@ -1,7 +1,14 @@
 'use client';
 
-import { useRef, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { PhotoFrameEditor, type PhotoFrameEditorHandle } from '@/components/artists/PhotoFrameEditor';
+import {
+  SongCreatePreview,
+  SongCustomizePanel,
+  type LyricsDraftRequest,
+} from '@/components/create/SongCustomizePanel';
+import { useSongCustomize } from '@/components/create/useSongCustomize';
+import { NEW_ARTIST_TEMPO, type SongCustomizeValue } from '@/lib/create/songOptions';
 import { getInitials } from '@/lib/utils/avatar';
 import {
   CREATE_MOODS,
@@ -42,6 +49,8 @@ export function CreateFlowView({
   submitting,
   onSubmit,
   fileInputRef,
+  onCustomizeChange,
+  requestDraft,
 }: {
   name: string;
   onNameChange: (value: string) => void;
@@ -72,8 +81,19 @@ export function CreateFlowView({
   submitting: boolean;
   onSubmit: () => void;
   fileInputRef: RefObject<HTMLInputElement>;
+  onCustomizeChange?: (value: SongCustomizeValue) => void;
+  requestDraft?: LyricsDraftRequest;
 }) {
   const frameRef = useRef<PhotoFrameEditorHandle>(null);
+  const customize = useSongCustomize({
+    name,
+    tempoMin: NEW_ARTIST_TEMPO.min,
+    tempoMax: NEW_ARTIST_TEMPO.max,
+    moods: [],
+  });
+  useEffect(() => {
+    onCustomizeChange?.(customize.value);
+  }, [customize.value, onCustomizeChange]);
   const trimmedName = name.trim();
   const initials = trimmedName ? getInitials(trimmedName) : '';
 
@@ -300,6 +320,17 @@ export function CreateFlowView({
                 {promptError}
               </p>
             ) : null}
+            <div className="mt-4">
+              <SongCustomizePanel
+                artistName={trimmedName}
+                defaults={customize.defaults}
+                value={customize.value}
+                onChange={customize.setValue}
+                prompt={prompt}
+                requestDraft={requestDraft}
+                disabled={submitting}
+              />
+            </div>
           </div>
 
           <div>
@@ -314,6 +345,12 @@ export function CreateFlowView({
       </div>
 
       <div className="sticky bottom-[calc(var(--tab-h,56px)+env(safe-area-inset-bottom,0px))] z-30 -mx-4 mt-8 border-t border-[#2A2A38] bg-[#0A0A10]/95 p-4 md:bottom-0">
+        <SongCreatePreview
+          artistName={trimmedName}
+          defaults={customize.defaults}
+          value={customize.value}
+          onReset={customize.reset}
+        />
         {submitError ? (
           <p role="alert" className="mb-3 text-sm text-[#FF4D6A]">
             {submitError}

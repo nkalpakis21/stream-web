@@ -1,6 +1,7 @@
 /**
  * Read-only counts of funnelEvents in a UTC date range.
- * First-time events report unique users. play, song_shared, and x_post report
+ * First-time events report unique users. play, song_shared, x_post, and
+ * create_options_used report
  * total events and unique users. Every event is also split by platform
  * (`web`, `ios`, `unknown`). Plays are also split by `source`
  * (`share_page`, or `none` when the field is absent). The script does not write.

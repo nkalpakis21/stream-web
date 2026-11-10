@@ -1,7 +1,8 @@
 #!/usr/bin/env tsx
 /**
  * Print funnelEvents counts for one Firebase project and a UTC date range.
- * First-time events print unique users. play and song_shared print total
+ * First-time events print unique users. play, song_shared, x_post, and
+ * create_options_used print total
  * events and unique users. Each line also splits those numbers by platform
  * (web, ios, unknown). Play lines also split events and actors by source
  * (`share_page`, or `none`). Read-only: it only runs a query.

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -8,6 +8,14 @@ import { LaunchCoinToggle } from '@/components/artists/LaunchCoinToggle';
 import { CreateFlowView } from '@/components/create/CreateFlowView';
 import { getFreshIdToken, isAuthFailure, userFacingApiError } from '@/lib/api/clientAuth';
 import { reportCreateMilestone } from '@/lib/analytics/reportCreate';
+import { requestLyricsDraft } from '@/lib/create/lyricsDraftClient';
+import {
+  NEW_ARTIST_TEMPO,
+  artistDefaults,
+  initialSongCustomize,
+  toWireCreateOptions,
+  type SongCustomizeValue,
+} from '@/lib/create/songOptions';
 import { authHref } from '@/lib/auth/returnTo';
 import { webPlatformHeaders } from '@/lib/funnel/platform';
 import {
@@ -81,6 +89,25 @@ export function OneFlowCreate() {
   const pendingLooksRef = useRef<string[] | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const nameCheckRef = useRef(0);
+  const customizeRef = useRef<SongCustomizeValue>(
+    initialSongCustomize(artistDefaults({ tempoMin: NEW_ARTIST_TEMPO.min, tempoMax: NEW_ARTIST_TEMPO.max }))
+  );
+  const nameRef = useRef('');
+  const onCustomizeChange = useCallback((value: SongCustomizeValue) => {
+    customizeRef.current = value;
+  }, []);
+  const requestDraft = useCallback(
+    (input: { sessionId: string; prompt: string; artistId?: string | null }) =>
+      requestLyricsDraft({
+        ...input,
+        style: input.artistId
+          ? undefined
+          : {
+              name: nameRef.current,
+            },
+      }),
+    []
+  );
 
   const [draft, setDraft] = useState<CreateDraft | null>(null);
   const [nameTaken, setNameTaken] = useState(false);
@@ -153,6 +180,7 @@ export function OneFlowCreate() {
   }, [draft]);
 
   if (!draft) return <div className="min-h-[50vh]" />;
+  nameRef.current = draft.name;
 
   const nameError = artistNameError(artistNameIssue(draft.name), nameTaken);
   const ready = canSubmitCreate(draft.name, draft.prompt) && !nameTaken;
@@ -413,7 +441,7 @@ export function OneFlowCreate() {
           const styleDNA: StyleDNA = {
             genres: [],
             moods: activeMood ? [activeMood] : [],
-            tempoRange: { min: 60, max: 180 },
+            tempoRange: { min: NEW_ARTIST_TEMPO.min, max: NEW_ARTIST_TEMPO.max },
             influences: [],
           };
           const pumpWallet =
@@ -464,6 +492,9 @@ export function OneFlowCreate() {
         const songArtistId = artistId;
         const songVersionId = versionId;
         maybeAttachGenerated(uid);
+        const chosen = customizeRef.current;
+        const customLyrics =
+          chosen.instrumental || chosen.words !== 'mine' ? '' : chosen.lyrics.trim();
 
         const created = await runSongCreateAttempt({
           createSong: async () => {
@@ -474,6 +505,7 @@ export function OneFlowCreate() {
               isPublic: true,
               idempotencyKey,
               prompt,
+              lyrics: customLyrics,
             });
             return { id: result.song.id, reused: result.reused };
           },
@@ -490,9 +522,11 @@ export function OneFlowCreate() {
                 lore: artistVersion.lore,
                 vocalIdentity: artistVersion.vocalIdentity,
               },
+              lyrics: customLyrics || undefined,
+              createOptions: toWireCreateOptions(chosen),
             });
           },
-          abandon: songId => abandonFailedSongCreate(songId, { prompt }),
+          abandon: songId => abandonFailedSongCreate(songId, { prompt, lyrics: customLyrics }),
         });
 
         idempotencyKeyRef.current = null;
@@ -577,6 +611,8 @@ export function OneFlowCreate() {
       submitting={submitting}
       onSubmit={onSubmit}
       fileInputRef={fileInputRef}
+      onCustomizeChange={onCustomizeChange}
+      requestDraft={requestDraft}
     />
   );
 }

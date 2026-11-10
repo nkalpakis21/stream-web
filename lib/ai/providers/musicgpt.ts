@@ -60,6 +60,16 @@ export function musicGptByIdUrl(baseUrl: string): string {
 }
 
 /**
+ * Lyrics Generator. Documented only as GET /v1/prompt_to_lyrics?prompt=
+ * https://docs.musicgpt.com/api-documentation/conversions/lyrics_generator
+ * Prod MusicAI stays on v1 via MUSICGPT_API_VERSION. Develop may create on v2.
+ * This call stays on v1 either way, because that is the documented lyrics path.
+ */
+export function musicGptPromptToLyricsUrl(baseUrl: string): string {
+  return `${musicGptPublicOrigin(baseUrl)}/api/public/v1/prompt_to_lyrics`;
+}
+
+/**
  * MusicGPT covers when COVER_PIPELINE is not fal. Fal posters are the source
  * of truth once COVER_PIPELINE=fal, so we do not ask MusicGPT for a cover.
  */
@@ -72,6 +82,13 @@ export type MusicGptCreateInput = {
   lyrics?: string;
   music_style?: string;
   make_instrumental?: boolean;
+  /**
+   * Documented on MusicAI v1 and v2 as `male`, `female`, or `neutral`.
+   * We send male or female only. Omitting the field leaves the artist's voice.
+   * https://docs.musicgpt.com/api-documentation/conversions/musicai
+   * https://docs.musicgpt.com/api-documentation/conversions/musicaiv2
+   */
+  gender?: 'male' | 'female';
   webhook_url?: string;
   title?: string;
 };
@@ -93,6 +110,7 @@ export function buildMusicGptCreateBody(
   };
   if (payload.lyrics) body.lyrics = payload.lyrics;
   if (payload.music_style) body.music_style = payload.music_style;
+  if (payload.gender === 'male' || payload.gender === 'female') body.gender = payload.gender;
   if (payload.webhook_url) body.webhook_url = payload.webhook_url;
   if (payload.title) body.title = payload.title;
   if (version === 'v2') {
@@ -115,7 +133,7 @@ function callbackToken(webhookUrl?: string): string | null {
 type ArtistContext = NonNullable<AIGenerationRequest['artistContext']>;
 
 /** MusicGPT prompt guidance is ~280 chars; style can be longer, but keep it bounded. */
-const MUSIC_STYLE_MAX_LENGTH = 1000;
+export const MUSIC_STYLE_MAX_LENGTH = 1000;
 
 /**
  * Map an artist's full style DNA into MusicGPT request fields.
@@ -173,7 +191,9 @@ export function buildMusicGPTStyleFromArtistContext(artistContext?: ArtistContex
 
   return {
     ...(music_style ? { music_style } : {}),
-    make_instrumental: trimmedLore.toLowerCase().includes('instrumental'),
+    // Lore text can mention "instrumental" without asking for a beat-only track.
+    // Only the create panel switch sets make_instrumental.
+    make_instrumental: false,
   };
 }
 
@@ -399,6 +419,41 @@ export async function getConversionDataByConversionID(
     console.error('[MusicGPT] Error fetching conversion data by conversion_id:', error);
     return null;
   }
+}
+
+/**
+ * Lyrics Generator. GET /v1/prompt_to_lyrics.
+ * The prompt must already be 1–1000 characters.
+ * Returns the `lyrics` string from a successful body.
+ */
+export async function createMusicGptLyrics(prompt: string): Promise<string> {
+  const { MUSICGPT_BASE_URL, MUSICGPT_API_KEY } = getMusicGPTConfig();
+  if (!MUSICGPT_BASE_URL || !MUSICGPT_API_KEY) {
+    throw new Error('MusicGPT configuration is missing');
+  }
+  const url = new URL(musicGptPromptToLyricsUrl(MUSICGPT_BASE_URL));
+  url.searchParams.set('prompt', prompt);
+  const res = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      Authorization: MUSICGPT_API_KEY,
+      accept: 'application/json',
+    },
+  });
+  const responseText = await res.text();
+  if (!res.ok) {
+    throw new Error(`MusicGPT lyrics request failed with status ${res.status}`);
+  }
+  let parsed: { lyrics?: unknown };
+  try {
+    parsed = JSON.parse(responseText) as { lyrics?: unknown };
+  } catch {
+    throw new Error('MusicGPT lyrics response was not JSON');
+  }
+  if (typeof parsed.lyrics !== 'string' || !parsed.lyrics.trim()) {
+    throw new Error('MusicGPT did not return lyrics');
+  }
+  return parsed.lyrics.trim();
 }
 
 /**
