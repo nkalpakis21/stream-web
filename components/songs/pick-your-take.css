@@ -165,6 +165,10 @@
   border-radius: 12px;
   background: #14141c;
   padding: 20px;
+}
+
+/* Room for the close control. The sheet body stays on the 20px panel padding. */
+.take-sheet-panel .take-title {
   padding-right: 64px;
 }
 

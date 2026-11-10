@@ -793,4 +793,37 @@ describe('MusicGPT webhook audio persistence', { concurrency: false }, () => {
     const take1 = stored.find((row) => row.data.providerOutputId === CONV_A);
     assert.equal(String(take1?.data.audioURL).includes(CONV_A), true);
   });
+
+  it('keeps a beat-first instrumental off the public shelf and the time-to-song clock', async () => {
+    const memory = createMemoryAdminDb();
+    const bucket = createBucket();
+    setSongAudioStorageDepsForTests({ bucket, fetchImpl: mp3Fetch() });
+    await seed(memory, [CONV_A, CONV_B], {
+      path: 'beat_first',
+      isPublic: false,
+      audioReady: false,
+      publicOnReady: true,
+      beatFirst: { stage: 'generating', retriesUsed: 0, vocalsAdded: false },
+    });
+    await memory.db.collection(COLLECTIONS.generations).doc('gen-1').set(
+      { parameters: { job: 'beat' } },
+      { merge: true }
+    );
+    const response = await processMusicGptWebhook({
+      success: true,
+      conversion_type: 'MUSIC_AI',
+      task_id: TASK_ID,
+      conversion_id: CONV_A,
+      conversion_path: audioUrl(CONV_A),
+    });
+    assert.equal(response.status, 200);
+    const songDoc = memory.list(COLLECTIONS.songs).find((row) => row.id === SONG_ID);
+    assert.equal(songDoc?.data.audioReady, false);
+    assert.equal(songDoc?.data.isPublic, false);
+    const beat = songDoc?.data.beatFirst as { stage?: string; firstBeatAt?: unknown };
+    assert.equal(beat.stage, 'ready');
+    assert.ok(beat.firstBeatAt);
+    assert.equal(versions(memory).some((row) => row.data.providerOutputId === CONV_A), true);
+    assert.equal(memory.list(COLLECTIONS.notifications).length, 0);
+  });
 });

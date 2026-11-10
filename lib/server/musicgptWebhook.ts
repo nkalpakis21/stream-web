@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { notifyOwnerSongReady } from '@/lib/server/expoPush';
-import { recordFunnelEvent, type FunnelPlatform } from '@/lib/server/funnel';
+import { recordFunnelEvent, trackFunnelEvent, type FunnelPlatform } from '@/lib/server/funnel';
 import { firstSongReadyProps } from '@/lib/server/songReady';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import type { GenerationDocument, MusicGptUsageRecord, SongDocument, SongVersionDocument } from '@/types/firestore';
@@ -41,6 +41,8 @@ import { redactForLog } from '@/lib/webhooks/redactUrl';
 import { revalidateHomepage } from '@/lib/webhooks/revalidate';
 import { persistConversionAudio } from '@/lib/server/songAudioStorage';
 import { conversionIdsAfterLateTake } from '@/lib/songs/takes';
+import { countsTowardTimeToSong, holdBeatPublish, readAudioJob } from '@/lib/songs/beatFirst';
+import { noteBeatAttemptEnded, noteBeatAudioStored, noteSingOverFinished } from '@/lib/server/beatFirst';
 
 export interface MusicGPTWebhookPayload {
   success: boolean;
@@ -291,6 +293,13 @@ async function recordMusicGptFailure(body: MusicGPTWebhookPayload): Promise<void
   if (!songId) return;
   if (generation && (await recordPartialTakeFailure(generation, body))) return;
   const marked = await adminMarkSongGenerationFailed(songId);
+  if (generation?.parameters?.job === 'beat') {
+    try {
+      await noteBeatAttemptEnded(songId);
+    } catch (error) {
+      console.error('[beat-first] beat failed', error instanceof Error ? error.message : 'failed');
+    }
+  }
   if (!marked || !generation) return;
   const reason =
     typeof body.reason === 'string' && body.reason.trim()
@@ -543,6 +552,15 @@ export async function processMusicGptWebhook(
     return NextResponse.json({ ok: true, ignored: 'deleted' });
   }
 
+  const taskBinding = await getMusicGptTaskBinding(body.task_id);
+  const audioJob = readAudioJob(taskBinding?.job, generation.parameters?.job);
+  const holdPublish = holdBeatPublish({
+    path: song.path,
+    job: audioJob,
+    stage: song.beatFirst?.stage,
+  });
+  const skipTimeToSong = !countsTowardTimeToSong(song.path);
+
   const existingVersions = await adminGetSongVersions(song.id);
   const existingProviderOutputIds = new Set(
     existingVersions.map((v) => v.providerOutputId).filter((id): id is string => !!id)
@@ -562,11 +580,11 @@ export async function processMusicGptWebhook(
       },
       { merge: true }
     );
-    if (existingVersions.some(versionHasAudio)) {
+    if (!holdPublish && existingVersions.some(versionHasAudio)) {
       const visible = await publishFirstAudio(song);
       if (visible) await revalidateHomepage();
     }
-    await tryPostSongLive(song.id, 'version-already-exists');
+    if (!holdPublish) await tryPostSongLive(song.id, 'version-already-exists');
     return NextResponse.json({ ok: true });
   }
 
@@ -603,9 +621,9 @@ export async function processMusicGptWebhook(
   };
   await versionRef.set(version);
 
-  if (persisted.audioPersisted) {
+  if (persisted.audioPersisted && !skipTimeToSong) {
     try {
-      const binding = await getMusicGptTaskBinding(body.task_id);
+      const binding = taskBinding;
       const stored = binding?.platform;
       const platform: FunnelPlatform =
         stored === 'web' || stored === 'ios' || stored === 'unknown' ? stored : 'unknown';
@@ -632,13 +650,23 @@ export async function processMusicGptWebhook(
   }
 
   let catalogRevalidate = false;
-  if (versionHasAudio(version)) {
+  if (versionHasAudio(version) && !holdPublish) {
     catalogRevalidate = await publishFirstAudio(song);
   }
 
-  await tryPostSongLive(song.id, 'audio-written');
+  if (!holdPublish) {
+    await tryPostSongLive(song.id, 'audio-written');
+  }
 
-  if (!hasExistingAudio && isFalCoverPipeline()) {
+  if (audioJob === 'beat') {
+    try {
+      await noteBeatAudioStored(song);
+    } catch (error) {
+      console.error('[beat-first] note beat', error instanceof Error ? error.message : 'failed');
+    }
+  }
+
+  if (!hasExistingAudio && !holdPublish && isFalCoverPipeline()) {
     try {
       if (
         song.coverMotionStatus !== 'ready' &&
@@ -717,7 +745,7 @@ export async function processMusicGptWebhook(
   let musicGptUsage: MusicGptUsageRecord | undefined;
   if (shouldMarkCompleted) {
     try {
-      const binding = await getMusicGptTaskBinding(body.task_id);
+      const binding = taskBinding;
       const startedAtMs = timestampMillis(binding?.createdAt) ?? timestampMillis(generation.createdAt);
       const completedAtMs = now.toMillis();
       const observed = resolveMusicGptUsageNumbers({
@@ -764,7 +792,32 @@ export async function processMusicGptWebhook(
     { merge: true }
   );
 
-  if (shouldMarkCompleted) {
+  if (audioJob === 'sing_over' && versionHasAudio(version)) {
+    try {
+      const noted = await noteSingOverFinished(song, generation.id);
+      if (noted.logVocals) {
+        const platform: FunnelPlatform =
+          taskBinding?.platform === 'web' || taskBinding?.platform === 'ios' || taskBinding?.platform === 'unknown'
+            ? taskBinding.platform
+            : 'unknown';
+        await trackFunnelEvent(
+          song.ownerId,
+          'vocals_added',
+          {
+            songId: song.id,
+            artistId: song.artistId,
+            vocalsAdded: true,
+            ...(noted.msFromFirstBeat != null ? { msFromFirstBeat: noted.msFromFirstBeat } : {}),
+          },
+          platform
+        );
+      }
+    } catch (error) {
+      console.error('[funnel] vocals_added', error instanceof Error ? error.message : 'failed');
+    }
+  }
+
+  if (shouldMarkCompleted && !holdPublish) {
     try {
       await adminCreateSongReadyNotification({
         userId: song.ownerId,

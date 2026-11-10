@@ -350,6 +350,32 @@ export interface SongDocument {
    * elapsedMs from this. Clients may set it once and cannot change it.
    */
   createSubmittedAt?: Timestamp | null;
+  /**
+   * Server-only create path. `beat_first` is excluded from the time-to-song
+   * clock (first_song_ready elapsedMs). Clients cannot set or change it.
+   */
+  path?: 'beat_first' | null;
+  /**
+   * Server-only beat-first progress. Clients cannot set or change it.
+   * `retriesUsed` is the number of extra beats after the first, capped at 2.
+   */
+  beatFirst?: {
+    stage: 'generating' | 'ready' | 'singing' | 'vocals' | 'instrumental';
+    retriesUsed: number;
+    chosenVersionId?: string | null;
+    firstBeatAt?: Timestamp | null;
+    vocalsAdded?: boolean;
+    creditEstimate?: number | null;
+  } | null;
+  /**
+   * Server-only Sing Over accounting, shared by beat-first and later
+   * re-sings. Clients cannot set or change it.
+   */
+  singOver?: {
+    attempts: number;
+    creditEstimate: number | null;
+    lastGenerationId?: string | null;
+  } | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   deletedAt: Timestamp | null;

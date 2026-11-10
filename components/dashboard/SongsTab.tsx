@@ -24,8 +24,10 @@ export function SongsTab({
   onSongCreated,
 }: SongsTabProps) {
   const searchParams = useSearchParams();
+  const beatSongId = searchParams.get('beatSong') || undefined;
+  const focusFeel = searchParams.get('focus') === 'feel';
   const [showForm, setShowForm] = useState(
-    Boolean(preselectedArtistId) || searchParams.get('new') === '1'
+    Boolean(preselectedArtistId) || searchParams.get('new') === '1' || Boolean(beatSongId)
   );
 
   return (
@@ -41,6 +43,8 @@ export function SongsTab({
         <div className="animate-in fade-in slide-in-from-top-4 duration-300">
           <CreativeSongForm
             preselectedArtistId={preselectedArtistId}
+            beatSongId={beatSongId}
+            focusFeel={focusFeel}
             onSuccess={() => onSongCreated?.()}
             onCancel={() => setShowForm(false)}
           />

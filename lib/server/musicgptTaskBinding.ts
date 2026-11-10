@@ -45,6 +45,11 @@ export type MusicGptTaskBinding = {
    * webhook records as `unknown`.
    */
   platform?: 'web' | 'ios' | 'unknown';
+  /**
+   * `beat` is an instrumental pass. `sing_over` sings on source audio.
+   * Absent on a normal MusicAI song. Admin SDK only.
+   */
+  job?: 'beat' | 'sing_over';
 };
 
 export type GenerationCandidate = {
@@ -150,6 +155,10 @@ export function readMusicGptTaskBinding(data: unknown): MusicGptTaskBinding | nu
     binding.platform = record.platform;
   }
 
+  if (record.job === 'beat' || record.job === 'sing_over') {
+    binding.job = record.job;
+  }
+
   return binding;
 }
 
@@ -234,6 +243,7 @@ export function musicGptTaskBindingFields(input: {
   apiVersion?: 'v1' | 'v2';
   creditEstimate?: number | null;
   platform?: 'web' | 'ios' | 'unknown';
+  job?: 'beat' | 'sing_over';
 }): {
   uid: string;
   songId: string | null;
@@ -244,6 +254,7 @@ export function musicGptTaskBindingFields(input: {
   apiVersion?: 'v1' | 'v2';
   creditEstimate?: number;
   platform?: 'web' | 'ios' | 'unknown';
+  job?: 'beat' | 'sing_over';
 } {
   const nowMs = input.nowMs ?? Date.now();
   return {
@@ -260,6 +271,7 @@ export function musicGptTaskBindingFields(input: {
     ...(input.platform === 'web' || input.platform === 'ios' || input.platform === 'unknown'
       ? { platform: input.platform }
       : {}),
+    ...(input.job === 'beat' || input.job === 'sing_over' ? { job: input.job } : {}),
   };
 }
 
@@ -273,6 +285,7 @@ export async function saveMusicGptTaskBinding(input: {
   apiVersion?: 'v1' | 'v2';
   creditEstimate?: number | null;
   platform?: 'web' | 'ios' | 'unknown';
+  job?: 'beat' | 'sing_over';
 }): Promise<void> {
   if (!input.taskId) {
     throw new Error('MusicGPT task id is required');

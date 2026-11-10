@@ -24,7 +24,9 @@ import { SongStageSkeleton } from '@/components/songs/SongStageSkeleton';
 import { getLyricsForSong } from '@/lib/services/lyrics';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import type { SongDocument, SongVersionDocument } from '@/types/firestore';
+import { BeatFirstScreen } from '@/components/songs/BeatFirstScreen';
 import { playableAudioUrl } from '@/lib/songs/audioAvailability';
+import { beatFeelFromOptions, unfinishedBeat } from '@/lib/songs/beatFirst';
 import { loadSongShareFacts } from '@/lib/server/songShareFacts';
 import { metadataFromShareFacts, sharePageGate } from '@/lib/songs/shareCard';
 import { SongTakesPanel } from '@/components/songs/SongTakesPanel';
@@ -113,8 +115,10 @@ async function SongPageBody({
     })),
     generations: generations.map((generation) => generationTakeInput(generation)),
   });
+  const beatDraft = ownerView && unfinishedBeat(song);
+  const beatFeel = beatFeelFromOptions(song);
   const showTakePicker =
-    viewerId === song.ownerId && shouldShowTakePicker(buildTakeSlots(takeSeed));
+    viewerId === song.ownerId && !beatDraft && shouldShowTakePicker(buildTakeSlots(takeSeed));
   const heardVersions = listenerVersions(allVersions, song.currentVersionId);
 
   return (
@@ -133,7 +137,22 @@ async function SongPageBody({
           emptyInitials={visible.initials}
           ownerCoverNotice={ownerCoverNotice}
           audioUrl={primaryAudioUrl}
-          pending={hasPendingGeneration}
+          pending={hasPendingGeneration && !beatDraft}
+          belowCover={
+            beatDraft ? (
+              <BeatFirstScreen
+                songId={song.id}
+                artistId={song.artistId}
+                artistName={artistName}
+                initialSeed={takeSeed}
+                retriesUsed={song.beatFirst?.retriesUsed ?? 0}
+                stage={song.beatFirst?.stage ?? 'generating'}
+                prompt={song.createPrompt ?? ''}
+                feel={beatFeel.feel}
+                energy={beatFeel.energy}
+              />
+            ) : null
+          }
           durationSeconds={song.duration ?? null}
           shareUrl={shareUrl}
           versions={heardVersions.map(version => ({

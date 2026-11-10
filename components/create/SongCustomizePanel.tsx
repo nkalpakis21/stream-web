@@ -123,6 +123,7 @@ export function SongCustomizePanel({
   initialRemaining = 3,
   initialHasDraft = false,
   initialDraftError = null,
+  part = 'all',
 }: {
   artistName?: string | null;
   artistId?: string | null;
@@ -138,6 +139,8 @@ export function SongCustomizePanel({
   initialRemaining?: number;
   initialHasDraft?: boolean;
   initialDraftError?: string | null;
+  /** `voice-words` is Add vocals. `feel-energy` is Change the feel. No tone row. */
+  part?: 'all' | 'voice-words' | 'feel-energy';
 }) {
   const [open, setOpen] = useState(initialExpanded);
   const [drafting, setDrafting] = useState(initialDrafting);
@@ -217,9 +220,14 @@ export function SongCustomizePanel({
 
   const showVoice = !value.instrumental;
   const showWords = !value.instrumental;
+  const voiceWordsOnly = part === 'voice-words';
+  const feelEnergyOnly = part === 'feel-energy';
+  const sheet = voiceWordsOnly || feelEnergyOnly;
+  const expanded = sheet || open;
 
   return (
-    <div data-customize-panel>
+    <div data-customize-panel data-part={part}>
+      {sheet ? null : (
       <button
         type="button"
         aria-expanded={open}
@@ -249,9 +257,11 @@ export function SongCustomizePanel({
           />
         </svg>
       </button>
+      )}
 
-      {open ? (
-        <div className="mt-3 space-y-4">
+      {expanded ? (
+        <div className={sheet ? 'space-y-4' : 'mt-3 space-y-4'}>
+          {sheet ? null : (
           <button
             type="button"
             role="switch"
@@ -264,8 +274,9 @@ export function SongCustomizePanel({
             <span className="text-sm text-[#F5F4F8]">Just the beat, no vocals</span>
             <SwitchFace on={value.instrumental} />
           </button>
+          )}
 
-          {showVoice ? (
+          {showVoice && !feelEnergyOnly ? (
             <div>
               <SectionLabel>Voice</SectionLabel>
               <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -295,7 +306,7 @@ export function SongCustomizePanel({
             </div>
           ) : null}
 
-          {showWords ? (
+          {showWords && !feelEnergyOnly ? (
             <div>
               <SectionLabel>Words</SectionLabel>
               <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -399,7 +410,9 @@ export function SongCustomizePanel({
             </div>
           ) : null}
 
-          <div>
+          {voiceWordsOnly ? null : (
+          <>
+          <div id="song-feel">
             <SectionLabel>Feel</SectionLabel>
             <div className="mt-2 flex flex-wrap gap-2">
               {FEEL_OPTIONS.map(option => {
@@ -455,6 +468,8 @@ export function SongCustomizePanel({
             </div>
             <p className="mt-2 text-xs text-[#8B8896]">A nudge, not exact</p>
           </div>
+          </>
+          )}
         </div>
       ) : null}
     </div>

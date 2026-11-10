@@ -85,6 +85,8 @@ export interface OwnerSongSnapshot {
   generationAttemptAt?: unknown;
   deletedAt?: unknown;
   title?: unknown;
+  path?: unknown;
+  beatFirst?: unknown;
 }
 
 /** Merge a song-doc snapshot into the tile's song. audioReady true wins. */
@@ -103,6 +105,8 @@ export function mergeOwnerSongSnapshot<T extends OwnerTileSong>(
   if ('generationAttemptAt' in snap) next.generationAttemptAt = snap.generationAttemptAt;
   if ('deletedAt' in snap) next.deletedAt = snap.deletedAt;
   if (typeof snap.title === 'string' && snap.title) (next as T & { title?: string }).title = snap.title;
+  if (snap.path === 'beat_first') (next as T & { path?: string }).path = 'beat_first';
+  if ('beatFirst' in snap) (next as T & { beatFirst?: unknown }).beatFirst = snap.beatFirst;
   return next;
 }
 
