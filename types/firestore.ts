@@ -543,6 +543,11 @@ export interface GenerationDocument {
    * Used for idempotency and to determine when generation is fully complete.
    */
   providerProcessedConversions: string[];
+  /**
+   * Conversion ids MusicGPT reported as failed. Admin webhook only.
+   * A failed second take does not unpublish the song when the first take has audio.
+   */
+  providerFailedConversions?: string[];
   output: {
     audioURL: string | null; // Main audio file
     stems: string[] | null; // Individual stem URLs if available
