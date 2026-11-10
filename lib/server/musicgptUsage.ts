@@ -10,6 +10,7 @@ const CHARGED_KEYS = [
   'charged_cost',
   'chargedCost',
   'cost',
+  'conversion_cost',
   'credits_used',
   'credit_used',
   'amount_charged',

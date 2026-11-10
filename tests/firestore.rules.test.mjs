@@ -633,6 +633,48 @@ test('clients cannot write createOptions, and a song that already has it can sti
   }));
 });
 
+test('clients cannot write voiceSplit, and a song that already has it can still be retitled', async () => {
+  await seedCatalog();
+  const alice = dbFor('alice');
+  const split = {
+    sourceVersionId: 'ver1',
+    audioUrl: 'https://example.com/beat.mp3',
+    status: 'ready',
+    creditEstimate: 0,
+  };
+  await assertFails(setDoc(doc(alice, 'songs/clientSplit'), songData({
+    id: 'clientSplit',
+    currentVersionId: 'clientSplitVer',
+    voiceSplit: split,
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/clientSplitNull'), songData({
+    id: 'clientSplitNull',
+    currentVersionId: 'clientSplitNullVer',
+    voiceSplit: null,
+  })));
+  await seed(async (db) => {
+    await setDoc(doc(db, 'songs/serverSplit'), songData({
+      id: 'serverSplit',
+      voiceSplit: { sourceVersionId: 'ver1', audioUrl: null, status: 'splitting', creditEstimate: 0 },
+    }));
+  });
+  await assertSucceeds(updateDoc(doc(alice, 'songs/serverSplit'), {
+    title: 'Renamed',
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/serverSplit'), {
+    voiceSplit: split,
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/serverSplit'), {
+    voiceSplit: { status: 'ready', audioUrl: 'https://example.com/other.mp3' },
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/song1'), {
+    voiceSplit: split,
+    updatedAt: now,
+  }));
+});
+
 test('clients cannot write voiceChange, and a song that already has it can still be retitled', async () => {
   await seedCatalog();
   const alice = dbFor('alice');

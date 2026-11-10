@@ -22,6 +22,7 @@ import {
   voiceChangeActionLabel,
   voiceChangeSnapshot,
   voiceChangeSpent,
+  voiceChangeSplitsBeat,
   type CompareRow,
   type CompareRowKey,
   type SungGender,
@@ -218,6 +219,7 @@ export function ChangeVoice({
       {open ? (
         <ChangeVoiceSheet
           voices={sheetVoices}
+          splitCaveat={voiceChangeSplitsBeat(liveSong.path)}
           busy={busy}
           error={error}
           onClose={() => {

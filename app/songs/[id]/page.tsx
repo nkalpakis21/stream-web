@@ -189,6 +189,8 @@ async function SongPageBody({
                 ? {
                     path: song.path ?? null,
                     currentVersionId: song.currentVersionId,
+                    audioReady: song.audioReady ?? null,
+                    duration: song.duration ?? null,
                     createOptions: song.createOptions ?? null,
                     beatFirst: song.beatFirst
                       ? { stage: song.beatFirst.stage, chosenVersionId: song.beatFirst.chosenVersionId ?? null }

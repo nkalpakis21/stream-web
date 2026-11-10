@@ -42,9 +42,10 @@ import { revalidateHomepage } from '@/lib/webhooks/revalidate';
 import { persistConversionAudio } from '@/lib/server/songAudioStorage';
 import { conversionIdsAfterLateTake } from '@/lib/songs/takes';
 import { countsTowardTimeToSong, holdBeatPublish, readAudioJob } from '@/lib/songs/beatFirst';
-import { isVoiceChangeGeneration } from '@/lib/songs/voiceChange';
+import { isStemSplitGeneration, isVoiceChangeGeneration } from '@/lib/songs/voiceChange';
 import { noteBeatAttemptEnded, noteBeatAudioStored, noteSingOverFinished } from '@/lib/server/beatFirst';
-import { noteVoiceChangeSettled } from '@/lib/server/voiceChange';
+import { noteVoiceChangeSettled, noteVoiceSplitFailed, noteVoiceSplitReady } from '@/lib/server/voiceChange';
+import { instrumentalUrlFromExtraction, isMusicGptExtractionEvent } from '@/lib/server/stemSplit';
 
 export interface MusicGPTWebhookPayload {
   success: boolean;
@@ -68,6 +69,11 @@ export interface MusicGPTWebhookPayload {
   streaming_url?: string;
   model?: string;
   credit_estimate?: number | string;
+  /** Extraction bills this. Recorded as charged cost, separate from credit_estimate. */
+  conversion_cost?: number | string;
+  /** Extraction webhook: JSON string of stem name to URL. */
+  audio_url?: string;
+  audio_url_wav?: string;
   cost?: number | string;
   charged_cost?: number | string;
   credits_used?: number | string;
@@ -310,6 +316,22 @@ async function recordMusicGptFailure(body: MusicGPTWebhookPayload): Promise<void
   const binding = generation ? null : await getMusicGptTaskBinding(body.task_id);
   const songId =
     generation?.songId ?? (typeof binding?.songId === 'string' ? binding.songId : null);
+  if (generation && isStemSplitGeneration(generation.parameters)) {
+    try {
+      await noteVoiceSplitFailed(generation.songId, generation.id);
+    } catch (error) {
+      console.error('[voice-change] split failed', error instanceof Error ? error.message : 'failed');
+    }
+    return;
+  }
+  if (!generation && binding?.job === 'stem_split' && songId) {
+    try {
+      await noteVoiceSplitFailed(songId, '');
+    } catch (error) {
+      console.error('[voice-change] split failed', error instanceof Error ? error.message : 'failed');
+    }
+    return;
+  }
   if (!songId) return;
   if (generation && (await recordPartialTakeFailure(generation, body))) return;
   const marked = await adminMarkSongGenerationFailed(songId);
@@ -358,6 +380,87 @@ async function tryPostSongLive(songId: string, reason: string): Promise<void> {
   } catch (error) {
     console.error('[MusicGPT Webhook] X deferred sweep failed:', error);
   }
+}
+
+/**
+ * Extraction finished. Cache the instrumental and sing over it.
+ * This does not publish a song version or move the current audio.
+ */
+async function handleVoiceSplitWebhook(body: MusicGPTWebhookPayload): Promise<NextResponse> {
+  const generation = await loadAuthorizedGeneration(body.task_id);
+  if (!generation || !isStemSplitGeneration(generation.parameters)) {
+    return NextResponse.json({ ok: true, ignored: 'extraction' });
+  }
+  if (generation.status === 'completed' || generation.status === 'failed') {
+    return NextResponse.json({ ok: true });
+  }
+
+  const instrumental = instrumentalUrlFromExtraction(body);
+  if (!instrumental) {
+    try {
+      await noteVoiceSplitFailed(generation.songId, generation.id);
+    } catch (error) {
+      console.error('[voice-change] split failed', error instanceof Error ? error.message : 'failed');
+    }
+    return NextResponse.json({ ok: true, failed: true });
+  }
+
+  const persisted = await persistConversionAudio({
+    songId: generation.songId,
+    conversionId: `${body.conversion_id || generation.id}-instrumental`,
+    sourceUrl: instrumental,
+  });
+  const binding = await getMusicGptTaskBinding(body.task_id);
+  const observed = resolveMusicGptUsageNumbers({
+    webhook: body as unknown as Record<string, unknown>,
+    metadata: (generation.output?.metadata as Record<string, unknown> | undefined) ?? null,
+    bindingCreditEstimate: binding?.creditEstimate ?? null,
+    bindingModel: binding?.model ?? null,
+    bindingApiVersion: binding?.apiVersion ?? null,
+  });
+  const now = Timestamp.now();
+  const startedAtMs = timestampMillis(binding?.createdAt) ?? timestampMillis(generation.createdAt);
+  const usage: MusicGptUsageRecord = {
+    ...observed,
+    durationMs: musicGptDurationMs(startedAtMs, now.toMillis()),
+    taskId: body.task_id,
+    songId: generation.songId,
+    generationId: generation.id,
+    startedAtMs,
+    completedAtMs: now.toMillis(),
+  };
+  logMusicGptUsage(usage);
+  await getAdminDb()
+    .collection(COLLECTIONS.generations)
+    .doc(generation.id)
+    .set(
+      {
+        musicGptUsage: usage,
+        output: {
+          audioURL: persisted.audioURL,
+          stems: null,
+          metadata: {
+            ...(generation.output?.metadata || {}),
+            instrumental: persisted.audioURL,
+            musicgptInstrumentalUrl: persisted.musicgptAudioUrl,
+            audioPersisted: persisted.audioPersisted,
+          },
+        },
+      },
+      { merge: true }
+    );
+
+  try {
+    await noteVoiceSplitReady({
+      songId: generation.songId,
+      splitGenerationId: generation.id,
+      instrumentalUrl: persisted.audioURL,
+      creditEstimate: observed.creditEstimate,
+    });
+  } catch (error) {
+    console.error('[voice-change] split ready', error instanceof Error ? error.message : 'failed');
+  }
+  return NextResponse.json({ ok: true });
 }
 
 /**
@@ -527,6 +630,10 @@ export async function processMusicGptWebhook(
     return NextResponse.json({ ok: true, failed: true });
   }
 
+  if (isMusicGptExtractionEvent(body)) {
+    return handleVoiceSplitWebhook(body);
+  }
+
   if (!body.conversion_id) {
     console.error(
       '[MusicGPT Webhook] Invalid payload structure: conversion_id required for conversion completion webhook:',
@@ -582,6 +689,9 @@ export async function processMusicGptWebhook(
   const taskBinding = await getMusicGptTaskBinding(body.task_id);
   const audioJob = readAudioJob(taskBinding?.job, generation.parameters?.job);
   const voiceChange = isVoiceChangeGeneration(generation.parameters);
+  if (isStemSplitGeneration(generation.parameters)) {
+    return NextResponse.json({ ok: true, ignored: 'stem_split' });
+  }
   const holdPublish = holdBeatPublish({
     path: song.path,
     job: audioJob,

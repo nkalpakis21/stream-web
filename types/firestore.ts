@@ -394,6 +394,21 @@ export interface SongDocument {
     sourceVersionId?: string | null;
     creditEstimate?: number | null;
   } | null;
+  /**
+   * Server-only cached instrumental from a MusicGPT stem split of this song.
+   * The next voice change reuses `audioUrl` and does not split again.
+   * Clients cannot set or change it. `creditEstimate` is the extraction
+   * credit_estimate (0 while the stem_preset promotion applies).
+   */
+  voiceSplit?: {
+    sourceVersionId: string;
+    audioUrl: string | null;
+    musicgptAudioUrl?: string | null;
+    status: 'splitting' | 'ready' | 'failed';
+    taskId?: string | null;
+    generationId?: string | null;
+    creditEstimate?: number | null;
+  } | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   deletedAt: Timestamp | null;

@@ -14,7 +14,7 @@ export const revalidate = 0;
 export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
 
-/** Sing Over the stored beat. Two takes stay off the main audio until the owner keeps one. */
+/** Sing Over a beat. A finished mix is split first. Takes stay off the main audio until the owner keeps one. */
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const uid = await requireUser(request, { verifyToken: voiceChangeAuthVerifier() });

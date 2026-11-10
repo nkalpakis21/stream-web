@@ -47,9 +47,10 @@ export type MusicGptTaskBinding = {
   platform?: 'web' | 'ios' | 'unknown';
   /**
    * `beat` is an instrumental pass. `sing_over` sings on source audio.
+   * `stem_split` extracts an instrumental from a finished mix.
    * Absent on a normal MusicAI song. Admin SDK only.
    */
-  job?: 'beat' | 'sing_over';
+  job?: 'beat' | 'sing_over' | 'stem_split';
 };
 
 export type GenerationCandidate = {
@@ -155,7 +156,7 @@ export function readMusicGptTaskBinding(data: unknown): MusicGptTaskBinding | nu
     binding.platform = record.platform;
   }
 
-  if (record.job === 'beat' || record.job === 'sing_over') {
+  if (record.job === 'beat' || record.job === 'sing_over' || record.job === 'stem_split') {
     binding.job = record.job;
   }
 
@@ -243,7 +244,7 @@ export function musicGptTaskBindingFields(input: {
   apiVersion?: 'v1' | 'v2';
   creditEstimate?: number | null;
   platform?: 'web' | 'ios' | 'unknown';
-  job?: 'beat' | 'sing_over';
+  job?: 'beat' | 'sing_over' | 'stem_split';
 }): {
   uid: string;
   songId: string | null;
@@ -254,7 +255,7 @@ export function musicGptTaskBindingFields(input: {
   apiVersion?: 'v1' | 'v2';
   creditEstimate?: number;
   platform?: 'web' | 'ios' | 'unknown';
-  job?: 'beat' | 'sing_over';
+  job?: 'beat' | 'sing_over' | 'stem_split';
 } {
   const nowMs = input.nowMs ?? Date.now();
   return {
@@ -271,7 +272,9 @@ export function musicGptTaskBindingFields(input: {
     ...(input.platform === 'web' || input.platform === 'ios' || input.platform === 'unknown'
       ? { platform: input.platform }
       : {}),
-    ...(input.job === 'beat' || input.job === 'sing_over' ? { job: input.job } : {}),
+    ...(input.job === 'beat' || input.job === 'sing_over' || input.job === 'stem_split'
+      ? { job: input.job }
+      : {}),
   };
 }
 
@@ -285,7 +288,7 @@ export async function saveMusicGptTaskBinding(input: {
   apiVersion?: 'v1' | 'v2';
   creditEstimate?: number | null;
   platform?: 'web' | 'ios' | 'unknown';
-  job?: 'beat' | 'sing_over';
+  job?: 'beat' | 'sing_over' | 'stem_split';
 }): Promise<void> {
   if (!input.taskId) {
     throw new Error('MusicGPT task id is required');

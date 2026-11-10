@@ -1,16 +1,20 @@
 /**
  * Change the voice on a song that already exists.
  *
- * Same beat, same saved words, two new sung takes. The cap is two accepted
- * Sing Over jobs on this song. It does not create a song and does not count
- * toward a song-creation quota.
+ * Same saved words, two new sung takes. Beat-first songs sing over the stored
+ * instrumental. Finished normal songs sing over a cached stem split of the
+ * mix. The cap is two accepted Sing Over jobs on this song, shared by both
+ * paths. It does not create a song and does not count toward a song-creation
+ * quota.
  *
- * Source audio is a stored instrumental. This module never calls a stem
- * separator. `generations.output.stems` in this app is the full-mix wav from
- * the MusicGPT webhook, not a separated beat.
+ * This module does not call MusicGPT. The server splits, caches the
+ * instrumental, and uploads that beat to the shared Sing Over call.
+ * `generations.output.stems` in this app is the full-mix wav from the
+ * MusicGPT webhook, not a separated beat.
  */
 
 import type { VoiceChoice } from '@/lib/create/songOptions';
+import { BEAT_FIRST_PATH } from '@/lib/songs/beatFirst';
 import { parseLyricsFromMetadata } from '@/lib/utils/lyrics';
 
 export const VOICE_CHANGE_CAP = 2;
@@ -31,6 +35,13 @@ export const NEW_VOICE_1_LABEL = 'New voice 1';
 export const NEW_VOICE_2_LABEL = 'New voice 2';
 
 export const VOICE_CHANGE_PURPOSE = 'voice_change' as const;
+export const VOICE_SPLIT_PURPOSE = 'voice_split' as const;
+export const STEM_SPLIT_JOB = 'stem_split' as const;
+
+/** Sing Over refuses audio longer than this. Extraction's own cap is 8 minutes. */
+export const SING_OVER_MAX_SECONDS = 4 * 60;
+
+export const SPLIT_VOCAL_CAVEAT = 'You may hear a little of the old vocal.';
 
 export type VoiceChangeVoice = VoiceChoice;
 export type SungGender = 'female' | 'male';
@@ -75,6 +86,99 @@ export function otherVoiceChoice(current: SungGender | null): SungGender | null 
 
 export function singVoiceLabel(voice: SungGender): string {
   return voice === 'female' ? SING_HER_VOICE_LABEL : SING_HIS_VOICE_LABEL;
+}
+
+/** True when this voice change sings over a split of the mix, not a beat-first beat. */
+export function voiceChangeSplitsBeat(path: string | null | undefined): boolean {
+  return path !== BEAT_FIRST_PATH;
+}
+
+export function voiceChangeSource(path: string | null | undefined): 'beat_first' | 'split' {
+  return path === BEAT_FIRST_PATH ? 'beat_first' : 'split';
+}
+
+export function songTooLongForSingOver(durationSeconds: number | null | undefined): boolean {
+  return (
+    typeof durationSeconds === 'number' &&
+    Number.isFinite(durationSeconds) &&
+    durationSeconds > SING_OVER_MAX_SECONDS
+  );
+}
+
+function nestedDuration(value: unknown): number | null {
+  if (!value || typeof value !== 'object') return null;
+  const duration = (value as { conversion_duration?: unknown }).conversion_duration;
+  if (typeof duration === 'number' && Number.isFinite(duration) && duration > 0) return duration;
+  return null;
+}
+
+function durationFromMetadata(
+  metadata: Record<string, unknown> | null | undefined,
+  conversionId?: string | null
+): number | null {
+  if (!metadata) return null;
+  if (conversionId) {
+    const seconds = nestedDuration(metadata[`conversion_${conversionId}`]);
+    if (seconds != null) return seconds;
+  }
+  let found: number | null = null;
+  for (const [key, value] of Object.entries(metadata)) {
+    if (!key.startsWith('conversion_') || key.endsWith('_lyrics')) continue;
+    const seconds = nestedDuration(value);
+    if (seconds != null) found = seconds;
+  }
+  return found;
+}
+
+/**
+ * Song length in seconds when we actually know it. `song.duration` wins.
+ * Otherwise the current take's `conversion_duration`, then any saved one.
+ * Missing stays null. Never invent a length.
+ */
+export function readSongDurationSeconds(input: {
+  duration?: number | null;
+  conversionId?: string | null;
+  generations?: readonly {
+    createdAtMs?: number | null;
+    output?: { metadata?: Record<string, unknown> | null } | null;
+  }[];
+}): number | null {
+  if (typeof input.duration === 'number' && Number.isFinite(input.duration) && input.duration > 0) {
+    return input.duration;
+  }
+  const generations = [...(input.generations ?? [])].sort(
+    (a, b) => (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0)
+  );
+  if (input.conversionId) {
+    for (const generation of generations) {
+      const seconds = durationFromMetadata(generation.output?.metadata, input.conversionId);
+      if (seconds != null) return seconds;
+    }
+  }
+  for (const generation of generations) {
+    const seconds = durationFromMetadata(generation.output?.metadata, null);
+    if (seconds != null) return seconds;
+  }
+  return null;
+}
+
+export type CachedSplit = {
+  sourceVersionId: string;
+  audioUrl: string;
+};
+
+/** Ready instrumental from an earlier split on this song. Null until one is cached. */
+export function cachedSplitInstrumental(song: {
+  voiceSplit?: {
+    status?: string | null;
+    audioUrl?: string | null;
+    sourceVersionId?: string | null;
+  } | null;
+}): CachedSplit | null {
+  const url = song.voiceSplit?.audioUrl?.trim() ?? '';
+  if (!url || song.voiceSplit?.status !== 'ready') return null;
+  const sourceVersionId = song.voiceSplit?.sourceVersionId?.trim() || 'split';
+  return { sourceVersionId, audioUrl: url };
 }
 
 const MAX_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
@@ -175,6 +279,11 @@ export function countsTowardSongQuota(): boolean {
 export function isVoiceChangeGeneration(parameters: unknown): boolean {
   if (!parameters || typeof parameters !== 'object') return false;
   return (parameters as { purpose?: unknown }).purpose === VOICE_CHANGE_PURPOSE;
+}
+
+export function isStemSplitGeneration(parameters: unknown): boolean {
+  if (!parameters || typeof parameters !== 'object') return false;
+  return (parameters as { job?: unknown }).job === STEM_SPLIT_JOB;
 }
 
 export function readVoiceChangeStatus(value: unknown): VoiceChangeStatus | null {
@@ -320,16 +429,22 @@ export function resolveStoredInstrumental(input: {
 }
 
 export function shouldOfferVoiceChange(input: {
-  /** Normal songs stay hidden until a later stem split can supply a beat. */
   beatFirst: boolean;
   instrumental: boolean;
   lyrics: string | null;
   source: { versionId: string } | null;
   used: number;
   status: VoiceChangeStatus | null;
+  /** Seconds. Over 4 minutes hides a normal song. Beat-first ignores this. */
+  durationSeconds?: number | null;
+  /** Explicit false hides a normal song that is still generating. */
+  audioReady?: boolean | null;
 }): boolean {
-  if (!input.beatFirst || input.instrumental || !input.lyrics) return false;
+  if (input.instrumental || !input.lyrics) return false;
   if (input.used > 0 || input.status) return true;
+  if (input.beatFirst) return Boolean(input.source);
+  if (input.audioReady === false) return false;
+  if (songTooLongForSingOver(input.durationSeconds)) return false;
   return Boolean(input.source);
 }
 
@@ -345,9 +460,16 @@ export function voiceChangeSnapshot(input: {
   song: {
     path?: string | null;
     currentVersionId?: string | null;
+    audioReady?: boolean | null;
+    duration?: number | null;
     createOptions?: { instrumental?: boolean; voice?: string | null } | null;
     beatFirst?: { stage?: string | null; chosenVersionId?: string | null } | null;
     voiceChange?: VoiceChangeRecord | null;
+    voiceSplit?: {
+      status?: string | null;
+      audioUrl?: string | null;
+      sourceVersionId?: string | null;
+    } | null;
   };
   versions: readonly VoiceVersionRef[];
   generations: ReadonlyArray<
@@ -362,7 +484,16 @@ export function voiceChangeSnapshot(input: {
   }));
   const current = input.versions.find((version) => version.id === input.song.currentVersionId);
   const lyrics = savedLyricsText(generations, current?.providerOutputId ?? null);
-  const source = resolveStoredInstrumental({ song: input.song, versions: input.versions, generations });
+  const beatFirst = input.song.path === BEAT_FIRST_PATH;
+  const stored = resolveStoredInstrumental({ song: input.song, versions: input.versions, generations });
+  const mix = playable(current);
+  const cached = cachedSplitInstrumental(input.song);
+  const source = beatFirst ? stored : mix ?? (cached ? { versionId: cached.sourceVersionId, audioUrl: cached.audioUrl } : null);
+  const durationSeconds = readSongDurationSeconds({
+    duration: input.song.duration,
+    conversionId: current?.providerOutputId ?? null,
+    generations,
+  });
   const record = input.song.voiceChange ?? null;
   const used = typeof record?.used === 'number' && Number.isFinite(record.used) ? Math.max(0, Math.floor(record.used)) : 0;
   const status = readVoiceChangeStatus(record?.status);
@@ -373,12 +504,14 @@ export function voiceChangeSnapshot(input: {
   const original = input.versions.find((version) => version.id === originalVersionId);
   const active = generations.find((generation) => generation.id === generationId) ?? null;
   const show = shouldOfferVoiceChange({
-    beatFirst: input.song.path === 'beat_first',
+    beatFirst,
     instrumental: songIsInstrumental(input.song),
     lyrics,
     source,
     used,
     status,
+    durationSeconds,
+    audioReady: input.song.audioReady,
   });
   return {
     show,

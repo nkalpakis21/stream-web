@@ -19,6 +19,8 @@ describe('change the voice render', () => {
     );
     assert.match(known, /Change the voice/);
     assert.match(known, /Same beat and words, sung fresh in a new voice\./);
+    assert.equal(known.includes('You may hear a little of the old vocal.'), false);
+    assert.equal(known.includes('data-voice-split-caveat'), false);
     assert.match(known, /data-voice-buttons="one"/);
     assert.match(known, /Sing it in his voice/);
     assert.equal(known.includes('Sing it in her voice'), false);
@@ -56,6 +58,24 @@ describe('change the voice render', () => {
     assert.match(making, /#8B8896/);
     assert.doesNotMatch(making, /animate-spin|spinner/i);
     assert.equal(making.includes('Sing it in his voice'), false);
+
+    const split = renderToStaticMarkup(
+      createElement(ChangeVoiceSheet, {
+        voices: ['male'],
+        splitCaveat: true,
+        onClose: () => {},
+        onSubmit: () => {},
+      })
+    );
+    const subtitleAt = split.indexOf('Same beat and words, sung fresh in a new voice.');
+    const caveatAt = split.indexOf('You may hear a little of the old vocal.');
+    assert.ok(subtitleAt >= 0);
+    assert.ok(caveatAt > subtitleAt);
+    assert.match(split, /data-voice-split-caveat/);
+    assert.match(split, /text-\[#8B8896\]/);
+    assert.equal(split.includes('warning'), false);
+    const caveat = split.slice(caveatAt - 80, caveatAt + 80);
+    assert.equal(caveat.includes('<svg'), false);
   });
 
   it('compares the original and two new voices with the take orb and scrubber', () => {
