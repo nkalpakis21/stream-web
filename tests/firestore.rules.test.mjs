@@ -633,6 +633,43 @@ test('clients cannot write createOptions, and a song that already has it can sti
   }));
 });
 
+test('clients cannot write voiceChange, and a song that already has it can still be retitled', async () => {
+  await seedCatalog();
+  const alice = dbFor('alice');
+  const counter = { used: 2, status: 'ready', voice: 'female', generationId: 'gen-voice' };
+  await assertFails(setDoc(doc(alice, 'songs/clientVoice'), songData({
+    id: 'clientVoice',
+    currentVersionId: 'clientVoiceVer',
+    voiceChange: counter,
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/clientVoiceNull'), songData({
+    id: 'clientVoiceNull',
+    currentVersionId: 'clientVoiceNullVer',
+    voiceChange: null,
+  })));
+  await seed(async (db) => {
+    await setDoc(doc(db, 'songs/serverVoice'), songData({
+      id: 'serverVoice',
+      voiceChange: { used: 1, status: 'making', voice: 'male' },
+    }));
+  });
+  await assertSucceeds(updateDoc(doc(alice, 'songs/serverVoice'), {
+    title: 'Renamed',
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/serverVoice'), {
+    voiceChange: counter,
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/serverVoice'), {
+    voiceChange: { used: 0 },
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/song1'), {
+    voiceChange: counter,
+    updatedAt: now,
+  }));
+});
+
 test('coverModeration is server-only and an owner can still retitle', async () => {
   await seedCatalog();
   const alice = dbFor('alice');

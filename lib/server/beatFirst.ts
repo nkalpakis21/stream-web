@@ -576,7 +576,7 @@ async function draftIfNeeded(input: {
     vocalIdentity: input.artist.vocalIdentity,
     lore: input.artist.lore,
   });
-  if (!prompt) throw new HttpError(400, 'Add a prompt first');
+  if (!prompt) throw new HttpError(400, 'Add a prompt first.');
   assertNoObjectionableContent(prompt);
   const createdAtMs = nowMs();
   const decision = await (deps().reserveDraft ?? reserveLyricsDraft)(input.uid, input.sessionId, createdAtMs);
@@ -651,7 +651,7 @@ export async function addBeatVocals(input: {
   });
 
   const db = getAdminDb();
-  if (!singPrompt) throw new HttpError(400, 'Add a prompt first');
+  if (!singPrompt) throw new HttpError(400, 'Add a prompt first.');
   const gate = accountForSong(song);
   let submitted;
   try {

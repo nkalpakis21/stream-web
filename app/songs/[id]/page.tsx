@@ -25,6 +25,8 @@ import { getLyricsForSong } from '@/lib/services/lyrics';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import type { SongDocument, SongVersionDocument } from '@/types/firestore';
 import { BeatFirstScreen } from '@/components/songs/BeatFirstScreen';
+import { savedArtistVoice } from '@/lib/server/voiceChange';
+import type { VoiceGenerationRef, VoiceVersionRef } from '@/lib/songs/voiceChange';
 import { playableAudioUrl } from '@/lib/songs/audioAvailability';
 import { beatFeelFromOptions, unfinishedBeat } from '@/lib/songs/beatFirst';
 import { loadSongShareFacts } from '@/lib/server/songShareFacts';
@@ -98,6 +100,7 @@ async function SongPageBody({
   });
   const coverImageUrl = (visible.fallback ? visible.fields.coverPosterUrl : resolveCoverPoster(visible.fields)) ?? null;
   const ownerView = viewerId != null && viewerId === song.ownerId;
+  const artistVoice = ownerView ? await savedArtistVoice(song.artistId, song.artistVersionId) : null;
   const ownerCoverNotice = ownerView ? visible.notice : null;
   const primaryAudioUrl = playableAudioUrl(allVersions);
   const lyrics = getLyricsForSong(generations);
@@ -176,7 +179,62 @@ async function SongPageBody({
           )}
         </SongStage>
         <div className="mt-6 mb-10 flex flex-col items-start gap-3">
-          <SongOwnerActions songId={song.id} songTitle={song.title} ownerId={song.ownerId} />
+          <SongOwnerActions
+            songId={song.id}
+            songTitle={song.title}
+            ownerId={song.ownerId}
+            artistVoice={artistVoice}
+            song={
+              ownerView
+                ? {
+                    path: song.path ?? null,
+                    currentVersionId: song.currentVersionId,
+                    createOptions: song.createOptions ?? null,
+                    beatFirst: song.beatFirst
+                      ? { stage: song.beatFirst.stage, chosenVersionId: song.beatFirst.chosenVersionId ?? null }
+                      : null,
+                    voiceChange: song.voiceChange ?? null,
+                  }
+                : { currentVersionId: song.currentVersionId }
+            }
+            versions={
+              ownerView
+                ? allVersions.map(
+                    (version): VoiceVersionRef => ({
+                      id: version.id,
+                      audioURL: version.audioURL,
+                      providerOutputId: version.providerOutputId,
+                      isPrimary: version.isPrimary,
+                      versionNumber: version.versionNumber,
+                    })
+                  )
+                : []
+            }
+            generations={
+              ownerView
+                ? generations.map(
+                    (generation): VoiceGenerationRef => ({
+                      id: generation.id,
+                      status: generation.status,
+                      createdAtMs:
+                        generation.createdAt && typeof generation.createdAt.toMillis === 'function'
+                          ? generation.createdAt.toMillis()
+                          : null,
+                      providerConversionIds: generation.providerConversionIds,
+                      providerFailedConversions: generation.providerFailedConversions ?? null,
+                      parameters: generation.parameters
+                        ? {
+                            job: generation.parameters.job,
+                            purpose: generation.parameters.purpose,
+                            sourceVersionId: generation.parameters.sourceVersionId,
+                          }
+                        : null,
+                      output: { metadata: (generation.output?.metadata as Record<string, unknown> | null) ?? null },
+                    })
+                  )
+                : []
+            }
+          />
           <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3">
             Created {timeAgo}
           </p>

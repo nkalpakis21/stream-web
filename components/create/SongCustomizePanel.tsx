@@ -139,8 +139,8 @@ export function SongCustomizePanel({
   initialRemaining?: number;
   initialHasDraft?: boolean;
   initialDraftError?: string | null;
-  /** `voice-words` is Add vocals. `feel-energy` is Change the feel. No tone row. */
-  part?: 'all' | 'voice-words' | 'feel-energy';
+  /** `voice-words` is Add vocals. `feel-energy` is Change the feel. `voice` is Change the voice. No tone row. */
+  part?: 'all' | 'voice-words' | 'feel-energy' | 'voice';
 }) {
   const [open, setOpen] = useState(initialExpanded);
   const [drafting, setDrafting] = useState(initialDrafting);
@@ -218,11 +218,12 @@ export function SongCustomizePanel({
     void runDraft();
   };
 
-  const showVoice = !value.instrumental;
-  const showWords = !value.instrumental;
+  const voiceOnly = part === 'voice';
+  const showVoice = (voiceOnly || !value.instrumental) && part !== 'feel-energy';
+  const showWords = !value.instrumental && !voiceOnly;
   const voiceWordsOnly = part === 'voice-words';
   const feelEnergyOnly = part === 'feel-energy';
-  const sheet = voiceWordsOnly || feelEnergyOnly;
+  const sheet = voiceWordsOnly || feelEnergyOnly || voiceOnly;
   const expanded = sheet || open;
 
   return (
@@ -276,7 +277,7 @@ export function SongCustomizePanel({
           </button>
           )}
 
-          {showVoice && !feelEnergyOnly ? (
+          {showVoice ? (
             <div>
               <SectionLabel>Voice</SectionLabel>
               <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -306,7 +307,7 @@ export function SongCustomizePanel({
             </div>
           ) : null}
 
-          {showWords && !feelEnergyOnly ? (
+          {showWords && !feelEnergyOnly && !voiceOnly ? (
             <div>
               <SectionLabel>Words</SectionLabel>
               <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -410,7 +411,7 @@ export function SongCustomizePanel({
             </div>
           ) : null}
 
-          {voiceWordsOnly ? null : (
+          {voiceWordsOnly || voiceOnly ? null : (
           <>
           <div id="song-feel">
             <SectionLabel>Feel</SectionLabel>

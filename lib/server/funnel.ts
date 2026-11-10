@@ -4,8 +4,8 @@
  * Client Firebase Analytics records page views and CTA clicks. It cannot see
  * the MusicGPT webhook. First-time milestones use doc id `${uid}_${event}`
  * and create-if-absent. `play`, `song_shared`, `x_post`, `create_options_used`,
- * `take_picked`, and the beat-first events are a new auto-id doc each time.
- * `x_post`, `create_options_used`, `take_picked`, and the beat-first events
+ * `take_picked`, `voice_change`, and the beat-first events are a new auto-id doc each time.
+ * `x_post`, `create_options_used`, `take_picked`, `voice_change`, and the beat-first events
  * are server-only. `platform` is
  * `web`, `ios`, or `unknown` (`lib/funnel/platform.ts`).
  * Anonymous share-page plays are auto-id docs with `uid: null`, `visitorId`,
@@ -47,11 +47,12 @@ export const REPEAT_FUNNEL_EVENTS = [
   'beat_picked',
   'vocals_added',
   'used_as_instrumental',
+  'voice_change',
 ] as const;
 
 /**
  * Repeat events the browser may report. `x_post`, `create_options_used`,
- * `take_picked`, and the beat-first events stay server-only.
+ * `take_picked`, `voice_change`, and the beat-first events stay server-only.
  */
 const CLIENT_REPEAT_EVENTS = ['play', 'song_shared'] as const;
 
@@ -166,8 +167,9 @@ export function isPlayRateLimited(
 
 /**
  * Keep ids, the create-flow enums, a bounded elapsedMs, create option tags,
- * take_picked fields (take, changedFromDefault, msToPick), and beat-first
- * fields (retriesUsed, vocalsAdded, msFromFirstBeat). Drop emails, urls,
+ * take_picked fields (take, changedFromDefault, msToPick), beat-first
+ * fields (retriesUsed, vocalsAdded, msFromFirstBeat), and voice_change
+ * fields (voice, kept, msToKeep). Drop emails, urls,
  * skip/none on face_set, and anything else.
  */
 export function sanitizeFunnelProps(
@@ -219,6 +221,18 @@ export function sanitizeFunnelProps(
     out.retriesUsed = props.retriesUsed;
   }
   if (typeof props.vocalsAdded === 'boolean') out.vocalsAdded = props.vocalsAdded;
+  if (props.voice === 'same' || props.voice === 'female' || props.voice === 'male') {
+    out.voice = props.voice;
+  }
+  if (typeof props.kept === 'boolean') out.kept = props.kept;
+  if (
+    typeof props.msToKeep === 'number' &&
+    Number.isInteger(props.msToKeep) &&
+    props.msToKeep >= 0 &&
+    props.msToKeep <= MAX_ELAPSED_MS
+  ) {
+    out.msToKeep = props.msToKeep;
+  }
   if (
     typeof props.msFromFirstBeat === 'number' &&
     Number.isInteger(props.msFromFirstBeat) &&
@@ -375,7 +389,7 @@ function eventData(
 
 /**
  * First-time events create `${uid}_${event}` once. `play`, `song_shared`,
- * `x_post`, `create_options_used`, `take_picked`, and the beat-first events
+ * `x_post`, `create_options_used`, `take_picked`, `voice_change`, and the beat-first events
  * always add a new doc.
  * Throws on an unknown event, platform, or uid.
  */

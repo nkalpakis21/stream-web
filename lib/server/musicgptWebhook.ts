@@ -42,7 +42,9 @@ import { revalidateHomepage } from '@/lib/webhooks/revalidate';
 import { persistConversionAudio } from '@/lib/server/songAudioStorage';
 import { conversionIdsAfterLateTake } from '@/lib/songs/takes';
 import { countsTowardTimeToSong, holdBeatPublish, readAudioJob } from '@/lib/songs/beatFirst';
+import { isVoiceChangeGeneration } from '@/lib/songs/voiceChange';
 import { noteBeatAttemptEnded, noteBeatAudioStored, noteSingOverFinished } from '@/lib/server/beatFirst';
+import { noteVoiceChangeSettled } from '@/lib/server/voiceChange';
 
 export interface MusicGPTWebhookPayload {
   success: boolean;
@@ -253,6 +255,24 @@ async function recordPartialTakeFailure(
   const accounted =
     ids.length > 0 &&
     ids.every((id) => processed.has(id) || providerFailedConversions.includes(id));
+  if (
+    isVoiceChangeGeneration(generation.parameters) &&
+    hasAudio &&
+    accounted &&
+    generation.status !== 'completed'
+  ) {
+    const now = Timestamp.now();
+    await db.collection(COLLECTIONS.generations).doc(generation.id).set(
+      { status: 'completed', completedAt: now },
+      { merge: true }
+    );
+    try {
+      await noteVoiceChangeSettled(song.id, generation.id, 'ready');
+    } catch (error) {
+      console.error('[voice-change] settle', error instanceof Error ? error.message : 'failed');
+    }
+    return true;
+  }
   if (hasAudio && accounted && generation.status !== 'completed') {
     const now = Timestamp.now();
     await db.collection(COLLECTIONS.generations).doc(generation.id).set(
@@ -298,6 +318,13 @@ async function recordMusicGptFailure(body: MusicGPTWebhookPayload): Promise<void
       await noteBeatAttemptEnded(songId);
     } catch (error) {
       console.error('[beat-first] beat failed', error instanceof Error ? error.message : 'failed');
+    }
+  }
+  if (generation && isVoiceChangeGeneration(generation.parameters)) {
+    try {
+      await noteVoiceChangeSettled(songId, generation.id, 'failed');
+    } catch (error) {
+      console.error('[voice-change] failed', error instanceof Error ? error.message : 'failed');
     }
   }
   if (!marked || !generation) return;
@@ -554,6 +581,7 @@ export async function processMusicGptWebhook(
 
   const taskBinding = await getMusicGptTaskBinding(body.task_id);
   const audioJob = readAudioJob(taskBinding?.job, generation.parameters?.job);
+  const voiceChange = isVoiceChangeGeneration(generation.parameters);
   const holdPublish = holdBeatPublish({
     path: song.path,
     job: audioJob,
@@ -617,11 +645,11 @@ export async function processMusicGptWebhook(
     musicgptAudioUrl: persisted.musicgptAudioUrl,
     audioPersisted: persisted.audioPersisted,
     providerOutputId,
-    isPrimary: !hasExistingAudio,
+    isPrimary: voiceChange ? false : !hasExistingAudio,
   };
   await versionRef.set(version);
 
-  if (persisted.audioPersisted && !skipTimeToSong) {
+  if (persisted.audioPersisted && !skipTimeToSong && !voiceChange) {
     try {
       const binding = taskBinding;
       const stored = binding?.platform;
@@ -650,11 +678,11 @@ export async function processMusicGptWebhook(
   }
 
   let catalogRevalidate = false;
-  if (versionHasAudio(version) && !holdPublish) {
+  if (versionHasAudio(version) && !holdPublish && !voiceChange) {
     catalogRevalidate = await publishFirstAudio(song);
   }
 
-  if (!holdPublish) {
+  if (!holdPublish && !voiceChange) {
     await tryPostSongLive(song.id, 'audio-written');
   }
 
@@ -666,7 +694,7 @@ export async function processMusicGptWebhook(
     }
   }
 
-  if (!hasExistingAudio && !holdPublish && isFalCoverPipeline()) {
+  if (!hasExistingAudio && !holdPublish && !voiceChange && isFalCoverPipeline()) {
     try {
       if (
         song.coverMotionStatus !== 'ready' &&
@@ -689,7 +717,7 @@ export async function processMusicGptWebhook(
     }
   }
 
-  if (!hasExistingAudio) {
+  if (!hasExistingAudio && !voiceChange) {
     try {
       await adminSetPrimarySongVersion(song.id, versionId);
     } catch (error) {
@@ -739,7 +767,7 @@ export async function processMusicGptWebhook(
       albumCoverPath: conversion.album_cover_path as string | undefined,
       albumCoverThumbnail: conversion.album_cover_thumbnail as string | undefined,
     });
-    await persistMusicGptAlbumCover(song.id, songUpdates);
+    if (!voiceChange) await persistMusicGptAlbumCover(song.id, songUpdates);
   }
 
   let musicGptUsage: MusicGptUsageRecord | undefined;
@@ -792,7 +820,7 @@ export async function processMusicGptWebhook(
     { merge: true }
   );
 
-  if (audioJob === 'sing_over' && versionHasAudio(version)) {
+  if (audioJob === 'sing_over' && versionHasAudio(version) && !voiceChange) {
     try {
       const noted = await noteSingOverFinished(song, generation.id);
       if (noted.logVocals) {
@@ -817,7 +845,15 @@ export async function processMusicGptWebhook(
     }
   }
 
-  if (shouldMarkCompleted && !holdPublish) {
+  if (voiceChange && versionHasAudio(version)) {
+    try {
+      await noteVoiceChangeSettled(song.id, generation.id, shouldMarkCompleted ? 'ready' : 'making');
+    } catch (error) {
+      console.error('[voice-change] settle', error instanceof Error ? error.message : 'failed');
+    }
+  }
+
+  if (shouldMarkCompleted && !holdPublish && !voiceChange) {
     try {
       await adminCreateSongReadyNotification({
         userId: song.ownerId,
