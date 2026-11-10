@@ -4,8 +4,9 @@
  * Client Firebase Analytics records page views and CTA clicks. It cannot see
  * the MusicGPT webhook. First-time milestones use doc id `${uid}_${event}`
  * and create-if-absent. `play`, `song_shared`, `x_post`, `create_options_used`,
- * and `take_picked` are a new auto-id doc each time. `x_post`,
- * `create_options_used`, and `take_picked` are server-only. `platform` is
+ * `take_picked`, and the beat-first events are a new auto-id doc each time.
+ * `x_post`, `create_options_used`, `take_picked`, and the beat-first events
+ * are server-only. `platform` is
  * `web`, `ios`, or `unknown` (`lib/funnel/platform.ts`).
  * Anonymous share-page plays are auto-id docs with `uid: null`, `visitorId`,
  * and `source: 'share_page'`. Signed-in plays from that page set the same source.
@@ -41,9 +42,17 @@ export const REPEAT_FUNNEL_EVENTS = [
   'x_post',
   'create_options_used',
   'take_picked',
+  'beat_first_started',
+  'beat_regenerated',
+  'beat_picked',
+  'vocals_added',
+  'used_as_instrumental',
 ] as const;
 
-/** Repeat events the browser may report. `x_post`, `create_options_used`, and `take_picked` stay server-only. */
+/**
+ * Repeat events the browser may report. `x_post`, `create_options_used`,
+ * `take_picked`, and the beat-first events stay server-only.
+ */
 const CLIENT_REPEAT_EVENTS = ['play', 'song_shared'] as const;
 
 export const FUNNEL_EVENTS = [...FIRST_FUNNEL_EVENTS, ...REPEAT_FUNNEL_EVENTS] as const;
@@ -157,8 +166,9 @@ export function isPlayRateLimited(
 
 /**
  * Keep ids, the create-flow enums, a bounded elapsedMs, create option tags,
- * and take_picked fields (take, changedFromDefault, msToPick). Drop emails,
- * urls, skip/none on face_set, and anything else.
+ * take_picked fields (take, changedFromDefault, msToPick), and beat-first
+ * fields (retriesUsed, vocalsAdded, msFromFirstBeat). Drop emails, urls,
+ * skip/none on face_set, and anything else.
  */
 export function sanitizeFunnelProps(
   props?: Record<string, unknown> | null
@@ -199,6 +209,23 @@ export function sanitizeFunnelProps(
     props.msToPick <= MAX_ELAPSED_MS
   ) {
     out.msToPick = props.msToPick;
+  }
+  if (
+    typeof props.retriesUsed === 'number' &&
+    Number.isInteger(props.retriesUsed) &&
+    props.retriesUsed >= 0 &&
+    props.retriesUsed <= 2
+  ) {
+    out.retriesUsed = props.retriesUsed;
+  }
+  if (typeof props.vocalsAdded === 'boolean') out.vocalsAdded = props.vocalsAdded;
+  if (
+    typeof props.msFromFirstBeat === 'number' &&
+    Number.isInteger(props.msFromFirstBeat) &&
+    props.msFromFirstBeat >= 0 &&
+    props.msFromFirstBeat <= MAX_ELAPSED_MS
+  ) {
+    out.msFromFirstBeat = props.msFromFirstBeat;
   }
   return out;
 }
@@ -348,7 +375,8 @@ function eventData(
 
 /**
  * First-time events create `${uid}_${event}` once. `play`, `song_shared`,
- * `x_post`, `create_options_used`, and `take_picked` always add a new doc.
+ * `x_post`, `create_options_used`, `take_picked`, and the beat-first events
+ * always add a new doc.
  * Throws on an unknown event, platform, or uid.
  */
 export async function trackFunnelEvent(

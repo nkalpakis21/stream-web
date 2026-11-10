@@ -33,6 +33,8 @@ import type { ComponentType } from 'react';
 import { PrivateSongTag } from '@/components/songs/PrivateSongTag';
 import { UnavailableAudioRow } from '@/components/songs/UnavailableAudioRow';
 import { SWITCH_TAKE_LABEL, seedHasTwoTakes } from '@/lib/songs/takes';
+import { BEAT_READY_STUDIO_LABEL, studioBeatLabel } from '@/lib/songs/beatFirst';
+import { BeatReadyTag } from '@/components/songs/BeatReadyTag';
 import { useTakeSeed } from '@/components/songs/useTakeSeed';
 import '@/components/songs/pick-your-take.css';
 
@@ -135,9 +137,10 @@ export function SongCard({
     return () => window.clearTimeout(timer);
   }, [shown, ownerCatalog]);
 
+  const beatReady = ownerCatalog && studioBeatLabel(shown) === BEAT_READY_STUDIO_LABEL;
   const waiting = ownerSongTileState(shown, ownerCatalog, nowMs);
   if (!ownerCatalog && shown.audioReady === false && !shown.deletedAt) return null;
-  if (waiting) {
+  if (waiting && !beatReady) {
     return (
       <UnavailableAudioRow
         songId={shown.id}
@@ -201,6 +204,7 @@ export function SongCard({
           </Link>
           {showPrivate ? <PrivateSongTag /> : null}
         </div>
+        {beatReady ? <BeatReadyTag songId={shown.id} /> : null}
         {name || showTicker ? (
           <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
             {name ? (
@@ -225,7 +229,7 @@ export function SongCard({
           </div>
         ) : null}
         {coin ? <ArtistCoinRow artistId={shown.artistId} quote={coin} linkable={linkable} /> : null}
-        {showSwitchTake ? (
+        {showSwitchTake && !beatReady ? (
           <button
             type="button"
             className="take-switch"

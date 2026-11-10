@@ -3,10 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { HearBeatFirstLink } from '@/components/create/HearBeatFirstLink';
 import { SongCreatePreview, SongCustomizePanel } from '@/components/create/SongCustomizePanel';
 import { useSongCustomize } from '@/components/create/useSongCustomize';
+import { getFreshIdToken, userFacingApiError } from '@/lib/api/clientAuth';
 import { requestLyricsDraft } from '@/lib/create/lyricsDraftClient';
-import { SONG_LYRICS_MAX, toWireCreateOptions } from '@/lib/create/songOptions';
+import { SONG_LYRICS_MAX, toWireCreateOptions, type Energy, type FeelLabel } from '@/lib/create/songOptions';
+import { postBeatFirst, postBeatRetry } from '@/lib/songs/beatFirstClient';
+import { getSong } from '@/lib/services/songs';
 import { getUserArtists } from '@/lib/services/artists';
 import { abandonFailedSongCreate, createSong } from '@/lib/services/songs';
 import { createGeneration } from '@/lib/services/generations';
@@ -45,15 +49,25 @@ interface CreativeSongFormProps {
   preselectedArtistId?: string;
   onSuccess?: (songId: string) => void;
   onCancel?: () => void;
+  /** Resume a beat on this song. Change the feel lands here. */
+  beatSongId?: string;
+  focusFeel?: boolean;
 }
 
-export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: CreativeSongFormProps) {
+export function CreativeSongForm({
+  preselectedArtistId,
+  onSuccess,
+  onCancel,
+  beatSongId,
+  focusFeel = false,
+}: CreativeSongFormProps) {
   const { user } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [generationFailed, setGenerationFailed] = useState(false);
   const submitLock = useRef(false);
   const idempotencyKeyRef = useRef<string | null>(null);
+  const resumeFeelRef = useRef<{ feel: FeelLabel[]; energy: Energy } | null>(null);
   const [artists, setArtists] = useState<AIArtistDocument[]>([]);
   const [loadingArtists, setLoadingArtists] = useState(true);
   const { toasts, showToast, dismissToast } = useToast();
@@ -104,6 +118,58 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
       loadArtists();
     }
   }, [user, loadArtists]);
+
+  useEffect(() => {
+    if (!focusFeel) return;
+    const node = document.getElementById('song-feel');
+    node?.scrollIntoView({ block: 'center' });
+  }, [focusFeel, formData.artistId]);
+
+  useEffect(() => {
+    if (!user || !beatSongId) return;
+    let cancelled = false;
+    void getSong(beatSongId).then((song) => {
+      if (cancelled || !song || song.ownerId !== user.uid) return;
+      setFormData((prev) => ({
+        ...prev,
+        title: song.title || prev.title,
+        artistId: song.artistId || prev.artistId,
+        prompt: song.createPrompt || prev.prompt,
+      }));
+      const feel = (song.createOptions?.feel ?? []).filter((item): item is FeelLabel => typeof item === 'string');
+      const energy: Energy =
+        song.createOptions?.energy === 'Slow' ||
+        song.createOptions?.energy === 'Fast' ||
+        song.createOptions?.energy === 'Steady'
+          ? song.createOptions.energy
+          : 'Steady';
+      resumeFeelRef.current = { feel, energy };
+      customize.setValue({
+        ...customize.value,
+        feel,
+        energy,
+        instrumental: false,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Prefill once when the resume id arrives. Later edits stay local.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, beatSongId]);
+
+  useEffect(() => {
+    const resume = resumeFeelRef.current;
+    if (!resume) return;
+    customize.setValue({
+      ...customize.value,
+      feel: resume.feel,
+      energy: resume.energy,
+      instrumental: false,
+    });
+    // Re-apply after the artist defaults reset the panel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customize.resetKey]);
 
   const submitSong = async () => {
     if (submitLock.current) return;
@@ -220,6 +286,59 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     void submitSong();
+  };
+
+  const hearBeatFirst = () => {
+    if (!user || loading) return;
+    const chosen = customize.value;
+    if (chosen.instrumental) return;
+    if (!formData.artistId || !formData.title.trim() || !formData.prompt.trim()) {
+      showToast('Add a title, artist, and prompt first.', 'error');
+      return;
+    }
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `k${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+    }
+    setLoading(true);
+    void (async () => {
+      try {
+        const token = await getFreshIdToken(user);
+        const result = beatSongId
+          ? await postBeatRetry({
+              token,
+              songId: beatSongId,
+              feel: chosen.feel,
+              energy: chosen.energy,
+            })
+          : await postBeatFirst({
+              token,
+              artistId: formData.artistId,
+              title: formData.title.trim(),
+              prompt: formData.prompt.trim(),
+              feel: chosen.feel,
+              energy: chosen.energy,
+              idempotencyKey: idempotencyKeyRef.current as string,
+            });
+        if (!result.ok) {
+          showToast(userFacingApiError(undefined, result.error, "Couldn't make a beat."), 'error');
+          return;
+        }
+        const songId = beatSongId || (typeof result.data.songId === 'string' ? result.data.songId : '');
+        if (!songId) {
+          showToast("Couldn't make a beat.", 'error');
+          return;
+        }
+        onSuccess?.(songId);
+        router.push(`/songs/${songId}`);
+      } catch (error) {
+        showToast(userFacingApiError(undefined, error, "Couldn't make a beat."), 'error');
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
   if (loadingArtists) {
@@ -369,6 +488,7 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
             prompt={formData.prompt}
             requestDraft={requestDraft}
             disabled={loading}
+            initialExpanded={focusFeel}
           />
 
           {generationFailed ? (
@@ -380,6 +500,12 @@ export function CreativeSongForm({ preselectedArtistId, onSuccess, onCancel }: C
             defaults={customize.defaults}
             value={customize.value}
             onReset={customize.reset}
+          />
+
+          <HearBeatFirstLink
+            instrumental={customize.value.instrumental}
+            disabled={loading}
+            onClick={hearBeatFirst}
           />
 
           <div className="flex gap-3 pt-2">

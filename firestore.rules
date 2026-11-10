@@ -345,6 +345,9 @@ service cloud.firestore {
           && request.resource.data.createLyrics.size() <= 2000
         ))
         && !('createOptions' in request.resource.data)
+        && !('path' in request.resource.data)
+        && !('beatFirst' in request.resource.data)
+        && !('singOver' in request.resource.data)
         && (!('createSubmittedAt' in request.resource.data)
           || request.resource.data.createSubmittedAt is timestamp);
     }
