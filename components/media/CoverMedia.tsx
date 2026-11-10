@@ -95,6 +95,8 @@ interface CoverMediaProps {
   rounded?: string;
   className?: string;
   priority?: boolean;
+  /** Initials when the poster is empty because moderation hid the cover. */
+  emptyInitials?: string | null;
 }
 
 export function CoverMedia({
@@ -105,6 +107,7 @@ export function CoverMedia({
   rounded = 'rounded-cover',
   className = '',
   priority = false,
+  emptyInitials = null,
 }: CoverMediaProps) {
   const posterUrl = resolveCoverPoster(cover);
   const videoUrl = resolveCoverVideo(cover);
@@ -158,6 +161,7 @@ export function CoverMedia({
         sizes={sizes}
         rounded={rounded}
         priority={priority}
+        emptyInitials={emptyInitials}
       />
       {mountVideo && videoUrl ? (
         <video

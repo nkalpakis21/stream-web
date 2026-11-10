@@ -34,6 +34,8 @@ interface PlayableArtProps {
   className?: string;
   /** Set on /songs/[id] so a start is a share-page play. */
   sharePage?: boolean;
+  /** Initials when moderation hides the cover and the artist has no face. */
+  emptyInitials?: string | null;
 }
 
 export function PlayableArt({
@@ -48,6 +50,7 @@ export function PlayableArt({
   href,
   className = '',
   sharePage = false,
+  emptyInitials = null,
 }: PlayableArtProps) {
   const { play, nowPlaying, isPlaying, togglePlayPause } = useSongPlayer();
   const [resolvedAudio, setResolvedAudio] = useState<string | null>(audioUrlProp ?? null);
@@ -128,6 +131,7 @@ export function PlayableArt({
               title={title}
               playback={playback}
               sizes="(max-width: 768px) 50vw, 25vw"
+              emptyInitials={emptyInitials}
             />
           </Link>
         ) : (
@@ -136,6 +140,7 @@ export function PlayableArt({
             title={title}
             playback={playback}
             sizes="(max-width: 768px) 50vw, 25vw"
+            emptyInitials={emptyInitials}
           />
         )}
 

@@ -8,7 +8,7 @@ import { artistHeroFaceSources } from '@/lib/images/artistFace';
 import { ClearOwnerRecovery } from '@/components/states/ClearOwnerRecovery';
 import { isArtistOwner, selectArtistPageSongs } from '@/lib/artists/ownerSongs';
 import { songAudioExpired } from '@/lib/songs/audioAvailability';
-import { coverFieldsFromSong } from '@/lib/covers/resolve';
+import { isCoverModerationEnabled, resolveVisibleCover, withPublicSongCover } from '@/lib/covers/moderation';
 import { adminGetArtist } from '@/lib/server/artistsAdmin';
 import { adminCountFollowers } from '@/lib/server/followsCount';
 import { isXConfigured } from '@/lib/x/config';
@@ -107,11 +107,14 @@ async function ArtistPageBody({
     audioUnavailable: ownerView && audioExpired(song),
   }));
 
+  const moderationEnabled = isCoverModerationEnabled();
+  const photoUrl = cards.displays.get(artist.id)?.photoUrl ?? null;
   const faceSongs = songs.filter(song => song.isPublic === true && !song.audioUnavailable);
+  const faceList = faceSongs.length > 0 ? faceSongs : ownerView ? songs : [];
   const faceSources = artistHeroFaceSources({
-    lockedLookUrl: cards.displays.get(artist.id)?.photoUrl ?? null,
+    lockedLookUrl: photoUrl,
     avatarURL: artist.avatarURL,
-    songs: faceSongs.length > 0 ? faceSongs : ownerView ? songs : [],
+    songs: faceList.map(song => withPublicSongCover(song, moderationEnabled)),
   });
   const clientProps = artistPageClientProps({
     artist,
@@ -201,25 +204,47 @@ async function ArtistPageBody({
           </div>
           {songs.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {clientProps.songs.map(song =>
-                song.audioUnavailable ? (
+              {clientProps.songs.map(song => {
+                const visible = resolveVisibleCover(song, {
+                  enabled: moderationEnabled,
+                  faceUrl: photoUrl,
+                  artistName: view.name,
+                });
+                return song.audioUnavailable ? (
                   <UnavailableAudioRow
                     key={song.id}
                     songId={song.id}
                     title={song.title}
-                    cover={coverFieldsFromSong(song)}
+                    cover={visible.fields}
+                    emptyInitials={visible.initials}
+                    coverNotice={
+                      visible.notice
+                        ? {
+                            songId: song.id,
+                            message: visible.notice.message,
+                            action: visible.notice.action,
+                            buttonLabel: visible.notice.buttonLabel,
+                          }
+                        : null
+                    }
                   />
                 ) : (
                   <SongCard
                     key={song.id}
                     song={song}
                     artistName={view.name}
+                    artist={{
+                      id: view.id,
+                      name: view.name,
+                      photoUrl,
+                      isPublic: view.isPublic === true,
+                    }}
                     ticker={coinBadge?.ticker}
                     coinIcon={coinBadge?.iconSrc}
                     ownerCatalog={ownerView}
                   />
-                )
-              )}
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-xl border-2 border-dashed border-border bg-muted/30 p-12 text-center">

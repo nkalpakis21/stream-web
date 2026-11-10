@@ -1,6 +1,7 @@
 import { getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import { publicArtistPhotoUrl } from '@/lib/artists/cardDisplay';
+import { coverIsPublic, isCoverModerationEnabled } from '@/lib/covers/moderation';
 import { resolveCoverPoster } from '@/lib/covers/resolve';
 import { playableAudioUrl } from '@/lib/songs/audioAvailability';
 import {
@@ -68,7 +69,7 @@ export async function loadSongShareFacts(
     song.artistId ? readFace(song.artistId) : Promise.resolve(null),
   ]);
   const audioReady = playableAudioUrl(versions) != null;
-  const coverUrl = resolveCoverPoster(song);
+  const coverUrl = coverIsPublic(song, isCoverModerationEnabled()) ? resolveCoverPoster(song) : null;
   const faceUrl = face?.photoUrl ?? null;
   return {
     gate: 'public',

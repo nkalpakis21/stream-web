@@ -11,8 +11,10 @@ import { CoinBadge } from '@/components/songs/CoinBadge';
 import { ArtistCoinRow } from '@/components/songs/ArtistCoinRow';
 import { ArtistFace } from '@/components/artists/ArtistFace';
 import { MaybeArtistLink } from '@/components/songs/MaybeArtistLink';
-import { coverFieldsFromSong } from '@/lib/covers/resolve';
+import { resolveVisibleCover, type CoverModerationStatus } from '@/lib/covers/moderation';
 import { artistFaceSources, songCoverCandidates } from '@/lib/images/artistFace';
+import { useCoverModerationEnabled } from '@/components/providers/CoverModerationProvider';
+import { CoverModerationNotice } from '@/components/songs/CoverModerationNotice';
 import { songShowsPrivateTag } from '@/lib/artists/ownerSongs';
 import { db } from '@/lib/firebase/config';
 import { getSongPath } from '@/lib/firebase/collections';
@@ -82,7 +84,9 @@ export function SongCard({
   coin = null,
   ownerCatalog = false,
 }: SongCardProps) {
+  const moderationEnabled = useCoverModerationEnabled();
   const shown = useLiveOwnerSong(song, ownerCatalog);
+  const [statusOverride, setStatusOverride] = useState<CoverModerationStatus | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const isCompact = size === 'compact';
   const showTicker = Boolean(ticker?.trim());
@@ -90,6 +94,19 @@ export function SongCard({
   const linkable = artist?.isPublic === true;
   const photoUrl = artist?.photoUrl ?? null;
   const showPrivate = songShowsPrivateTag(shown, ownerCatalog);
+  const visibleSong = statusOverride
+    ? { ...shown, coverModeration: { status: statusOverride, checkedAt: null, labels: null } }
+    : shown;
+  const visible = resolveVisibleCover(visibleSong, {
+    enabled: moderationEnabled,
+    faceUrl: photoUrl,
+    artistName: name || 'Artist',
+  });
+  const notice = ownerCatalog ? visible.notice : null;
+
+  useEffect(() => {
+    setStatusOverride(null);
+  }, [shown.id, shown.coverPosterUrl, shown.coverModeration?.status]);
 
   useEffect(() => {
     if (!shouldListenForOwnerSong(shown, ownerCatalog)) return;
@@ -108,7 +125,19 @@ export function SongCard({
       <UnavailableAudioRow
         songId={shown.id}
         title={shown.title}
-        cover={coverFieldsFromSong(shown)}
+        cover={visible.fields}
+        emptyInitials={visible.initials}
+        coverNotice={
+          notice
+            ? {
+                songId: shown.id,
+                message: notice.message,
+                action: notice.action,
+                buttonLabel: notice.buttonLabel,
+              }
+            : null
+        }
+        onCoverResolved={setStatusOverride}
         state={waiting}
         prompt={shown.createPrompt}
         lyrics={shown.createLyrics}
@@ -125,11 +154,23 @@ export function SongCard({
         title={shown.title}
         artistName={name || 'Artist'}
         artistId={shown.artistId}
-        cover={coverFieldsFromSong(shown)}
+        cover={visible.fields}
+        emptyInitials={visible.initials}
         playback="visibility"
         durationSeconds={shown.duration}
         href={`/songs/${shown.id}`}
       />
+      {notice ? (
+        <div className={isCompact ? 'px-2 pt-2' : 'px-3 pt-2'}>
+          <CoverModerationNotice
+            songId={shown.id}
+            message={notice.message}
+            action={notice.action}
+            buttonLabel={notice.buttonLabel}
+            onResolved={setStatusOverride}
+          />
+        </div>
+      ) : null}
       <div className={isCompact ? 'p-2' : 'p-3'}>
         <div className={showPrivate ? 'flex min-w-0 items-center gap-2' : undefined}>
           <Link href={`/songs/${shown.id}`} className={showPrivate ? 'block min-w-0' : 'block'}>
@@ -149,7 +190,7 @@ export function SongCard({
               <>
                 <ArtistFace
                   name={name}
-                  sources={artistFaceSources(photoUrl, songCoverCandidates(shown))}
+                  sources={artistFaceSources(photoUrl, songCoverCandidates(visible.fields))}
                   size="card"
                 />
                 <MaybeArtistLink

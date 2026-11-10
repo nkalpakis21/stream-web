@@ -1,5 +1,9 @@
+'use client';
+
 import Link from 'next/link';
 import { ArtistFace } from '@/components/artists/ArtistFace';
+import { useCoverModerationEnabled } from '@/components/providers/CoverModerationProvider';
+import { withPublicSongCover } from '@/lib/covers/moderation';
 import { artistHeroFaceSources } from '@/lib/images/artistFace';
 import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
 import type { AIArtistDocument, SongDocument } from '@/types/firestore';
@@ -21,7 +25,10 @@ export function StudioArtistTile({
     albumCoverThumbnail?: string | null;
   }[] | null;
 }) {
-  const list = songs?.filter(item => item.artistId === artist.id && !item.deletedAt) ?? [];
+  const moderationEnabled = useCoverModerationEnabled();
+  const list = (songs?.filter(item => item.artistId === artist.id && !item.deletedAt) ?? []).map(song =>
+    withPublicSongCover(song, moderationEnabled)
+  );
   const sources = artistHeroFaceSources({
     lockedLookUrl: photoUrl,
     avatarURL: artist.avatarURL,

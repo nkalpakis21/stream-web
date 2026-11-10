@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { PlayableArt } from '@/components/songs/PlayableArt';
+import { CoverModerationNotice } from '@/components/songs/CoverModerationNotice';
 import { ShareButton } from '@/components/songs/ShareButton';
 import { ArtistFace } from '@/components/artists/ArtistFace';
 import { MaybeArtistLink } from '@/components/songs/MaybeArtistLink';
@@ -35,6 +36,12 @@ interface SongStageProps {
   shareUrl: string;
   pending?: boolean;
   children?: React.ReactNode;
+  emptyInitials?: string | null;
+  ownerCoverNotice?: {
+    message: string;
+    action: 'replace' | 'retry';
+    buttonLabel: string;
+  } | null;
 }
 
 function formatClock(total: number): string {
@@ -69,6 +76,8 @@ export function SongStage({
   shareUrl,
   pending = false,
   children,
+  emptyInitials = null,
+  ownerCoverNotice = null,
 }: SongStageProps) {
   const playable = useMemo(
     () => versions.filter(v => v.audioURL && v.audioExpired !== true),
@@ -85,26 +94,40 @@ export function SongStage({
     durationSeconds != null && Number.isFinite(durationSeconds) && durationSeconds > 0
       ? formatClock(durationSeconds)
       : versionClock(active || { id: '', audioURL: null, isPrimary: false }, null);
-  const coverFields = coverFieldsFromSong({
-    ...cover,
-    albumCoverPath: cover?.albumCoverPath ?? albumCoverUrl,
-    albumCoverThumbnail: cover?.albumCoverThumbnail ?? albumCoverUrl,
-  });
+  const coverFields = cover
+    ? coverFieldsFromSong(cover)
+    : coverFieldsFromSong({
+        albumCoverPath: albumCoverUrl,
+        albumCoverThumbnail: albumCoverUrl,
+      });
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start">
-      <PlayableArt
-        songId={songId}
-        title={songTitle}
-        artistName={artistName}
-        artistId={artistId || undefined}
-        cover={coverFields}
-        playback="always"
-        audioUrl={currentAudio}
-        durationSeconds={durationSeconds}
-        sharePage
-        className="w-full"
-      />
+      <div className="min-w-0">
+        <PlayableArt
+          songId={songId}
+          title={songTitle}
+          artistName={artistName}
+          artistId={artistId || undefined}
+          cover={coverFields}
+          emptyInitials={emptyInitials}
+          playback="always"
+          audioUrl={currentAudio}
+          durationSeconds={durationSeconds}
+          sharePage
+          className="w-full"
+        />
+        {ownerCoverNotice ? (
+          <div className="mt-3">
+            <CoverModerationNotice
+              songId={songId}
+              message={ownerCoverNotice.message}
+              action={ownerCoverNotice.action}
+              buttonLabel={ownerCoverNotice.buttonLabel}
+            />
+          </div>
+        ) : null}
+      </div>
       <div className="min-w-0">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h1 className="listen-h1" data-entity="track">{songTitle}</h1>

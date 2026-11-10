@@ -633,6 +633,56 @@ test('clients cannot write createOptions, and a song that already has it can sti
   }));
 });
 
+test('coverModeration is server-only and an owner can still retitle', async () => {
+  await seedCatalog();
+  const alice = dbFor('alice');
+  const moderation = {
+    status: 'passed',
+    checkedAt: now,
+    labels: { adult: 'VERY_LIKELY', violence: 'UNLIKELY', racy: 'POSSIBLE' },
+  };
+
+  await assertFails(setDoc(doc(alice, 'songs/modCreate'), songData({
+    id: 'modCreate',
+    currentVersionId: 'modCreateVer',
+    coverModeration: moderation,
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/modNull'), songData({
+    id: 'modNull',
+    currentVersionId: 'modNullVer',
+    coverModeration: null,
+  })));
+  await assertSucceeds(setDoc(doc(alice, 'songs/modOk'), songData({
+    id: 'modOk',
+    currentVersionId: 'modOkVer',
+  })));
+
+  await seed(async (db) => {
+    await setDoc(doc(db, 'songs/moderated'), songData({
+      id: 'moderated',
+      currentVersionId: 'moderatedVer',
+      coverModeration: { status: 'flagged', checkedAt: now, labels: { adult: 'LIKELY' } },
+    }));
+  });
+
+  await assertSucceeds(updateDoc(doc(alice, 'songs/moderated'), {
+    title: 'Renamed',
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/moderated'), {
+    coverModeration: moderation,
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/song1'), {
+    coverModeration: moderation,
+    updatedAt: now,
+  }));
+  await assertSucceeds(updateDoc(doc(alice, 'songs/song1'), {
+    title: 'Still Mine',
+    updatedAt: now,
+  }));
+});
+
 test('owner can retitle or soft-delete a song and cannot change ownerId or covers', async () => {
   await seedCatalog();
   const alice = dbFor('alice');

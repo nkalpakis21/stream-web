@@ -16,7 +16,8 @@ import { toPlain, type Plain } from '@/lib/serialize/toPlain';
 import { VersionCards } from '@/components/songs/VersionCards';
 import { SongOwnerActions } from '@/components/songs/SongOwnerActions';
 import { publicUrl } from '@/lib/brand/site';
-import { coverFieldsFromSong, resolveCoverPoster } from '@/lib/covers/resolve';
+import { isCoverModerationEnabled, resolveVisibleCover } from '@/lib/covers/moderation';
+import { resolveCoverPoster } from '@/lib/covers/resolve';
 import { LyricsSectionWrapper } from '@/components/lyrics/LyricsSectionWrapper';
 import { SongStage } from '@/components/songs/SongStage';
 import { SongStageSkeleton } from '@/components/songs/SongStageSkeleton';
@@ -62,9 +63,11 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
 async function SongPageBody({
   song,
   allVersions,
+  viewerId,
 }: {
   song: Plain<SongDocument>;
   allVersions: Plain<SongVersionDocument>[];
+  viewerId: string | null;
 }) {
   const [artistContext, generations] = await Promise.all([
     getArtistCardContext([song.artistId]),
@@ -77,8 +80,15 @@ async function SongPageBody({
   const createdAt = typeof song.createdAt === 'number' ? song.createdAt : 0;
   const timeAgo = formatDistanceToNow(createdAt, { addSuffix: true });
 
-  const coverImageUrl = resolveCoverPoster(song);
-  const cover = coverFieldsFromSong(song);
+  const artistName = artist?.name || 'Unknown Artist';
+  const visible = resolveVisibleCover(song, {
+    enabled: isCoverModerationEnabled(),
+    faceUrl: artist?.photoUrl ?? null,
+    artistName,
+  });
+  const coverImageUrl = (visible.fallback ? visible.fields.coverPosterUrl : resolveCoverPoster(visible.fields)) ?? null;
+  const ownerView = viewerId != null && viewerId === song.ownerId;
+  const ownerCoverNotice = ownerView ? visible.notice : null;
   const primaryAudioUrl = playableAudioUrl(allVersions);
   const lyrics = getLyricsForSong(generations);
 
@@ -95,9 +105,11 @@ async function SongPageBody({
           artistId={song.artistId}
           artistLinkable={artistLinkable}
           artistPhotoUrl={artist?.photoUrl ?? null}
-          artistName={artist?.name || 'Unknown Artist'}
+          artistName={artistName}
           albumCoverUrl={coverImageUrl}
-          cover={cover}
+          cover={visible.fields}
+          emptyInitials={visible.initials}
+          ownerCoverNotice={ownerCoverNotice}
           audioUrl={primaryAudioUrl}
           pending={hasPendingGeneration}
           durationSeconds={song.duration ?? null}
@@ -115,7 +127,7 @@ async function SongPageBody({
               <LyricsSectionWrapper
                 lyrics={lyrics}
                 songTitle={song.title}
-                artistName={artist?.name || 'Unknown Artist'}
+                artistName={artistName}
                 albumCoverUrl={coverImageUrl}
                 audioUrl={primaryAudioUrl}
               />
@@ -131,7 +143,7 @@ async function SongPageBody({
 
         <VersionCards
           songTitle={song.title}
-          artistName={artist?.name || 'Unknown Artist'}
+          artistName={artistName}
           artistId={artist?.id}
           albumCoverUrl={coverImageUrl}
           initialVersions={allVersions}
@@ -162,7 +174,7 @@ export default async function SongPage({ params }: SongPageProps) {
 
   return (
     <Suspense fallback={<SongStageSkeleton />}>
-      <SongPageBody song={toPlain(song)} allVersions={toPlain(allVersions)} />
+      <SongPageBody song={toPlain(song)} allVersions={toPlain(allVersions)} viewerId={viewerId} />
     </Suspense>
   );
 }

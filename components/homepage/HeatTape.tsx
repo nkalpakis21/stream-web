@@ -22,6 +22,7 @@ export interface HeatTrack {
   artistPhotoUrl?: string | null;
   artistLinkable?: boolean;
   cover: CoverFields;
+  emptyInitials?: string | null;
   coin: ArtistCoinQuote | null;
 }
 
@@ -140,6 +141,7 @@ function HeatRow({ track, rank, queue }: { track: HeatTrack; rank: number; queue
             title={track.title}
             playback="visibility"
             sizes="40px"
+            emptyInitials={track.emptyInitials}
           />
         </span>
         <div className="heat-meta">

@@ -8,6 +8,7 @@ import { EmptyAction } from '@/components/states/EmptyAction';
 import '@/components/artists/artist-card.css';
 import { hasLaunchedCoin } from '@/lib/brand/coin';
 import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
+import { isCoverModerationEnabled, withPublicSongCover } from '@/lib/covers/moderation';
 import type { SongDocument } from '@/types/firestore';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 
@@ -24,6 +25,7 @@ async function ArtistsIndex() {
     getPublicSongs(400),
   ]);
 
+  const moderationEnabled = isCoverModerationEnabled();
   const playableByArtist = new Map<string, SongDocument>();
   const trackCountByArtist = new Map<string, number>();
   songs.forEach(song => {
@@ -65,7 +67,12 @@ async function ArtistsIndex() {
               <ArtistCard
                 key={artist.id}
                 artist={artist}
-                playable={playableByArtist.get(artist.id) || null}
+                playable={
+                  (() => {
+                    const song = playableByArtist.get(artist.id);
+                    return song ? withPublicSongCover(song, moderationEnabled) : null;
+                  })()
+                }
                 trackCount={trackCountByArtist.get(artist.id)}
                 coin={coinByArtist.get(artist.id) || null}
               />

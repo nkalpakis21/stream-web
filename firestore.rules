@@ -259,20 +259,6 @@ service cloud.firestore {
         );
     }
 
-    function sameCoverProvider() {
-      return (
-        (!('coverProvider' in resource.data) || resource.data.coverProvider == null)
-        && (!('coverProvider' in request.resource.data) || request.resource.data.coverProvider == null)
-      ) || (
-        resource.data.coverProvider != null
-        && request.resource.data.coverProvider != null
-        && request.resource.data.coverProvider.posterModel == resource.data.coverProvider.posterModel
-        && request.resource.data.coverProvider.loopModel == resource.data.coverProvider.loopModel
-        && request.resource.data.coverProvider.posterRequestId == resource.data.coverProvider.posterRequestId
-        && request.resource.data.coverProvider.loopRequestId == resource.data.coverProvider.loopRequestId
-      );
-    }
-
     function artistProfileUpdate() {
       return isOwner(resource.data.ownerId)
         && fieldUnchanged('name')
@@ -297,78 +283,24 @@ service cloud.firestore {
         // A client cannot add or change either field.
     }
 
+    // Owner edits may touch only these keys. createOptions, coverModeration,
+    // covers, play counts, and the other server fields stay as stored.
+    // affectedKeys stays under the rules expression limit; a per-field
+    // fieldUnchanged list does not once both server maps are guarded.
     function songServerFieldsUnchanged() {
-      return fieldUnchanged('ownerId')
-        && fieldUnchanged('artistId')
-        && fieldUnchanged('id')
-        && fieldUnchanged('createdAt')
-        && fieldUnchanged('parentSongId')
-        && fieldUnchanged('collaborationType')
-        && fieldUnchanged('albumCoverPath')
-        && fieldUnchanged('albumCoverThumbnail')
-        && fieldUnchanged('coverPosterUrl')
-        && fieldUnchanged('coverVideoUrl')
-        && fieldUnchanged('coverMotionStatus')
-        && fieldUnchanged('coverMotionError')
-        && fieldUnchanged('coverUpdatedAt')
-        && fieldUnchanged('tokenMintAddress')
-        && fieldUnchanged('tokenMintCreatedAt')
-        && fieldUnchanged('duration')
-        && fieldUnchanged('audioReady')
-        && fieldUnchanged('publicOnReady')
-        && fieldUnchanged('idempotencyKey')
-        && fieldUnchanged('generationStatus')
-        && fieldUnchanged('generationAttemptAt')
-        && fieldUnchanged('createPrompt')
-        && fieldUnchanged('createLyrics')
-        && fieldUnchanged('createOptions')
-        && fieldUnchanged('createSubmittedAt')
-        && sameCoverProvider()
-        && request.resource.data.keys().hasOnly([
-          'id',
-          'ownerId',
-          'artistId',
-          'artistVersionId',
-          'title',
-          'isPublic',
-          'audioReady',
-          'publicOnReady',
-          'idempotencyKey',
-          'generationStatus',
-          'generationAttemptAt',
-          'createPrompt',
-          'createLyrics',
-          'createOptions',
-          'createSubmittedAt',
-          'createdAt',
-          'updatedAt',
-          'deletedAt',
-          'currentVersionId',
-          'parentSongId',
-          'collaborationType',
-          'albumCoverPath',
-          'albumCoverThumbnail',
-          'coverPosterUrl',
-          'coverVideoUrl',
-          'coverMotionStatus',
-          'coverMotionError',
-          'coverUpdatedAt',
-          'coverProvider',
-          'playCount',
-          'playsBySource',
-          'playsBackground',
-          'duration',
-          'tokenMintAddress',
-          'tokenMintCreatedAt'
-        ]);
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'title',
+        'isPublic',
+        'updatedAt',
+        'deletedAt',
+        'currentVersionId',
+        'artistVersionId'
+      ]);
     }
 
     function songOwnerUpdate() {
       return isOwner(resource.data.ownerId)
         && songServerFieldsUnchanged()
-        && fieldUnchanged('playCount')
-        && fieldUnchanged('playsBySource')
-        && fieldUnchanged('playsBackground')
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
         && request.resource.data.title.size() <= 300
@@ -388,6 +320,7 @@ service cloud.firestore {
         && (!('coverMotionError' in request.resource.data) || request.resource.data.coverMotionError == null)
         && (!('coverUpdatedAt' in request.resource.data) || request.resource.data.coverUpdatedAt == null)
         && (!('coverProvider' in request.resource.data) || request.resource.data.coverProvider == null)
+        && !('coverModeration' in request.resource.data)
         && (!('albumCoverPath' in request.resource.data) || request.resource.data.albumCoverPath == null)
         && (!('albumCoverThumbnail' in request.resource.data) || request.resource.data.albumCoverThumbnail == null)
         && (!('tokenMintAddress' in request.resource.data) || request.resource.data.tokenMintAddress == null)
