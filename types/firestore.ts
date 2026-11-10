@@ -370,11 +370,29 @@ export interface SongDocument {
   /**
    * Server-only Sing Over accounting, shared by beat-first and later
    * re-sings. Clients cannot set or change it.
+   * Voice changes also add to this cost record. They do not use `attempts`
+   * as their cap, and they do not create a song.
    */
   singOver?: {
     attempts: number;
     creditEstimate: number | null;
     lastGenerationId?: string | null;
+  } | null;
+  /**
+   * Server-only voice changes on this song. `used` is how many Sing Over
+   * jobs were accepted, capped at 2. Clients cannot set or change it.
+   * A voice change does not count toward a song-creation quota.
+   */
+  voiceChange?: {
+    used: number;
+    status?: 'making' | 'ready' | 'failed' | null;
+    voice?: 'same' | 'female' | 'male' | null;
+    /** Server time when this voice change was accepted. */
+    startedAt?: Timestamp | null;
+    generationId?: string | null;
+    originalVersionId?: string | null;
+    sourceVersionId?: string | null;
+    creditEstimate?: number | null;
   } | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
