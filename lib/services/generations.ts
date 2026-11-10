@@ -79,7 +79,6 @@ export async function createGeneration(
     createOptions?: {
       instrumental: boolean;
       voice: 'same' | 'female' | 'male';
-      tone: string | null;
       feel: string[];
       energy: 'Slow' | 'Steady' | 'Fast';
     } | null;

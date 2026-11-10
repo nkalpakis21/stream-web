@@ -326,7 +326,6 @@ export interface SongDocument {
   createOptions?: {
     instrumental: boolean;
     voice: 'same' | 'female' | 'male';
-    tone: string | null;
     feel: string[];
     energy: 'Slow' | 'Steady' | 'Fast';
     words: 'artist' | 'mine';

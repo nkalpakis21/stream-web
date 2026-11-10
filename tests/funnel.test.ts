@@ -177,6 +177,7 @@ describe('trackFunnelEvent', () => {
     );
     assert.deepEqual(sanitizeFunnelProps({ options: 'bpm,key' }), {});
     assert.deepEqual(sanitizeFunnelProps({ options: 'voice,voice' }), {});
+    assert.deepEqual(sanitizeFunnelProps({ options: 'voice,tone' }), {});
     assert.equal(isFunnelEvent('create_options_used'), true);
     assert.equal(isClientFunnelEvent('create_options_used'), false);
   });

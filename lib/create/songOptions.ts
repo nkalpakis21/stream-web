@@ -2,13 +2,9 @@
  * Song customization for /create and Studio.
  *
  * Skipping every control must match today's MusicGPT request: artist DNA as
- * `music_style`, no `gender`, and `make_instrumental: false`. Feel, energy,
- * and tone are hints appended on top of that DNA. They never replace it.
- *
- * `TONE_ROW_ENABLED` stays off until the tone words are checked against audio.
+ * `music_style`, no `gender`, and `make_instrumental: false`. Feel and energy
+ * are hints appended on top of that DNA. They never replace it.
  */
-
-export const TONE_ROW_ENABLED = false;
 
 export const SONG_LYRICS_MAX = 2000;
 
@@ -34,22 +30,11 @@ export const ENERGY_OPTIONS = ['Slow', 'Steady', 'Fast'] as const;
 
 export type Energy = (typeof ENERGY_OPTIONS)[number];
 
-export const TONE_OPTIONS = ['Soft', 'Smooth', 'Raspy', 'Powerful', 'Airy'] as const;
-
-export type Tone = (typeof TONE_OPTIONS)[number];
-
 export const VOICE_OPTIONS = ['same', 'female', 'male'] as const;
 
 export type VoiceChoice = (typeof VOICE_OPTIONS)[number];
 
-export const CREATE_OPTION_TAGS = [
-  'instrumental',
-  'voice',
-  'tone',
-  'lyrics',
-  'feel',
-  'energy',
-] as const;
+export const CREATE_OPTION_TAGS = ['instrumental', 'voice', 'lyrics', 'feel', 'energy'] as const;
 
 export type CreateOptionTag = (typeof CREATE_OPTION_TAGS)[number];
 
@@ -72,7 +57,6 @@ export type ArtistDefaults = {
 export type SongCustomizeValue = {
   instrumental: boolean;
   voice: VoiceChoice;
-  tone: Tone | null;
   feel: FeelLabel[];
   energy: Energy;
   words: 'artist' | 'mine';
@@ -86,7 +70,6 @@ export type SongCustomizeValue = {
 export type ParsedCreateOptions = {
   instrumental: boolean;
   voice: VoiceChoice;
-  tone: Tone | null;
   feel: FeelLabel[] | null;
   energy: Energy | null;
 };
@@ -94,7 +77,6 @@ export type ParsedCreateOptions = {
 export type SongCreateOptionsRecord = {
   instrumental: boolean;
   voice: VoiceChoice;
-  tone: Tone | null;
   feel: string[];
   energy: Energy;
   words: 'artist' | 'mine';
@@ -169,7 +151,6 @@ export function initialSongCustomize(defaults: ArtistDefaults): SongCustomizeVal
   return {
     instrumental: false,
     voice: 'same',
-    tone: null,
     feel: [...defaults.feel],
     energy: defaults.energy,
     words: 'artist',
@@ -187,10 +168,6 @@ export function toggleFeel(selected: readonly FeelLabel[], label: FeelLabel): Fe
   if (selected.includes(label)) return selected.filter(item => item !== label);
   if (selected.length < FEEL_MAX) return [...selected, label];
   return [...selected.slice(1), label];
-}
-
-export function toggleTone(current: Tone | null, next: Tone): Tone | null {
-  return current === next ? null : next;
 }
 
 function sameFeel(left: readonly string[], right: readonly string[]): boolean {
@@ -231,7 +208,6 @@ export function defaultsLinkLabel(name?: string | null): string {
 export function previewSentence(input: {
   artistName?: string | null;
   value: SongCustomizeValue;
-  toneEnabled?: boolean;
 }): string {
   const name = displayArtistName(input.artistName);
   const descriptors = [...input.value.feel.map(feel => feel.toLowerCase()), input.value.energy.toLowerCase()];
@@ -241,34 +217,27 @@ export function previewSentence(input: {
   if (input.value.voice === 'female') sentence += ', in her voice';
   if (input.value.voice === 'male') sentence += ', in his voice';
   if (input.value.words === 'mine' && input.value.lyrics.trim()) sentence += ', singing your words';
-  if (input.toneEnabled && input.value.tone) sentence += `, ${input.value.tone.toLowerCase()}`;
   return `${sentence}.`;
 }
 
 export function customizeChanged(value: SongCustomizeValue, defaults: ArtistDefaults): boolean {
   if (value.instrumental) return true;
   if (value.voice !== 'same') return true;
-  if (value.tone) return true;
   if (value.words === 'mine') return true;
   if (!sameFeel(value.feel, defaults.feel)) return true;
   if (value.energy !== defaults.energy) return true;
   return false;
 }
 
-export function toWireCreateOptions(
-  value: SongCustomizeValue,
-  toneEnabled: boolean = TONE_ROW_ENABLED
-): {
+export function toWireCreateOptions(value: SongCustomizeValue): {
   instrumental: boolean;
   voice: VoiceChoice;
-  tone: Tone | null;
   feel: FeelLabel[];
   energy: Energy;
 } {
   return {
     instrumental: value.instrumental,
     voice: value.instrumental ? 'same' : value.voice,
-    tone: value.instrumental || !toneEnabled ? null : value.tone,
     feel: value.feel,
     energy: value.energy,
   };
@@ -277,12 +246,6 @@ export function toWireCreateOptions(
 function parseVoice(value: unknown): VoiceChoice {
   if (value === 'female' || value === 'male' || value === 'same') return value;
   return 'same';
-}
-
-function parseTone(value: unknown): Tone | null {
-  if (typeof value !== 'string') return null;
-  const cleaned = value.trim().toLowerCase();
-  return TONE_OPTIONS.find(option => option.toLowerCase() === cleaned) ?? null;
 }
 
 function parseEnergy(value: unknown): Energy | null {
@@ -311,7 +274,6 @@ export function parseCreateOptions(raw: unknown): ParsedCreateOptions | null {
   return {
     instrumental: record.instrumental === true,
     voice: parseVoice(record.voice),
-    tone: parseTone(record.tone),
     feel: 'feel' in record ? parseFeelList(record.feel) : null,
     energy: 'energy' in record ? parseEnergy(record.energy) : null,
   };
@@ -325,20 +287,18 @@ export function cleanLyrics(value: string | null | undefined): string | undefine
 }
 
 /**
- * DNA text, then feel, then energy, then tone.
+ * DNA text, then feel, then energy.
  * Pass only the hints that should be added. Defaults are omitted by the caller.
  */
 export function appendCreateStyleHints(
   base: string | undefined,
-  hints: { feel?: readonly string[]; energy?: string | null; tone?: string | null }
+  hints: { feel?: readonly string[]; energy?: string | null }
 ): string | undefined {
   const extra: string[] = [];
   const feel = (hints.feel ?? []).map(item => item.trim()).filter(Boolean);
   if (feel.length) extra.push(feel.join(', '));
   const energy = hints.energy?.trim();
   if (energy) extra.push(energy);
-  const tone = hints.tone?.trim();
-  if (tone) extra.push(tone);
   if (!extra.length) {
     const trimmed = base?.trim() ?? '';
     return trimmed || undefined;
@@ -386,7 +346,6 @@ export function resolveCreateRequest(input: {
   const feel = options.feel ?? input.defaults.feel;
   const energy = options.energy ?? input.defaults.energy;
   const voice: VoiceChoice = instrumental ? 'same' : options.voice;
-  const tone = instrumental ? null : options.tone;
   const sendLyrics = !instrumental ? lyrics : undefined;
   const feelChanged = options.feel != null && !sameFeel(options.feel, input.defaults.feel);
   const energyChanged = options.energy != null && options.energy !== input.defaults.energy;
@@ -396,7 +355,6 @@ export function resolveCreateRequest(input: {
   const used: CreateOptionTag[] = [];
   if (instrumental) used.push('instrumental');
   if (!instrumental && voice !== 'same') used.push('voice');
-  if (!instrumental && tone) used.push('tone');
   if (sendLyrics) used.push('lyrics');
   if (feelHint.length) used.push('feel');
   if (energyHint) used.push('energy');
@@ -405,7 +363,6 @@ export function resolveCreateRequest(input: {
     music_style: appendCreateStyleHints(input.musicStyle, {
       feel: feelHint,
       energy: energyHint,
-      tone,
     }),
     make_instrumental: instrumental,
     ...(voice === 'female' || voice === 'male' ? { gender: voice } : {}),
@@ -413,7 +370,6 @@ export function resolveCreateRequest(input: {
     persisted: {
       instrumental,
       voice,
-      tone,
       feel: [...feel],
       energy,
       words: sendLyrics ? 'mine' : 'artist',

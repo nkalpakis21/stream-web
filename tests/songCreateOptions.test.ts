@@ -22,7 +22,6 @@ import {
   resolveCreateRequest,
   styleInputFromArtistContext,
   toggleFeel,
-  TONE_ROW_ENABLED,
   type SongCustomizeValue,
 } from '../lib/create/songOptions';
 import { setMusicGptGenerationDepsForTests } from '../lib/server/musicgptGeneration';
@@ -62,7 +61,7 @@ const dna = {
 };
 
 describe('music style composition', () => {
-  it('keeps DNA and appends feel, energy, and tone in that order', () => {
+  it('keeps DNA and appends feel, then energy', () => {
     const base = buildMusicGPTStyleFromArtistContext(dna);
     assert.equal(base.make_instrumental, false);
     assert.match(base.music_style || '', /warm alto/);
@@ -70,14 +69,12 @@ describe('music style composition', () => {
     const style = appendCreateStyleHints(base.music_style, {
       feel: ['Chill', 'Dreamy'],
       energy: 'Fast',
-      tone: 'Soft',
     });
     assert.ok(style);
     assert.ok(style.includes('warm alto'));
     assert.ok(style.indexOf('warm alto') < style.indexOf('Chill, Dreamy'));
     assert.ok(style.indexOf('Chill, Dreamy') < style.indexOf('Fast'));
-    assert.ok(style.indexOf('Fast') < style.indexOf('Soft'));
-    assert.equal(style.endsWith('Soft'), true);
+    assert.equal(style.endsWith('Fast'), true);
   });
 
   it('does not turn on instrumental because lore says instrumental', () => {
@@ -96,14 +93,13 @@ describe('music style composition', () => {
     assert.equal(resolved.music_style, base.music_style);
   });
 
-  it('lets only the switch set instrumental and drops voice, tone, and lyrics', () => {
+  it('lets only the switch set instrumental and drops voice and lyrics', () => {
     const base = buildMusicGPTStyleFromArtistContext(dna);
     const resolved = resolveCreateRequest({
       musicStyle: base.music_style,
       options: {
         instrumental: true,
         voice: 'female',
-        tone: 'Raspy',
         feel: ['Angry'],
         energy: 'Fast',
       },
@@ -113,12 +109,11 @@ describe('music style composition', () => {
     assert.equal(resolved.make_instrumental, true);
     assert.equal(resolved.gender, undefined);
     assert.equal(resolved.lyrics, undefined);
-    assert.equal(resolved.persisted?.tone, null);
     assert.equal(resolved.persisted?.voice, 'same');
     assert.equal(resolved.persisted?.words, 'artist');
+    assert.equal('tone' in (resolved.persisted ?? {}), false);
     assert.match(resolved.music_style || '', /Angry/);
     assert.match(resolved.music_style || '', /Fast/);
-    assert.equal((resolved.music_style || '').includes('Raspy'), false);
     assert.deepEqual(resolved.used, ['instrumental', 'feel', 'energy']);
   });
 
@@ -126,17 +121,17 @@ describe('music style composition', () => {
     const defaults = artistDefaults(styleInputFromArtistContext(dna));
     const female = resolveCreateRequest({
       musicStyle: 'pop',
-      options: { instrumental: false, voice: 'female', tone: null, feel: null, energy: null },
+      options: { instrumental: false, voice: 'female', feel: null, energy: null },
       defaults,
     });
     const male = resolveCreateRequest({
       musicStyle: 'pop',
-      options: { instrumental: false, voice: 'male', tone: null, feel: null, energy: null },
+      options: { instrumental: false, voice: 'male', feel: null, energy: null },
       defaults,
     });
     const same = resolveCreateRequest({
       musicStyle: 'pop',
-      options: { instrumental: false, voice: 'same', tone: null, feel: null, energy: null },
+      options: { instrumental: false, voice: 'same', feel: null, energy: null },
       defaults,
     });
     assert.equal(female.gender, 'female');
@@ -177,7 +172,6 @@ describe('music style composition', () => {
       options: {
         instrumental: false,
         voice: 'same',
-        tone: null,
         feel: ['Dreamy', 'Chill'],
         energy: 'Steady',
       },
@@ -191,16 +185,15 @@ describe('music style composition', () => {
       options: {
         instrumental: false,
         voice: 'same',
-        tone: 'Airy',
         feel: ['Happy'],
         energy: 'Slow',
       },
       lyrics: '  [Chorus]\nStay  ',
       defaults,
     });
-    assert.equal(changed.music_style, 'warm alto. pop. Happy. Slow. Airy');
+    assert.equal(changed.music_style, 'warm alto. pop. Happy. Slow');
     assert.equal(changed.lyrics, '[Chorus]\nStay');
-    assert.deepEqual(changed.used, ['tone', 'lyrics', 'feel', 'energy']);
+    assert.deepEqual(changed.used, ['lyrics', 'feel', 'energy']);
     assert.equal(changed.persisted?.words, 'mine');
   });
 
@@ -332,13 +325,15 @@ describe('POST /api/generations/musicgpt create options', { concurrency: false }
     assert.equal(seen[0].gender, 'female');
     assert.equal(seen[0].make_instrumental, false);
     assert.equal(seen[0].lyrics, 'sing this');
-    assert.match(String(seen[0].music_style), /Happy\. Fast\. Soft$/);
+    assert.match(String(seen[0].music_style), /Happy\. Fast$/);
+    assert.equal(String(seen[0].music_style).includes('Soft'), false);
     assert.equal(saved.length, 1);
     assert.equal(saved[0].songId, 'song-1');
     assert.equal((saved[0].options as { voice: string }).voice, 'female');
+    assert.equal('tone' in (saved[0].options as object), false);
     const used = funnel.rows.filter(row => row.event === 'create_options_used');
     assert.equal(used.length, 1);
-    assert.equal((used[0].props as { options: string }).options, 'voice,tone,lyrics,feel,energy');
+    assert.equal((used[0].props as { options: string }).options, 'voice,lyrics,feel,energy');
     assert.equal(parseCreateOptions(null), null);
   });
 });
@@ -359,7 +354,13 @@ describe('preview copy', () => {
     );
     assert.equal(customizeChanged(value, defaults), true);
     assert.equal(defaultsSummary('Nova', defaults), "Nova's voice · Nova writes the words · Chill, Steady");
-    assert.equal(TONE_ROW_ENABLED, false);
+    assert.equal(/soft|raspy|airy|powerful|smooth|how they sing/i.test(defaultsSummary('Nova', defaults)), false);
+    assert.equal(
+      /soft|raspy|airy|powerful|smooth|how they sing/i.test(
+        previewSentence({ artistName: 'Nova', value })
+      ),
+      false
+    );
     const untouched = initialSongCustomize(defaults);
     assert.equal(customizeChanged(untouched, defaults), false);
     assert.equal(

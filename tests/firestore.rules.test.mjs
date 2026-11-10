@@ -612,7 +612,6 @@ test('clients cannot write createOptions, and a song that already has it can sti
       createOptions: {
         instrumental: false,
         voice: 'same',
-        tone: null,
         feel: ['Chill'],
         energy: 'Steady',
         words: 'artist',
@@ -627,7 +626,6 @@ test('clients cannot write createOptions, and a song that already has it can sti
     createOptions: {
       instrumental: true,
       voice: 'female',
-      tone: null,
       feel: ['Hype'],
       energy: 'Fast',
       words: 'mine',

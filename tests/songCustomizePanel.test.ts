@@ -5,7 +5,6 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { SongCreatePreview, SongCustomizePanel } from '../components/create/SongCustomizePanel';
 import {
-  TONE_ROW_ENABLED,
   artistDefaults,
   initialSongCustomize,
   previewSentence,
@@ -21,7 +20,7 @@ const defaults = artistDefaults({
   tempoMax: 110,
 });
 
-function panel(value: SongCustomizeValue, toneEnabled = TONE_ROW_ENABLED) {
+function panel(value: SongCustomizeValue) {
   return renderToStaticMarkup(
     createElement(SongCustomizePanel, {
       artistName: 'Nova',
@@ -31,7 +30,6 @@ function panel(value: SongCustomizeValue, toneEnabled = TONE_ROW_ENABLED) {
       onChange: () => {},
       prompt: 'a night drive',
       initialExpanded: true,
-      toneEnabled,
       requestDraft: async () => ({ lyrics: '', remaining: 3 }),
     })
   );
@@ -49,7 +47,7 @@ function preview(value: SongCustomizeValue) {
 }
 
 describe('song customize panel', () => {
-  it('hides voice, tone, and words when the beat switch is on', () => {
+  it('hides voice and words when the beat switch is on', () => {
     const off = panel(initialSongCustomize(defaults));
     assert.match(off, /Make it yours/);
     assert.match(off, /Nova(?:'|&#x27;)s voice · Nova writes the words · Chill, Happy, Steady/);
@@ -66,8 +64,16 @@ describe('song customize panel', () => {
     assert.match(off, /#14141C/);
     assert.match(off, /#2A2A38/);
     assert.match(off, /data-usual="true"/);
+    assert.match(off, />Voice</);
+    assert.match(off, />Words</);
+    assert.match(off, />Feel</);
+    assert.match(off, />Energy</);
     assert.equal(off.includes('How they sing'), false);
     assert.equal(off.includes('>Soft<'), false);
+    assert.equal(off.includes('Smooth'), false);
+    assert.equal(off.includes('Raspy'), false);
+    assert.equal(off.includes('Powerful'), false);
+    assert.equal(off.includes('Airy'), false);
     assert.equal(off.includes('BPM'), false);
     assert.equal(off.includes('gender'), false);
     assert.equal(off.includes('instrumental'), false);

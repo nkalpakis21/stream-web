@@ -4,8 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ENERGY_OPTIONS,
   FEEL_OPTIONS,
-  TONE_OPTIONS,
-  TONE_ROW_ENABLED,
   customizeChanged,
   defaultsLinkLabel,
   defaultsSummary,
@@ -13,13 +11,11 @@ import {
   newLyricsSessionId,
   previewSentence,
   toggleFeel,
-  toggleTone,
   type ArtistDefaults,
   type Energy,
   type FeelLabel,
   type LyricsDraftResult,
   type SongCustomizeValue,
-  type Tone,
   type VoiceChoice,
 } from '@/lib/create/songOptions';
 
@@ -81,19 +77,17 @@ export function SongCreatePreview({
   defaults,
   value,
   onReset,
-  toneEnabled = TONE_ROW_ENABLED,
 }: {
   artistName?: string | null;
   defaults: ArtistDefaults;
   value: SongCustomizeValue;
   onReset: () => void;
-  toneEnabled?: boolean;
 }) {
   const changed = customizeChanged(value, defaults);
   return (
     <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
       <p className="text-sm text-[#F5F4F8]" data-create-preview>
-        {previewSentence({ artistName, value, toneEnabled })}
+        {previewSentence({ artistName, value })}
       </p>
       {changed ? (
         <button
@@ -123,7 +117,6 @@ export function SongCustomizePanel({
   initialConfirming = false,
   initialRemaining = 3,
   initialHasDraft = false,
-  toneEnabled = TONE_ROW_ENABLED,
 }: {
   artistName?: string | null;
   artistId?: string | null;
@@ -138,7 +131,6 @@ export function SongCustomizePanel({
   initialConfirming?: boolean;
   initialRemaining?: number;
   initialHasDraft?: boolean;
-  toneEnabled?: boolean;
 }) {
   const [open, setOpen] = useState(initialExpanded);
   const [drafting, setDrafting] = useState(initialDrafting);
@@ -217,7 +209,6 @@ export function SongCustomizePanel({
   };
 
   const showVoice = !value.instrumental;
-  const showTone = toneEnabled && !value.instrumental;
   const showWords = !value.instrumental;
 
   return (
@@ -276,31 +267,6 @@ export function SongCustomizePanel({
                   );
                 })}
               </div>
-            </div>
-          ) : null}
-
-          {showTone ? (
-            <div>
-              <SectionLabel>How they sing</SectionLabel>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {TONE_OPTIONS.map(tone => {
-                  const selected = value.tone === tone;
-                  return (
-                    <button
-                      key={tone}
-                      type="button"
-                      aria-pressed={selected}
-                      data-tone={tone}
-                      disabled={disabled}
-                      onClick={() => patch({ tone: toggleTone(value.tone, tone as Tone) })}
-                      className={`${tileBase} ${selected ? tileOn : tileOff}`}
-                    >
-                      {tone}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="mt-2 text-xs text-[#8B8896]">A nudge, not exact</p>
             </div>
           ) : null}
 

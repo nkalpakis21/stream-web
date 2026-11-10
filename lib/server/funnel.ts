@@ -83,9 +83,9 @@ export const ARTIST_CREATED_WINDOW_MS = 2 * 60 * 60 * 1000;
 const CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 const PROP_KEYS = ['artistId', 'songId', 'taskId'] as const;
-const CREATE_OPTION_TAGS = ['instrumental', 'voice', 'tone', 'lyrics', 'feel', 'energy'] as const;
+const CREATE_OPTION_TAGS = ['instrumental', 'voice', 'lyrics', 'feel', 'energy'] as const;
 const OPTIONS_PROP =
-  /^(instrumental|voice|tone|lyrics|feel|energy)(,(instrumental|voice|tone|lyrics|feel|energy))*$/;
+  /^(instrumental|voice|lyrics|feel|energy)(,(instrumental|voice|lyrics|feel|energy))*$/;
 const PROP_VALUE = /^[A-Za-z0-9_-]{1,128}$/;
 /** Drop a clock that is negative or longer than a month. */
 const MAX_ELAPSED_MS = 30 * 24 * 60 * 60 * 1000;
