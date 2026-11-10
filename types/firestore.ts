@@ -267,6 +267,21 @@ export type CollaborationType = 'fork' | 'remix' | 'response' | 'extension';
  */
 export type CoverMotionStatus = 'pending' | 'poster_ready' | 'ready' | 'failed';
 
+/** SafeSearch result stored on the song. Server-written. Absent when moderation is off. */
+export type CoverModerationStatus = 'pending' | 'passed' | 'flagged' | 'error';
+
+export interface CoverModerationLabels {
+  adult?: string | null;
+  violence?: string | null;
+  racy?: string | null;
+}
+
+export interface CoverModeration {
+  status: CoverModerationStatus;
+  checkedAt: Timestamp | null;
+  labels?: CoverModerationLabels | null;
+}
+
 export interface CoverProviderCrumbs {
   posterModel?: string | null;
   loopModel?: string | null;
@@ -377,6 +392,12 @@ export interface SongDocument {
    * Provider/model crumbs for the last cover attempt.
    */
   coverProvider?: CoverProviderCrumbs | null;
+  /**
+   * Server-only SafeSearch result for the current cover.
+   * Public surfaces show the cover only when status is `passed` and
+   * COVER_MODERATION_ENABLED is the string `true`. Absent when moderation is off.
+   */
+  coverModeration?: CoverModeration | null;
   /**
    * Total number of times this song has been played.
    * Incremented atomically when users play the song.

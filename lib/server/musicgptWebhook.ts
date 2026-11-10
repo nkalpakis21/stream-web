@@ -10,6 +10,8 @@ import { getConversionDataByConversionID } from '@/lib/ai/providers/musicgpt';
 import { maybePostSongLive, sweepDeferredXPosts } from '@/lib/x/postSong';
 import { isFalCoverPipeline, shouldWriteMusicGptAlbumCover } from '@/lib/covers/config';
 import { musicGptAlbumCoverSongUpdates } from '@/lib/covers/musicgptAlbum';
+import { isCoverModerationEnabled } from '@/lib/covers/moderation';
+import { screenSongCover } from '@/lib/server/coverModeration';
 import { enqueueSongCoverGeneration } from '@/lib/covers/enqueue';
 import {
   adminGetSong,
@@ -175,6 +177,29 @@ export async function processMusicGptWebhook(
 
   const db = getAdminDb();
 
+  async function persistMusicGptAlbumCover(
+    songId: string,
+    updates: { albumCoverPath?: string | null; albumCoverThumbnail?: string | null }
+  ): Promise<void> {
+    if (Object.keys(updates).length === 0) return;
+    const payload: Record<string, unknown> = {
+      ...updates,
+      updatedAt: Timestamp.now(),
+    };
+    if (isCoverModerationEnabled()) {
+      payload.coverModeration = {
+        status: 'pending',
+        checkedAt: Timestamp.now(),
+        labels: null,
+      };
+    }
+    await db.collection(COLLECTIONS.songs).doc(songId).set(payload, { merge: true });
+    console.log(`[MusicGPT Webhook] Updated album cover for song ${songId}`);
+    if (isCoverModerationEnabled()) {
+      await screenSongCover(songId);
+    }
+  }
+
   if (body.subtype === 'album_cover_generation') {
     if (!shouldWriteMusicGptAlbumCover()) {
       console.log(
@@ -198,13 +223,7 @@ export async function processMusicGptWebhook(
       albumCoverPath: body.image_path,
       albumCoverThumbnail: body.thumbnail_path,
     });
-    if (Object.keys(songUpdates).length > 0) {
-      await db.collection(COLLECTIONS.songs).doc(song.id).set(
-        { ...songUpdates, updatedAt: Timestamp.now() },
-        { merge: true }
-      );
-      console.log(`[MusicGPT Webhook] Updated album cover for song ${song.id}`);
-    }
+    await persistMusicGptAlbumCover(song.id, songUpdates);
 
     const albumCoverMetadata: Record<string, unknown> = {
       updatedAt: Timestamp.now(),
@@ -510,13 +529,7 @@ export async function processMusicGptWebhook(
       albumCoverPath: conversion.album_cover_path as string | undefined,
       albumCoverThumbnail: conversion.album_cover_thumbnail as string | undefined,
     });
-    if (Object.keys(songUpdates).length > 0) {
-      await db.collection(COLLECTIONS.songs).doc(song.id).set(
-        { ...songUpdates, updatedAt: Timestamp.now() },
-        { merge: true }
-      );
-      console.log(`[MusicGPT Webhook] Updated album cover for song ${song.id}`);
-    }
+    await persistMusicGptAlbumCover(song.id, songUpdates);
   }
 
   let musicGptUsage: MusicGptUsageRecord | undefined;

@@ -53,6 +53,7 @@ const NO_STORE_ROUTES = [
   'app/api/conversations/[id]/route.ts',
   'app/api/conversations/[id]/messages/route.ts',
   'app/api/songs/[id]/route.ts',
+  'app/api/songs/[id]/cover-moderation/route.ts',
   'app/api/songs/[id]/token-metadata/route.ts',
   'app/songs/[id]/page.tsx',
   'app/api/users/link-wallet/route.ts',
@@ -325,6 +326,7 @@ describe('viewer cache and private artist 404', () => {
     assert.equal(covered('/api/artists/Far2rKTQV98sbAf1iqxw/coin-quote'), false);
     assert.equal(covered('/songs/song-1'), true);
     assert.equal(covered('/api/songs/song-1/token-metadata'), true);
+    assert.equal(covered('/api/songs/song-1/cover-moderation'), true);
   });
 
   it('gates the song page on a verified viewer and keeps the private title out of metadata', () => {

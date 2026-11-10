@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { CoverMedia } from '@/components/media/CoverMedia';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -8,6 +8,8 @@ import { getFreshIdToken } from '@/lib/api/clientAuth';
 import { getArtist, getArtistVersion } from '@/lib/services/artists';
 import { GenerationStillRunning, createGeneration } from '@/lib/services/generations';
 import type { CoverFields } from '@/lib/covers/resolve';
+import type { CoverModerationStatus } from '@/lib/covers/moderation';
+import { CoverModerationNotice } from '@/components/songs/CoverModerationNotice';
 import type { OwnerSongTileState } from '@/lib/songs/ownerTile';
 import './audio-unavailable.css';
 
@@ -26,6 +28,8 @@ interface UnavailableAudioRowViewProps {
   onCancel: () => void;
   onConfirm: () => void;
   onRetry?: () => void;
+  emptyInitials?: string | null;
+  coverNote?: ReactNode;
 }
 
 /** Greyed owner tile. Cover and title are not links and not a play control. */
@@ -42,6 +46,8 @@ export function UnavailableAudioRowView({
   onRetry,
   state = 'unavailable',
   retrying = false,
+  emptyInitials = null,
+  coverNote = null,
 }: UnavailableAudioRowViewProps) {
   const status =
     state === 'generating'
@@ -67,8 +73,10 @@ export function UnavailableAudioRowView({
           title={title}
           playback="still"
           sizes="(max-width: 768px) 50vw, 25vw"
+          emptyInitials={emptyInitials}
         />
       </div>
+      {coverNote ? <div className="px-3 pt-2">{coverNote}</div> : null}
       <div className="p-3">
         <h3 className="audio-unavailable-title" data-entity="track">
           {title}
@@ -152,6 +160,13 @@ export function UnavailableAudioRowView({
   );
 }
 
+interface CoverNoticeProps {
+  songId: string;
+  message: string;
+  action: 'replace' | 'retry';
+  buttonLabel: string;
+}
+
 interface UnavailableAudioRowProps {
   songId: string;
   title: string;
@@ -161,6 +176,9 @@ interface UnavailableAudioRowProps {
   lyrics?: string | null;
   artistId?: string;
   artistVersionId?: string;
+  emptyInitials?: string | null;
+  coverNotice?: CoverNoticeProps | null;
+  onCoverResolved?: (status: CoverModerationStatus) => void;
 }
 
 /**
@@ -176,6 +194,9 @@ export function UnavailableAudioRow({
   lyrics,
   artistId,
   artistVersionId,
+  emptyInitials = null,
+  coverNotice = null,
+  onCoverResolved,
 }: UnavailableAudioRowProps) {
   const { user } = useAuth();
   const router = useRouter();
@@ -307,6 +328,18 @@ export function UnavailableAudioRow({
         void confirmDelete();
       }}
       onRetry={phase === 'failed' ? () => { void retry(); } : undefined}
+      emptyInitials={emptyInitials}
+      coverNote={
+        coverNotice ? (
+          <CoverModerationNotice
+            songId={coverNotice.songId}
+            message={coverNotice.message}
+            action={coverNotice.action}
+            buttonLabel={coverNotice.buttonLabel}
+            onResolved={onCoverResolved}
+          />
+        ) : null
+      }
     />
   );
 }
