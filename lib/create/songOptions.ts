@@ -279,6 +279,65 @@ export function parseCreateOptions(raw: unknown): ParsedCreateOptions | null {
   };
 }
 
+/** Longer phrases first so "female vocals" does not leave a stray "vocals". */
+const VOCAL_GENDER_WORDS = [
+  'female vocals',
+  'male vocals',
+  'female',
+  'male',
+  'woman',
+  'man',
+  'girl',
+  'boy',
+  'her',
+  'his',
+] as const;
+
+function tidyStyle(text: string): string {
+  return text
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\s+([.,;:])/g, '$1')
+    .replace(/([.,;:])(?:\s*[.,;:])+/g, '$1')
+    .replace(/^[.,;:\s]+|[.,;:\s]+$/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
+ * Drop gendered vocal words from a style string. Whole words only.
+ * "Same as artist" does not call this.
+ */
+export function stripVocalGenderWords(style: string): string {
+  let text = style;
+  for (const phrase of VOCAL_GENDER_WORDS) {
+    const body = phrase.replace(/\s+/g, '\\s+');
+    text = text.replace(new RegExp(`\\b${body}\\b`, 'gi'), ' ');
+  }
+  return tidyStyle(text);
+}
+
+const TEMPO_PHRASE =
+  /\b\d{1,3}\s*[-–—]\s*\d{1,3}\s*bpm\b|\b\d{1,3}\s*bpm\b|\b(?:slow|fast|steady|medium|mid|high|low)\s+tempo\b|\b(?:up|down)[\s-]?tempo\b/gi;
+
+/**
+ * Put the picked energy where the artist's BPM or tempo phrase was.
+ * With no such phrase, the word is appended once.
+ */
+export function applyEnergyToStyle(style: string, energy: string): string {
+  const pattern = new RegExp(TEMPO_PHRASE.source, 'gi');
+  let replaced = false;
+  const next = style.replace(pattern, () => {
+    if (replaced) return ' ';
+    replaced = true;
+    return energy;
+  });
+  if (!replaced) {
+    const trimmed = style.trim();
+    return trimmed ? `${trimmed}. ${energy}` : energy;
+  }
+  return tidyStyle(next);
+}
+
 export function cleanLyrics(value: string | null | undefined): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
@@ -287,8 +346,8 @@ export function cleanLyrics(value: string | null | undefined): string | undefine
 }
 
 /**
- * DNA text, then feel, then energy.
- * Pass only the hints that should be added. Defaults are omitted by the caller.
+ * DNA text, then feel. Energy is applied separately: a pick replaces a tempo
+ * phrase when one is present, and is appended only when the DNA has none.
  */
 export function appendCreateStyleHints(
   base: string | undefined,
@@ -352,6 +411,19 @@ export function resolveCreateRequest(input: {
   const feelHint = feelChanged && feel.length ? feel : [];
   const energyHint = energyChanged ? energy : null;
 
+  let musicStyle = input.musicStyle?.trim() ?? '';
+  if (!instrumental && (voice === 'female' || voice === 'male') && musicStyle) {
+    musicStyle = stripVocalGenderWords(musicStyle);
+  }
+  let energyAppend: string | null = null;
+  if (energyHint) {
+    if (musicStyle && new RegExp(TEMPO_PHRASE.source, 'i').test(musicStyle)) {
+      musicStyle = applyEnergyToStyle(musicStyle, energyHint);
+    } else {
+      energyAppend = energyHint;
+    }
+  }
+
   const used: CreateOptionTag[] = [];
   if (instrumental) used.push('instrumental');
   if (!instrumental && voice !== 'same') used.push('voice');
@@ -360,9 +432,9 @@ export function resolveCreateRequest(input: {
   if (energyHint) used.push('energy');
 
   return {
-    music_style: appendCreateStyleHints(input.musicStyle, {
+    music_style: appendCreateStyleHints(musicStyle, {
       feel: feelHint,
-      energy: energyHint,
+      energy: energyAppend,
     }),
     make_instrumental: instrumental,
     ...(voice === 'female' || voice === 'male' ? { gender: voice } : {}),

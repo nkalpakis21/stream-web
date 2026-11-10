@@ -282,7 +282,7 @@ export async function postLyricsDraft(request: NextRequest): Promise<NextRespons
         error instanceof Error ? error.message : 'failed'
       );
       return NextResponse.json(
-        { error: 'Could not write a draft.', remaining: decision.remaining },
+        { error: "Couldn't write a draft.", remaining: decision.remaining },
         { status: 502 }
       );
     }
@@ -290,7 +290,7 @@ export async function postLyricsDraft(request: NextRequest): Promise<NextRespons
     const text = lyrics.trim().slice(0, SONG_LYRICS_MAX);
     if (!text) {
       return NextResponse.json(
-        { error: 'Could not write a draft.', remaining: decision.remaining },
+        { error: "Couldn't write a draft.", remaining: decision.remaining },
         { status: 502 }
       );
     }

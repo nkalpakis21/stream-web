@@ -52,6 +52,11 @@ describe('song customize panel', () => {
     assert.match(off, /Make it yours/);
     assert.match(off, /Nova(?:'|&#x27;)s voice · Nova writes the words · Chill, Happy, Steady/);
     assert.match(off, /Just the beat, no vocals/);
+    assert.match(off, /data-chevron="true"/);
+    assert.match(off, /data-open="true"/);
+    assert.match(off, /rotate-180/);
+    assert.match(off, /rounded-\[6px\]/);
+    assert.match(off, /rounded-\[4px\]/);
     assert.match(off, /aria-checked="false"/);
     assert.match(off, /data-on="false"/);
     assert.match(off, /Same as Nova/);
@@ -108,15 +113,20 @@ describe('song customize panel', () => {
     assert.match(html, /aria-pressed="true"[^>]*data-feel="Chill"/);
     assert.match(html, /aria-pressed="true"[^>]*data-feel="Sad"/);
     assert.match(html, /usual/);
+    assert.match(html, /placeholder="Write your words here"/);
     assert.match(html, /Tip: label parts like \[Verse\] and \[Chorus\]/);
-    assert.match(html, /Write a draft for me/);
+    assert.match(html, /data-draft-button="true"[^>]*text-\[#E8E6F2\][^>]*>Write a draft for me/);
+    assert.match(html, /data-draft-button="true"[^>]*bg-\[#14141C\]/);
+    assert.match(html, /data-draft-button="true"[^>]*border-\[#2A2A38\]/);
     assert.equal(html.includes('Try another draft'), false);
+    assert.equal(html.includes('data-lyrics-count'), false);
 
     const sentence = previewSentence({ artistName: 'Nova', value });
     assert.equal(sentence, 'Nova will make a chill, sad, fast song, singing your words.');
     const previewHtml = preview(value);
     assert.match(previewHtml, /Nova will make a chill, sad, fast song, singing your words\./);
     assert.match(previewHtml, /Back to Nova(?:'|&#x27;)s defaults/);
+    assert.match(previewHtml, /min-h-11/);
     assert.equal(previewHtml.includes('exactly'), false);
 
     const quiet = preview(initialSongCustomize(defaults));
@@ -137,7 +147,8 @@ describe('song customize panel', () => {
         initialRemaining: 2,
       })
     );
-    assert.match(editing, /Try another draft \(2 left\)/);
+    assert.match(editing, /data-draft-button="true"[^>]*>Try another draft \(2 left\)/);
+    assert.match(editing, /text-\[#E8E6F2\]/);
     assert.equal(editing.includes('Replace your edits?'), false);
     assert.equal(editing.includes('data-lyrics-skeleton'), false);
 
@@ -176,5 +187,58 @@ describe('song customize panel', () => {
     assert.match(editable, /my own line/);
     assert.equal(editable.includes('Try another draft'), false);
     assert.equal(editable.includes('Write a draft for me'), false);
+
+    const counted = renderToStaticMarkup(
+      createElement(SongCustomizePanel, {
+        artistName: 'Nova',
+        defaults,
+        value: { ...initialSongCustomize(defaults), words: 'mine', lyrics: 'a'.repeat(1840) },
+        onChange: () => {},
+        prompt: 'rain',
+        initialExpanded: true,
+      })
+    );
+    assert.match(counted, /data-lyrics-count="true"[^>]*#8B8896/);
+    assert.match(counted, /1,840 \/ 2,000/);
+    assert.equal(/data-lyrics-count="true"[^>]*#FF4D6A/.test(counted), false);
+
+    const capped = renderToStaticMarkup(
+      createElement(SongCustomizePanel, {
+        artistName: 'Nova',
+        defaults,
+        value: { ...initialSongCustomize(defaults), words: 'mine', lyrics: 'a'.repeat(2000) },
+        onChange: () => {},
+        prompt: 'rain',
+        initialExpanded: true,
+        initialDraftError: "Couldn't write a draft.",
+      })
+    );
+    assert.match(capped, /data-lyrics-count="true"[^>]*color:#FF4D6A/);
+    assert.match(capped, /2,000 \/ 2,000/);
+    assert.match(capped, /Couldn(?:'|&#x27;)t write a draft\./);
+
+    const quietCount = renderToStaticMarkup(
+      createElement(SongCustomizePanel, {
+        artistName: 'Nova',
+        defaults,
+        value: { ...initialSongCustomize(defaults), words: 'mine', lyrics: 'a'.repeat(1800) },
+        onChange: () => {},
+        prompt: 'rain',
+        initialExpanded: true,
+      })
+    );
+    assert.equal(quietCount.includes('data-lyrics-count'), false);
+
+    const closed = renderToStaticMarkup(
+      createElement(SongCustomizePanel, {
+        artistName: 'Nova',
+        defaults,
+        value: initialSongCustomize(defaults),
+        onChange: () => {},
+        prompt: '',
+      })
+    );
+    assert.match(closed, /data-open="false"/);
+    assert.equal(closed.includes('rotate-180'), false);
   });
 });

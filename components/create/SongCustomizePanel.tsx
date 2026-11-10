@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ENERGY_OPTIONS,
   FEEL_OPTIONS,
+  SONG_LYRICS_MAX,
   customizeChanged,
   defaultsLinkLabel,
   defaultsSummary,
@@ -23,6 +24,10 @@ const tileBase =
   'min-h-12 rounded-[12px] border px-3 text-sm font-medium transition-colors';
 const tileOff = 'border-[#2A2A38] bg-[#14141C] text-[#F5F4F8]';
 const tileOn = 'border-[#E8E6F2] bg-[#E8E6F2] text-[#0A0A10]';
+const ghostButton =
+  'mt-3 min-h-12 rounded-[12px] border border-[#2A2A38] bg-[#14141C] px-4 text-sm font-semibold text-[#E8E6F2] disabled:opacity-40';
+const DRAFT_FAILED = "Couldn't write a draft.";
+const LYRICS_COUNT_FROM = 1800;
 
 export type LyricsDraftRequest = (input: {
   sessionId: string;
@@ -33,13 +38,13 @@ export type LyricsDraftRequest = (input: {
 function SwitchFace({ on }: { on: boolean }) {
   return (
     <span
-      className="relative inline-block h-6 w-11 shrink-0 rounded-[12px]"
+      className="relative inline-block h-6 w-11 shrink-0 rounded-[6px]"
       data-on={on ? 'true' : 'false'}
       aria-hidden
       style={{ background: on ? '#E8E6F2' : '#2A2A38' }}
     >
       <span
-        className="absolute top-[3px] h-[18px] w-[18px] rounded-full"
+        className="absolute top-[3px] h-[18px] w-[18px] rounded-[4px]"
         style={{
           background: on ? '#0A0A10' : '#8B8896',
           left: on ? 23 : 3,
@@ -93,7 +98,7 @@ export function SongCreatePreview({
         <button
           type="button"
           onClick={onReset}
-          className="text-sm text-[#8B8896]"
+          className="inline-flex min-h-11 items-center text-sm text-[#8B8896]"
           data-reset-defaults
         >
           {defaultsLinkLabel(artistName)}
@@ -117,6 +122,7 @@ export function SongCustomizePanel({
   initialConfirming = false,
   initialRemaining = 3,
   initialHasDraft = false,
+  initialDraftError = null,
 }: {
   artistName?: string | null;
   artistId?: string | null;
@@ -131,13 +137,14 @@ export function SongCustomizePanel({
   initialConfirming?: boolean;
   initialRemaining?: number;
   initialHasDraft?: boolean;
+  initialDraftError?: string | null;
 }) {
   const [open, setOpen] = useState(initialExpanded);
   const [drafting, setDrafting] = useState(initialDrafting);
   const [confirming, setConfirming] = useState(initialConfirming);
   const [remaining, setRemaining] = useState(initialRemaining);
   const [hasDraft, setHasDraft] = useState(initialHasDraft);
-  const [draftError, setDraftError] = useState<string | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(initialDraftError);
   const lastDraft = useRef<string | null>(null);
   const sessionId = useRef(newLyricsSessionId());
   const mounted = useRef(true);
@@ -180,7 +187,7 @@ export function SongCustomizePanel({
         return;
       }
       if (result.error || !result.lyrics) {
-        setDraftError(result.error || 'Could not write a draft.');
+        setDraftError(result.error || DRAFT_FAILED);
         if (typeof result.remaining === 'number') setRemaining(result.remaining);
         return;
       }
@@ -190,7 +197,7 @@ export function SongCustomizePanel({
       onChange({ ...valueRef.current, words: 'mine', lyrics: result.lyrics });
     } catch (error) {
       if (!mounted.current) return;
-      setDraftError(error instanceof Error ? error.message : 'Could not write a draft.');
+      setDraftError(DRAFT_FAILED);
     } finally {
       if (mounted.current) setDrafting(false);
     }
@@ -217,12 +224,30 @@ export function SongCustomizePanel({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(current => !current)}
-        className="flex min-h-12 w-full flex-col items-start justify-center rounded-[12px] border border-[#2A2A38] bg-[#14141C] px-4 py-3 text-left"
+        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-[12px] border border-[#2A2A38] bg-[#14141C] px-4 py-3 text-left"
       >
-        <span className="text-sm font-medium text-[#F5F4F8]">Make it yours</span>
-        <span className="text-xs text-[#8B8896]" data-customize-summary>
-          {defaultsSummary(artistName, defaults)}
+        <span className="flex min-w-0 flex-col items-start">
+          <span className="text-sm font-medium text-[#F5F4F8]">Make it yours</span>
+          <span className="text-xs text-[#8B8896]" data-customize-summary>
+            {defaultsSummary(artistName, defaults)}
+          </span>
         </span>
+        <svg
+          viewBox="0 0 20 20"
+          aria-hidden
+          data-chevron
+          data-open={open ? 'true' : 'false'}
+          className={`h-5 w-5 shrink-0 text-[#8B8896] ${open ? 'rotate-180' : ''}`}
+        >
+          <path
+            d="M5 7.5 L10 12.5 L15 7.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </button>
 
       {open ? (
@@ -313,10 +338,22 @@ export function SongCustomizePanel({
                       value={value.lyrics}
                       disabled={disabled}
                       onChange={event => patch({ lyrics: event.target.value.slice(0, 2000) })}
-                      placeholder="Tip: label parts like [Verse] and [Chorus]"
+                      placeholder="Write your words here"
                       className="w-full rounded-[12px] border border-[#2A2A38] bg-[#14141C] px-4 py-3 text-sm text-[#F5F4F8] placeholder:text-[#8B8896] focus:outline-none focus:ring-2 focus:ring-[#E8E6F2]"
                     />
                   )}
+                  {value.lyrics.length > LYRICS_COUNT_FROM ? (
+                    <p
+                      data-lyrics-count
+                      className="mt-2 text-xs"
+                      style={{
+                        color: value.lyrics.length >= SONG_LYRICS_MAX ? '#FF4D6A' : '#8B8896',
+                      }}
+                    >
+                      {value.lyrics.length.toLocaleString('en-US')} /{' '}
+                      {SONG_LYRICS_MAX.toLocaleString('en-US')}
+                    </p>
+                  ) : null}
                   <p className="mt-2 text-xs text-[#8B8896]">
                     Tip: label parts like [Verse] and [Chorus]
                   </p>
@@ -346,7 +383,8 @@ export function SongCustomizePanel({
                       type="button"
                       onClick={askDraft}
                       disabled={disabled || drafting || !requestDraft}
-                      className="mt-3 min-h-12 rounded-[12px] bg-[#E8E6F2] px-4 text-sm font-semibold text-[#0A0A10] disabled:opacity-40"
+                      data-draft-button
+                      className={ghostButton}
                     >
                       {hasDraft ? `Try another draft (${remaining} left)` : 'Write a draft for me'}
                     </button>

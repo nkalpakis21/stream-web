@@ -22,6 +22,7 @@ import {
   resolveCreateRequest,
   styleInputFromArtistContext,
   toggleFeel,
+  type ArtistDefaults,
   type SongCustomizeValue,
 } from '../lib/create/songOptions';
 import { setMusicGptGenerationDepsForTests } from '../lib/server/musicgptGeneration';
@@ -197,6 +198,65 @@ describe('music style composition', () => {
     assert.equal(changed.persisted?.words, 'mine');
   });
 
+  it('strips gender words when His is picked and leaves them for the artist voice', () => {
+    const style = 'warm female vocals. pop. mood: chill';
+    const defaults: ArtistDefaults = { feel: [], energy: 'Steady' };
+    const his = resolveCreateRequest({
+      musicStyle: style,
+      options: { instrumental: false, voice: 'male', feel: null, energy: null },
+      defaults,
+    });
+    assert.equal(his.gender, 'male');
+    assert.equal(his.music_style, 'warm. pop. mood: chill');
+    assert.equal(/\bfemale\b/i.test(his.music_style || ''), false);
+    assert.equal(/\bvocals\b/i.test(his.music_style || ''), false);
+
+    const hers = resolveCreateRequest({
+      musicStyle: 'her bright girl vocal',
+      options: { instrumental: false, voice: 'female', feel: null, energy: null },
+      defaults,
+    });
+    assert.equal(hers.gender, 'female');
+    assert.equal(hers.music_style, 'bright vocal');
+
+    const same = resolveCreateRequest({
+      musicStyle: style,
+      options: { instrumental: false, voice: 'same', feel: null, energy: null },
+      defaults,
+    });
+    assert.equal(same.gender, undefined);
+    assert.equal(same.music_style, style);
+  });
+
+  it('replaces a BPM phrase with Fast and leaves it when energy is not picked', () => {
+    const style = 'pop. 70-90 BPM. night drive';
+    const defaults: ArtistDefaults = { feel: [], energy: 'Slow' };
+    const fast = resolveCreateRequest({
+      musicStyle: style,
+      options: { instrumental: false, voice: 'same', feel: null, energy: 'Fast' },
+      defaults,
+    });
+    assert.equal(fast.music_style, 'pop. Fast. night drive');
+    assert.equal(/bpm/i.test(fast.music_style || ''), false);
+    assert.deepEqual(fast.used, ['energy']);
+
+    const also = resolveCreateRequest({
+      musicStyle: '120 bpm uptempo. slow tempo verse',
+      options: { instrumental: false, voice: 'same', feel: ['Hype'], energy: 'Fast' },
+      defaults,
+    });
+    assert.equal(also.music_style, 'Fast. verse. Hype');
+    assert.equal(/bpm|uptempo|slow tempo/i.test(also.music_style || ''), false);
+
+    const untouched = resolveCreateRequest({
+      musicStyle: style,
+      options: { instrumental: false, voice: 'same', feel: null, energy: null },
+      defaults,
+    });
+    assert.equal(untouched.music_style, style);
+    assert.deepEqual(untouched.used, []);
+  });
+
   it('derives energy from the BPM range without putting numbers in the hint', () => {
     assert.equal(energyFromTempo(60, 80), 'Slow');
     assert.equal(energyFromTempo(60, 180), 'Steady');
@@ -325,7 +385,9 @@ describe('POST /api/generations/musicgpt create options', { concurrency: false }
     assert.equal(seen[0].gender, 'female');
     assert.equal(seen[0].make_instrumental, false);
     assert.equal(seen[0].lyrics, 'sing this');
-    assert.match(String(seen[0].music_style), /Happy\. Fast$/);
+    assert.match(String(seen[0].music_style), /\. Fast\./);
+    assert.match(String(seen[0].music_style), /Happy$/);
+    assert.equal(/\d+\s*-\s*\d+\s*bpm/i.test(String(seen[0].music_style)), false);
     assert.equal(String(seen[0].music_style).includes('Soft'), false);
     assert.equal(saved.length, 1);
     assert.equal(saved[0].songId, 'song-1');

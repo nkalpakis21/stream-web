@@ -58,7 +58,7 @@ export async function requestLyricsDraft(input: {
     return {
       lyrics: '',
       remaining,
-      error: typeof data.error === 'string' ? data.error : 'Could not write a draft.',
+      error: typeof data.error === 'string' ? data.error : "Couldn't write a draft.",
     };
   }
   return { lyrics: data.lyrics, remaining };
