@@ -6,6 +6,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NextRequest } from 'next/server';
 import { ArtistOwnerStatsView } from '../components/artists/ArtistOwnerStatsView';
+import { openSongShare } from '../lib/songs/openSongShare';
 import {
   ARTIST_STATS_PLAY_DEDUPE_MS,
   ARTIST_STATS_WINDOW_MS,
@@ -197,8 +198,8 @@ function view(props: Partial<Parameters<typeof ArtistOwnerStatsView>[0]> = {}) {
       loading: false,
       stats: ZERO,
       xConfigured: true,
-      onOpenShare() {},
-      onCloseShare() {},
+      onShare() {},
+      onRetry() {},
       onConnectX() {},
       ...props,
     })
@@ -225,19 +226,40 @@ describe('artist owner stats view', () => {
     assert.match(linked, />Share</);
     assert.match(linked, /your latest song to start getting plays\./);
     assert.equal(linked.includes('role="dialog"'), false);
+    assert.equal(linked.includes('Share song'), false);
 
     const plain = view({ stats: { ...ZERO, latestPublicSongId: null } });
     assert.match(plain, /Share your latest song to start getting plays\./);
     assert.equal(plain.includes('owner-stats-share'), false);
     assert.equal(plain.includes('<button'), false);
-
-    const sheet = view({ shareOpen: true });
-    assert.match(sheet, /role="dialog"/);
-    assert.match(sheet, /Share song/);
   });
 
-  it('replaces the X posts number with Connect X when X is not connected', () => {
-    const html = view({
+  it('opens the latest song share directly from Share', () => {
+    let shares = 0;
+    const element = createElement(ArtistOwnerStatsView, {
+      isOwner: true,
+      loading: false,
+      stats: ZERO,
+      xConfigured: true,
+      onShare: () => {
+        shares += 1;
+      },
+    });
+    const html = renderToStaticMarkup(element);
+    assert.match(html, /<button type="button" class="owner-stats-share">Share<\/button>/);
+    assert.equal(html.includes('role="dialog"'), false);
+    assert.equal(html.includes('Share song'), false);
+    element.props.onShare?.();
+    assert.equal(shares, 1);
+    const css = readFileSync('components/artists/owner-panel.css', 'utf8');
+    assert.match(css, /\.owner-stats-share[\s\S]*min-height:\s*44px/);
+  });
+
+  it('makes the whole X posts tile the Connect X button', () => {
+    let connects = 0;
+    const element = createElement(ArtistOwnerStatsView, {
+      isOwner: true,
+      loading: false,
       stats: {
         plays: 12300,
         listeners: 1000,
@@ -246,15 +268,63 @@ describe('artist owner stats view', () => {
         xConnected: false,
         latestPublicSongId: null,
       },
+      xConfigured: true,
+      onConnectX: () => {
+        connects += 1;
+      },
     });
+    const html = renderToStaticMarkup(element);
     assert.match(html, />12\.3k</);
     assert.match(html, />1,000</);
     assert.match(html, />9,999</);
-    const xTile = html.match(/data-stat="xPosts"[\s\S]*?<\/div>/)?.[0] ?? '';
-    assert.match(xTile, /Connect X/);
-    assert.match(xTile, /owner-stats-ice/);
-    assert.equal(xTile.includes('owner-stats-value'), false);
+    assert.match(
+      html,
+      /<button type="button" class="owner-stats-tile owner-stats-connect" data-stat="xPosts">/
+    );
+    assert.match(html, /class="owner-stats-connect-value">Connect X</);
+    assert.equal(html.includes('owner-stats-ice'), false);
+    assert.equal(html.includes('text-decoration:underline'), false);
     assert.equal(html.includes('Share your latest'), false);
+    element.props.onConnectX?.();
+    assert.equal(connects, 1);
+    const css = readFileSync('components/artists/owner-panel.css', 'utf8');
+    assert.match(css, /\.owner-stats-connect[\s\S]*height:\s*76px/);
+    assert.match(css, /\.owner-stats-connect-value[\s\S]*color:\s*#E8E6F2/);
+    assert.match(css, /\.owner-stats-connect-value[\s\S]*text-decoration:\s*none/);
+  });
+
+  it('shows em dashes, not zeros, when stats fail to load', () => {
+    const html = view({
+      loadFailed: true,
+      stats: { ...ZERO, plays: 4, listeners: 2, shares: 1, xPosts: 3, xConnected: false },
+    });
+    assert.equal(html.match(/—/g)?.length, 4);
+    assert.match(html, /Couldn(?:'|&#x27;)t load stats\./);
+    assert.match(html, /class="owner-stats-retry"/);
+    assert.match(html, />Try again</);
+    assert.equal(html.includes('>0<'), false);
+    assert.equal(html.includes('>4<'), false);
+    assert.equal(html.includes('Connect X'), false);
+    assert.equal(html.includes('Share your latest'), false);
+  });
+
+  it('retries from the Try again button', () => {
+    let retries = 0;
+    const element = createElement(ArtistOwnerStatsView, {
+      isOwner: true,
+      loading: false,
+      loadFailed: true,
+      stats: null,
+      onRetry: () => {
+        retries += 1;
+      },
+    });
+    const html = renderToStaticMarkup(element);
+    assert.match(html, /<button type="button" class="owner-stats-retry">Try again<\/button>/);
+    element.props.onRetry?.();
+    assert.equal(retries, 1);
+    const css = readFileSync('components/artists/owner-panel.css', 'utf8');
+    assert.match(css, /\.owner-stats-retry[\s\S]*min-height:\s*44px/);
   });
 
   it('renders nothing for someone who is not the owner', () => {
@@ -288,8 +358,79 @@ describe('artist owner stats view', () => {
     assert.match(block, /\.owner-stats-value[\s\S]*#F5F4F8/);
     assert.match(block, /\.owner-stats-head p[\s\S]*font-size:\s*13px/);
     assert.match(block, /\.owner-stats-head p[\s\S]*#8B8896/);
-    assert.match(block, /\.owner-stats-ice[\s\S]*#E8E6F2/);
+    assert.match(block, /\.owner-stats-connect-value[\s\S]*#E8E6F2/);
+    assert.match(block, /\.owner-stats-connect[\s\S]*background:\s*#14141C/);
     assert.doesNotMatch(block, /#C8F542|lime/i);
+  });
+});
+
+describe('openSongShare', () => {
+  it('opens the system share sheet and does not copy', async () => {
+    let shared: { url?: string; title?: string } | null = null;
+    let copied = 0;
+    let reported = 0;
+    const result = await openSongShare({
+      url: 'https://www.streamstar.xyz/songs/song-9',
+      title: 'Latest song',
+      songId: 'song-9',
+      artistId: 'artist-1',
+      share: async data => {
+        shared = data;
+      },
+      copy: async () => {
+        copied += 1;
+      },
+      report: () => {
+        reported += 1;
+      },
+    });
+    assert.equal(result, 'shared');
+    assert.deepEqual(shared, {
+      url: 'https://www.streamstar.xyz/songs/song-9',
+      title: 'Latest song',
+    });
+    assert.equal(copied, 0);
+    assert.equal(reported, 1);
+  });
+
+  it('copies when the sheet is missing and ignores a cancelled sheet', async () => {
+    let copied = '';
+    let reported = 0;
+    const copiedResult = await openSongShare({
+      url: 'https://www.streamstar.xyz/songs/song-9',
+      title: 'Latest song',
+      songId: 'song-9',
+      artistId: 'artist-1',
+      share: null,
+      copy: async url => {
+        copied = url;
+      },
+      report: () => {
+        reported += 1;
+      },
+    });
+    assert.equal(copiedResult, 'copied');
+    assert.equal(copied, 'https://www.streamstar.xyz/songs/song-9');
+    assert.equal(reported, 1);
+
+    reported = 0;
+    const cancelled = await openSongShare({
+      url: 'https://www.streamstar.xyz/songs/song-9',
+      title: 'Latest song',
+      share: async () => {
+        const error = new Error('cancelled');
+        error.name = 'AbortError';
+        throw error;
+      },
+      copy: async () => {
+        throw new Error('should not copy');
+      },
+      report: () => {
+        reported += 1;
+      },
+    });
+    assert.equal(cancelled, 'cancelled');
+    assert.equal(reported, 0);
   });
 });
 

@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArtistOwnerStatsView } from '@/components/artists/ArtistOwnerStatsView';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { ShareButton } from '@/components/songs/ShareButton';
+import { ToastContainer, useToast } from '@/components/ui/toast';
+import { reportClientFunnelEvent } from '@/lib/analytics/reportFunnel';
 import { parseArtistOwnerStats, type ArtistOwnerStats } from '@/lib/artists/ownerStats';
+import { shareUrl } from '@/lib/brand/site';
+import { openSongShare } from '@/lib/songs/openSongShare';
 import { startXConnect } from '@/lib/x/connectClient';
 
 export function ArtistOwnerStats({
@@ -25,7 +28,8 @@ export function ArtistOwnerStats({
   const [stats, setStats] = useState<ArtistOwnerStats | null>(null);
   const [connectHidden, setConnectHidden] = useState(false);
   const [connectBusy, setConnectBusy] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
+  const [requestId, setRequestId] = useState(0);
+  const { toasts, showToast, dismissToast } = useToast();
 
   useEffect(() => {
     const current = userRef.current;
@@ -51,14 +55,7 @@ export function ArtistOwnerStats({
         );
         if (!cancelled) {
           setLoadFailed(true);
-          setStats({
-            plays: 0,
-            listeners: 0,
-            shares: 0,
-            xPosts: 0,
-            xConnected: true,
-            latestPublicSongId: null,
-          });
+          setStats(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -67,16 +64,7 @@ export function ArtistOwnerStats({
     return () => {
       cancelled = true;
     };
-  }, [artistId, ownerId, user?.uid]);
-
-  useEffect(() => {
-    if (!shareOpen) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setShareOpen(false);
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [shareOpen]);
+  }, [artistId, ownerId, user?.uid, requestId]);
 
   const onConnectX = () => {
     if (!user || connectBusy) return;
@@ -94,31 +82,42 @@ export function ArtistOwnerStats({
       .finally(() => setConnectBusy(false));
   };
 
-  const songId = stats?.latestPublicSongId ?? null;
+  const onShare = () => {
+    const songId = stats?.latestPublicSongId;
+    if (!songId) return;
+    void openSongShare({
+      url: shareUrl(`/songs/${songId}`),
+      title: 'Latest song',
+      songId,
+      artistId,
+      report: props => reportClientFunnelEvent('song_shared', props),
+    })
+      .then(result => {
+        if (result === 'copied') showToast('Link copied', 'success');
+      })
+      .catch(error => {
+        console.error(
+          '[artist-stats] share',
+          error instanceof Error ? error.message : 'failed'
+        );
+      });
+  };
 
   return (
-    <ArtistOwnerStatsView
-      isOwner={isOwner}
-      loading={loading}
-      loadFailed={loadFailed}
-      stats={stats}
-      xConfigured={xConfigured}
-      connectHidden={connectHidden}
-      connectBusy={connectBusy}
-      shareOpen={shareOpen}
-      onOpenShare={() => setShareOpen(true)}
-      onCloseShare={() => setShareOpen(false)}
-      onConnectX={onConnectX}
-      shareAction={
-        songId ? (
-          <ShareButton
-            url={`/songs/${songId}`}
-            title="Latest song"
-            songId={songId}
-            artistId={artistId}
-          />
-        ) : null
-      }
-    />
+    <>
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      <ArtistOwnerStatsView
+        isOwner={isOwner}
+        loading={loading}
+        loadFailed={loadFailed}
+        stats={stats}
+        xConfigured={xConfigured}
+        connectHidden={connectHidden}
+        connectBusy={connectBusy}
+        onShare={onShare}
+        onRetry={() => setRequestId(id => id + 1)}
+        onConnectX={onConnectX}
+      />
+    </>
   );
 }

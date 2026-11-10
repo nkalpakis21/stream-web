@@ -1,6 +1,5 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { formatStatCount, type ArtistOwnerStats } from '@/lib/artists/ownerStats';
 
 const TILES = [
@@ -9,6 +8,8 @@ const TILES = [
   { key: 'shares', label: 'Shares' },
   { key: 'xPosts', label: 'X posts' },
 ] as const;
+
+const FAILED_VALUE = '—';
 
 function tileValue(stats: ArtistOwnerStats, key: (typeof TILES)[number]['key']): number {
   return stats[key];
@@ -26,38 +27,35 @@ export function ArtistOwnerStatsView({
   loadFailed = false,
   connectHidden = false,
   connectBusy = false,
-  shareOpen = false,
-  onOpenShare,
-  onCloseShare,
+  onShare,
+  onRetry,
   onConnectX,
-  shareAction = null,
 }: {
   isOwner: boolean;
   loading: boolean;
   stats: ArtistOwnerStats | null;
   xConfigured?: boolean;
-  /** The request failed. Show zeros, and skip the connect link and the share prompt. */
+  /** The request failed. Tiles show an em dash, not a zero. */
   loadFailed?: boolean;
   /** Connect returned unavailable, so the tile shows the count. */
   connectHidden?: boolean;
   connectBusy?: boolean;
-  shareOpen?: boolean;
-  onOpenShare?: () => void;
-  onCloseShare?: () => void;
+  onShare?: () => void;
+  onRetry?: () => void;
   onConnectX?: () => void;
-  shareAction?: ReactNode;
 }) {
   if (!isOwner) return null;
 
-  const showSkeleton = loading || !stats;
+  const showError = !loading && loadFailed;
+  const showSkeleton = loading || (!stats && !showError);
   const showConnect =
     !showSkeleton &&
-    !loadFailed &&
+    !showError &&
     stats != null &&
     !stats.xConnected &&
     xConfigured &&
     !connectHidden;
-  const showPrompt = !showSkeleton && !loadFailed && stats != null && allZero(stats);
+  const showPrompt = !showSkeleton && !showError && stats != null && allZero(stats);
 
   return (
     <section className="owner-stats" aria-label="Last 7 days" aria-busy={showSkeleton || undefined} data-owner-stats="">
@@ -66,31 +64,43 @@ export function ArtistOwnerStatsView({
         <p>Only you see this</p>
       </div>
       <div className="owner-stats-grid">
-        {TILES.map(tile => (
-          <div className="owner-stats-tile" key={tile.key} data-stat={tile.key}>
-            <p className="owner-stats-label">{tile.label}</p>
-            {showSkeleton ? (
-              <div className="owner-stats-value owner-stats-skeleton" aria-hidden />
-            ) : tile.key === 'xPosts' && showConnect ? (
+        {TILES.map(tile => {
+          if (tile.key === 'xPosts' && showConnect) {
+            return (
               <button
+                key={tile.key}
                 type="button"
-                className="owner-stats-ice"
+                className="owner-stats-tile owner-stats-connect"
+                data-stat={tile.key}
                 onClick={onConnectX}
                 disabled={connectBusy}
               >
-                Connect X
+                <span className="owner-stats-label">{tile.label}</span>
+                <span className="owner-stats-connect-value">Connect X</span>
               </button>
-            ) : (
-              <p className="owner-stats-value">{formatStatCount(tileValue(stats as ArtistOwnerStats, tile.key))}</p>
-            )}
-          </div>
-        ))}
+            );
+          }
+          return (
+            <div className="owner-stats-tile" key={tile.key} data-stat={tile.key}>
+              <p className="owner-stats-label">{tile.label}</p>
+              {showSkeleton ? (
+                <div className="owner-stats-value owner-stats-skeleton" aria-hidden />
+              ) : showError ? (
+                <p className="owner-stats-value">{FAILED_VALUE}</p>
+              ) : (
+                <p className="owner-stats-value">
+                  {formatStatCount(tileValue(stats as ArtistOwnerStats, tile.key))}
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
       {showPrompt && stats ? (
         <p className="owner-stats-empty">
           {stats.latestPublicSongId ? (
             <>
-              <button type="button" className="owner-stats-share" onClick={onOpenShare}>
+              <button type="button" className="owner-stats-share" onClick={onShare}>
                 Share
               </button>
               {' your latest song to start getting plays.'}
@@ -100,26 +110,12 @@ export function ArtistOwnerStatsView({
           )}
         </p>
       ) : null}
-      {shareOpen && stats?.latestPublicSongId ? (
-        <div className="owner-stats-sheet-backdrop">
-          <button
-            type="button"
-            className="owner-stats-sheet-dismiss"
-            aria-label="Close share"
-            onClick={onCloseShare}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="owner-stats-share-title"
-            className="owner-stats-sheet"
-          >
-            <h2 id="owner-stats-share-title">Share song</h2>
-            {shareAction}
-            <button type="button" className="owner-stats-sheet-close" onClick={onCloseShare}>
-              Close
-            </button>
-          </div>
+      {showError ? (
+        <div className="owner-stats-error">
+          <p>{"Couldn't load stats."}</p>
+          <button type="button" className="owner-stats-retry" onClick={onRetry}>
+            Try again
+          </button>
         </div>
       ) : null}
     </section>
