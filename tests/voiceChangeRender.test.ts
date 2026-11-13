@@ -41,6 +41,10 @@ describe('change the voice render', () => {
     assert.doesNotMatch(known, /animate-spin|spinner/i);
     assert.match(known, /data-current="true"/);
     assert.match(known, /border-transparent/);
+    const currentRow = known.slice(known.indexOf('data-voice-row="harbor"'), known.indexOf('data-voice-row="wells"'));
+    assert.match(currentRow, />Current</);
+    assert.match(currentRow, /#8B8896/);
+    assert.equal(currentRow.includes('opacity-40'), false);
 
     const making = renderToStaticMarkup(
       createElement(ChangeVoiceSheet, {

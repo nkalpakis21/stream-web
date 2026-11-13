@@ -66,6 +66,7 @@ export function ArtistVoiceSection({
           onSelect={setSelected}
           onUse={() => void save()}
           busy={busy}
+          confirm
         />
       </div>
       {error ? (

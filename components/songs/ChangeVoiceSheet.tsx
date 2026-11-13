@@ -83,6 +83,7 @@ export function ChangeVoiceSheet({
                 if (selected) onSubmit(selected);
               }}
               busy={busy}
+              confirm
             />
           </div>
         )}

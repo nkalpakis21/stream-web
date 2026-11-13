@@ -95,7 +95,6 @@ export function OneFlowCreate({ voices = [] }: { voices?: readonly PublicStreams
   );
   const nameRef = useRef('');
   const [voiceSlug, setVoiceSlug] = useState<VoiceSlug | null>(null);
-  const [confirmedVoice, setConfirmedVoice] = useState<VoiceSlug | null>(null);
   const onCustomizeChange = useCallback((value: SongCustomizeValue) => {
     customizeRef.current = value;
   }, []);
@@ -186,7 +185,7 @@ export function OneFlowCreate({ voices = [] }: { voices?: readonly PublicStreams
   nameRef.current = draft.name;
 
   const nameError = artistNameError(artistNameIssue(draft.name), nameTaken);
-  const ready = canSubmitCreate(draft.name, draft.prompt) && !nameTaken && confirmedVoice != null;
+  const ready = canSubmitCreate(draft.name, draft.prompt) && !nameTaken && voiceSlug != null;
 
   const patch = (next: Partial<CreateDraft>) => {
     setDraft(current => (current ? { ...current, ...next } : current));
@@ -393,11 +392,7 @@ export function OneFlowCreate({ voices = [] }: { voices?: readonly PublicStreams
       setPromptError('Keep the prompt to 300 characters.');
       return;
     }
-    if (nameTaken) return;
-    if (!confirmedVoice) {
-      setSubmitError('Pick a voice first.');
-      return;
-    }
+    if (nameTaken || !voiceSlug) return;
 
     submitLock.current = true;
     setSubmitting(true);
@@ -470,7 +465,7 @@ export function OneFlowCreate({ voices = [] }: { voices?: readonly PublicStreams
             styleDNA,
             lore: prompt,
             vocalIdentity: null,
-            voiceSlug: confirmedVoice,
+            voiceSlug,
             avatarURL: faceUrlRef.current,
             isPublic: true,
             pumpFun,
@@ -620,14 +615,7 @@ export function OneFlowCreate({ voices = [] }: { voices?: readonly PublicStreams
       onSubmit={onSubmit}
       voices={voices}
       voiceSlug={voiceSlug}
-      confirmedVoice={confirmedVoice}
-      onVoiceSelect={slug => {
-        setVoiceSlug(slug);
-        setConfirmedVoice(current => (current === slug ? current : null));
-      }}
-      onUseVoice={() => {
-        if (voiceSlug) setConfirmedVoice(voiceSlug);
-      }}
+      onVoiceSelect={setVoiceSlug}
       fileInputRef={fileInputRef}
       onCustomizeChange={onCustomizeChange}
       requestDraft={requestDraft}

@@ -55,9 +55,7 @@ export function CreateFlowView({
   requestDraft,
   voices = [],
   voiceSlug = null,
-  confirmedVoice = null,
   onVoiceSelect,
-  onUseVoice,
 }: {
   name: string;
   onNameChange: (value: string) => void;
@@ -92,9 +90,7 @@ export function CreateFlowView({
   requestDraft?: LyricsDraftRequest;
   voices?: readonly PublicStreamstarVoice[];
   voiceSlug?: VoiceSlug | null;
-  confirmedVoice?: VoiceSlug | null;
   onVoiceSelect?: (slug: VoiceSlug) => void;
-  onUseVoice?: () => void;
 }) {
   const frameRef = useRef<PhotoFrameEditorHandle>(null);
   const customize = useSongCustomize({
@@ -297,7 +293,6 @@ export function CreateFlowView({
             voices={voices}
             selected={voiceSlug}
             onSelect={slug => onVoiceSelect?.(slug)}
-            onUse={() => onUseVoice?.()}
           />
 
           <div>
@@ -349,10 +344,10 @@ export function CreateFlowView({
                 requestDraft={requestDraft}
                 disabled={submitting}
                 voiceDisplay={
-                  confirmedVoice
+                  voiceSlug
                     ? {
-                        name: voices.find(voice => voice.slug === confirmedVoice)?.name ?? '',
-                        descriptor: voices.find(voice => voice.slug === confirmedVoice)?.descriptor ?? '',
+                        name: voices.find(voice => voice.slug === voiceSlug)?.name ?? '',
+                        descriptor: voices.find(voice => voice.slug === voiceSlug)?.descriptor ?? '',
                       }
                     : null
                 }

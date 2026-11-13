@@ -9,7 +9,7 @@ import { NextRequest } from 'next/server';
 import { GET as getVoices } from '../app/api/voices/route';
 import { POST } from '../app/api/generations/musicgpt/route';
 import { ArtistPickList } from '../components/create/ArtistPickList';
-import { VoicePicker, nextPreviewSlug } from '../components/voices/VoicePicker';
+import { VoicePicker, beginVoicePreview, nextPreviewSlug } from '../components/voices/VoicePicker';
 import { buildMusicGptCreateBody, MUSICGPT_DEFAULT_MODEL } from '../lib/ai/providers/musicgpt';
 import { singOverTextFields } from '../lib/server/singOver';
 import { isClientFunnelEvent, isFunnelEvent, sanitizeFunnelProps } from '../lib/server/funnel';
@@ -252,7 +252,12 @@ describe('curated Streamstar voices', () => {
       })
     );
     assert.match(idle, /This is how they sing\./);
-    assert.match(idle, /Use this voice/);
+    assert.equal(idle.includes('Use this voice'), false);
+    assert.equal(idle.includes('Pick a voice first'), false);
+    assert.match(idle, /h-11 w-11/);
+    assert.match(idle, /rounded-full bg-\[#1C1C28\]/);
+    assert.match(idle, /items-center justify-center/);
+    assert.match(idle, /data-counts-as-play="false"/);
     assert.match(idle, /Bright and clear/);
     assert.match(idle, /Low and smoky/);
     assert.match(idle, /Rough and loud/);
@@ -264,8 +269,36 @@ describe('curated Streamstar voices', () => {
     assert.equal(idle.includes('sounds like'), false);
     assert.equal(idle.includes('grid-cols'), false);
     assert.equal(idle.includes('Bright and airy'), false);
-    const idleTag = idle.match(/<button[^>]*data-use-voice[^>]*>/)?.[0] ?? '';
-    assert.match(idleTag, /disabled=""/);
+    assert.equal(idle.includes('data-use-voice'), false);
+    let pauses = 0;
+    assert.equal(
+      beginVoicePreview({
+        playing: null,
+        clicked: 'calla',
+        pausePlayer: () => {
+          pauses += 1;
+        },
+      }),
+      'calla'
+    );
+    assert.equal(pauses, 1);
+    assert.equal(
+      beginVoicePreview({
+        playing: 'calla',
+        clicked: 'calla',
+        pausePlayer: () => {
+          pauses += 1;
+        },
+      }),
+      null
+    );
+    assert.equal(pauses, 1);
+    const pickerSource = readFileSync(path.join(ROOT, 'components/voices/VoicePicker.tsx'), 'utf8');
+    assert.match(pickerSource, /pausePlayerAudio/);
+    assert.match(readFileSync(path.join(ROOT, 'lib/player/boundAudio.ts'), 'utf8'), /boundPause/);
+    assert.match(readFileSync(path.join(ROOT, 'components/songs/SongPlayerProvider.tsx'), 'utf8'), /bindPlayerPause/);
+    assert.equal(pickerSource.includes('trackPlay'), false);
+    assert.equal(pickerSource.includes('reportClientFunnelEvent'), false);
     assert.equal(nextPreviewSlug(null, 'calla'), 'calla');
     assert.equal(nextPreviewSlug('calla', 'calla'), null);
     assert.equal(nextPreviewSlug('calla', 'harbor'), 'harbor');
@@ -283,8 +316,39 @@ describe('curated Streamstar voices', () => {
     const row = picked.slice(picked.indexOf('data-voice-row="calla"'), picked.indexOf('data-voice-row="vesper"'));
     assert.match(row, /border-transparent|border:\s*none|border-color:\s*transparent/);
     assert.equal(row.includes('border-[#2A2A38]'), false);
-    const useTag = picked.match(/<button[^>]*data-use-voice[^>]*>/)?.[0] ?? '';
-    assert.equal(useTag.includes('disabled=""'), false);
+    assert.equal(picked.includes('Use this voice'), false);
+    const confirmed = renderToStaticMarkup(
+      createElement(VoicePicker, {
+        voices,
+        selected: null,
+        confirm: true,
+        currentSlug: 'harbor',
+        onSelect: () => {},
+        onUse: () => {},
+      })
+    );
+    assert.match(confirmed, /Use this voice/);
+    const useTag = confirmed.match(/<button[^>]*data-use-voice[^>]*>/)?.[0] ?? '';
+    assert.match(useTag, /disabled=""/);
+    const currentRow = confirmed.slice(
+      confirmed.indexOf('data-voice-row="harbor"'),
+      confirmed.indexOf('data-voice-row="wells"')
+    );
+    assert.match(currentRow, />Current</);
+    assert.match(currentRow, /#8B8896/);
+    assert.equal(currentRow.includes('opacity-40'), false);
+    const chosen = renderToStaticMarkup(
+      createElement(VoicePicker, {
+        voices,
+        selected: 'calla',
+        confirm: true,
+        currentSlug: 'harbor',
+        onSelect: () => {},
+        onUse: () => {},
+      })
+    );
+    const chosenUse = chosen.match(/<button[^>]*data-use-voice[^>]*>/)?.[0] ?? '';
+    assert.equal(chosenUse.includes('disabled=""'), false);
 
     const artists = renderToStaticMarkup(
       createElement(ArtistPickList, {
