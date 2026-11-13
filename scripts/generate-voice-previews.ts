@@ -23,13 +23,33 @@ import {
 
 const OUT_DIR = path.join(process.cwd(), 'public', 'voices');
 
-function audioUrlFrom(conversion: Record<string, unknown> | undefined): string {
+/**
+ * MusicGPT GET /v1/byId names the files conversion_path_1 and conversion_path_2.
+ * Prefer the first take, then the second, then any older field name.
+ */
+export function audioUrlFrom(conversion: Record<string, unknown> | undefined): string {
   if (!conversion) return '';
-  const candidates = [conversion.conversion_path, conversion.audio_url, conversion.audioUrl];
+  const candidates = [
+    conversion.conversion_path_1,
+    conversion.conversion_path_2,
+    conversion.conversion_path,
+    conversion.audio_url,
+    conversion.audioUrl,
+  ];
   for (const value of candidates) {
     if (typeof value === 'string' && /^https?:\/\//i.test(value)) return value;
   }
   return '';
+}
+
+/** One voice at a time. Parallel MusicGPT requests are rejected with 429. */
+export async function generateVoicesSequentially<T>(
+  voices: readonly T[],
+  generateOne: (voice: T) => Promise<void>
+): Promise<void> {
+  for (const voice of voices) {
+    await generateOne(voice);
+  }
 }
 
 async function waitForAudio(taskId: string): Promise<string> {
@@ -53,7 +73,7 @@ async function main(): Promise<void> {
   }
 
   await mkdir(OUT_DIR, { recursive: true });
-  for (const voice of STREAMSTAR_VOICES) {
+  await generateVoicesSequentially(STREAMSTAR_VOICES, async voice => {
     const voiced = voicedRequest({ prompt: VOICE_PREVIEW_LINE, slug: voice.slug });
     const created = (await createMusicGPTSong({
       prompt: voiced.prompt,
@@ -72,10 +92,13 @@ async function main(): Promise<void> {
     const file = path.join(OUT_DIR, `${voice.slug}.mp3`);
     await writeFile(file, bytes);
     console.log(`wrote ${file} (${bytes.byteLength} bytes)`);
-  }
+  });
 }
 
-main().catch(error => {
-  console.error(error instanceof Error ? error.message : 'Preview generation failed');
-  process.exitCode = 1;
-});
+const invokedDirectly = process.argv[1]?.includes('generate-voice-previews') ?? false;
+if (invokedDirectly) {
+  main().catch(error => {
+    console.error(error instanceof Error ? error.message : 'Preview generation failed');
+    process.exitCode = 1;
+  });
+}
