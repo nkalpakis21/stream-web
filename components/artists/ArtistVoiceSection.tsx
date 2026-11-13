@@ -68,7 +68,7 @@ export function ArtistVoiceSection({
         <button
           type="button"
           data-change-voice
-          className="text-sm font-medium text-[#E8E6F2]"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center px-3 text-sm font-medium text-[#E8E6F2]"
           onClick={() => {
             setSelected(saved);
             setError(null);

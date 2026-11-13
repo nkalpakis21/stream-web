@@ -21,6 +21,7 @@ import { webPlatformHeaders } from '@/lib/funnel/platform';
 import {
   artistNameError,
   artistNameIssue,
+  canSubmitCreate,
   clearCreateDraft,
   readCreateDraft,
   submittedFace,
@@ -184,7 +185,7 @@ export function OneFlowCreate({ voices = [] }: { voices?: readonly PublicStreams
   nameRef.current = draft.name;
 
   const nameError = artistNameError(artistNameIssue(draft.name), nameTaken);
-  const ready = voiceSlug != null;
+  const ready = canSubmitCreate(draft.name, draft.prompt) && !nameTaken && voiceSlug != null;
 
   const patch = (next: Partial<CreateDraft>) => {
     setDraft(current => (current ? { ...current, ...next } : current));

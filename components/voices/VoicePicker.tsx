@@ -27,6 +27,27 @@ export function beginVoicePreview(input: {
   return next;
 }
 
+let previewAudio: { pause: () => void } | null = null;
+
+export function bindVoicePreview(audio: { pause: () => void } | null): void {
+  previewAudio = audio;
+}
+
+/** Pause the open preview. Safe to call when nothing is playing. */
+export function stopVoicePreview(): void {
+  previewAudio?.pause();
+}
+
+export const VOICE_SHEET_CLOSE_REASONS = ['voice', 'use', 'backdrop', 'escape'] as const;
+export type VoiceSheetCloseReason = (typeof VOICE_SHEET_CLOSE_REASONS)[number];
+
+/** Every way out of a voice sheet stops the preview, then runs the close. */
+export function closeVoiceSheet(reason: VoiceSheetCloseReason, close: () => void): void {
+  void reason;
+  stopVoicePreview();
+  close();
+}
+
 export function VoicePicker({
   voices,
   selected,
@@ -55,6 +76,17 @@ export function VoicePicker({
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    bindVoicePreview(audio);
+    return () => {
+      audio.pause();
+      if (previewAudio === audio) bindVoicePreview(null);
+    };
+  }, []);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    let cancelled = false;
     if (!playing) {
       audio.pause();
       return;
@@ -65,16 +97,18 @@ export function VoicePicker({
       audio.src = voice.previewUrl;
     }
     const play = audio.play();
-    if (play && typeof play.catch === 'function') {
-      play.catch(() => setUnavailable(playing));
+    if (play && typeof play.then === 'function') {
+      void play.then(() => {
+        if (cancelled) audio.pause();
+      }).catch(() => {
+        if (!cancelled) setUnavailable(playing);
+      });
     }
-  }, [playing, voices]);
-
-  useEffect(() => {
     return () => {
-      audioRef.current?.pause();
+      cancelled = true;
+      audio.pause();
     };
-  }, []);
+  }, [playing, voices]);
 
   const canUse = selected != null && selected !== currentSlug && !busy;
 

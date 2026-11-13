@@ -1,5 +1,6 @@
 import './render-setup';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createElement, createRef } from 'react';
 import { describe, it } from 'node:test';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -41,6 +42,20 @@ describe('one-flow create helpers', () => {
     assert.equal(canSubmitCreate('Jimmy', 'a rainy chorus'), true);
     assert.equal(canSubmitCreate('J', 'a rainy chorus'), false);
     assert.equal(canSubmitCreate('Jimmy', '  '), false);
+  });
+
+  it('keeps create disabled for an empty name, an empty prompt, or a taken name', () => {
+    const ready = (name: string, prompt: string, nameTaken: boolean, voiceSlug: string | null) =>
+      canSubmitCreate(name, prompt) && !nameTaken && voiceSlug != null;
+    assert.equal(ready('', 'a rainy chorus', false, 'calla'), false);
+    assert.equal(ready('J', 'a rainy chorus', false, 'calla'), false);
+    assert.equal(ready('Jimmy', '', false, 'calla'), false);
+    assert.equal(ready('Jimmy', '   ', false, 'calla'), false);
+    assert.equal(ready('Jimmy', 'a rainy chorus', true, 'calla'), false);
+    assert.equal(ready('Jimmy', 'a rainy chorus', false, null), false);
+    assert.equal(ready('Jimmy', 'a rainy chorus', false, 'calla'), true);
+    const source = readFileSync(new URL('../components/create/OneFlowCreate.tsx', import.meta.url), 'utf8');
+    assert.match(source, /canSubmitCreate\(draft\.name, draft\.prompt\) && !nameTaken && voiceSlug != null/);
   });
 
   it('records generate while a look is still running, and none for a skip', () => {

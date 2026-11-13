@@ -11,7 +11,15 @@ import { POST } from '../app/api/generations/musicgpt/route';
 import { createRef } from 'react';
 import { ArtistPickList } from '../components/create/ArtistPickList';
 import { CreateFlowView } from '../components/create/CreateFlowView';
-import { VoicePicker, beginVoicePreview, nextPreviewSlug } from '../components/voices/VoicePicker';
+import {
+  VoicePicker,
+  VOICE_SHEET_CLOSE_REASONS,
+  beginVoicePreview,
+  bindVoicePreview,
+  closeVoiceSheet,
+  nextPreviewSlug,
+  stopVoicePreview,
+} from '../components/voices/VoicePicker';
 import { VoiceSheet } from '../components/voices/VoiceSheet';
 import { buildMusicGptCreateBody, MUSICGPT_DEFAULT_MODEL } from '../lib/ai/providers/musicgpt';
 import { singOverTextFields } from '../lib/server/singOver';
@@ -441,6 +449,36 @@ describe('curated Streamstar voices', () => {
     assert.match(changeSheet, />Current</);
     const changeUse = changeSheet.match(/<button[^>]*data-use-voice[^>]*>/)?.[0] ?? '';
     assert.match(changeUse, /disabled=""/);
+
+    const audio = {
+      paused: false,
+      pause() {
+        this.paused = true;
+      },
+    };
+    bindVoicePreview(audio);
+    for (const reason of VOICE_SHEET_CLOSE_REASONS) {
+      audio.paused = false;
+      let closed = false;
+      closeVoiceSheet(reason, () => {
+        closed = true;
+      });
+      assert.equal(audio.paused, true, reason);
+      assert.equal(closed, true, reason);
+    }
+    bindVoicePreview(null);
+    stopVoicePreview();
+    const sheetSource = readFileSync(path.join(ROOT, 'components/voices/VoiceSheet.tsx'), 'utf8');
+    const songSheet = readFileSync(path.join(ROOT, 'components/songs/ChangeVoiceSheet.tsx'), 'utf8');
+    for (const source of [sheetSource, songSheet]) {
+      assert.match(source, /closeVoiceSheet\('voice'|closeVoiceSheet\('use'/);
+      assert.match(source, /closeVoiceSheet\('backdrop'/);
+      assert.match(source, /closeVoiceSheet\('escape'/);
+    }
+    assert.match(sheetSource, /closeVoiceSheet\('voice'/);
+    assert.match(songSheet, /closeVoiceSheet\('use'/);
+    const changeLink = readFileSync(path.join(ROOT, 'components/artists/ArtistVoiceSection.tsx'), 'utf8');
+    assert.match(changeLink, /data-change-voice[\s\S]*min-h-11/);
   });
 
   it('does not let client components import the voice module', () => {

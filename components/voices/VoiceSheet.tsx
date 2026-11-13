@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId } from 'react';
-import { VoicePicker } from '@/components/voices/VoicePicker';
+import { VoicePicker, closeVoiceSheet } from '@/components/voices/VoicePicker';
 import type { PublicStreamstarVoice, VoiceSlug } from '@/lib/voices/streamstarVoices';
 import '@/components/songs/pick-your-take.css';
 
@@ -31,7 +31,7 @@ export function VoiceSheet({
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') closeVoiceSheet('escape', onClose);
     };
     document.addEventListener('keydown', onKey);
     const previous = document.body.style.overflow;
@@ -44,9 +44,9 @@ export function VoiceSheet({
 
   return (
     <div className="take-sheet" data-voice-sheet>
-      <button type="button" className="take-sheet-backdrop" aria-label="Dismiss" onClick={onClose} />
+      <button type="button" className="take-sheet-backdrop" aria-label="Dismiss" onClick={() => closeVoiceSheet('backdrop', onClose)} />
       <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="take-sheet-panel">
-        <button type="button" className="take-sheet-close" aria-label="Close" onClick={onClose}>
+        <button type="button" className="take-sheet-close" aria-label="Close" onClick={() => closeVoiceSheet('escape', onClose)}>
           <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16">
             <path d="M3 3l10 10M13 3L3 13" fill="none" stroke="currentColor" strokeWidth="1.5" />
           </svg>
@@ -62,10 +62,16 @@ export function VoiceSheet({
             confirm={confirm}
             busy={busy}
             onSelect={slug => {
+              if (!confirm) {
+                closeVoiceSheet('voice', () => {
+                  onSelect(slug);
+                  onClose();
+                });
+                return;
+              }
               onSelect(slug);
-              if (!confirm) onClose();
             }}
-            onUse={onUse}
+            onUse={() => closeVoiceSheet('use', () => onUse?.())}
           />
         </div>
       </div>
