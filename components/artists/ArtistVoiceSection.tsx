@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getFreshIdToken } from '@/lib/api/clientAuth';
-import { VoicePicker } from '@/components/voices/VoicePicker';
+import { VoiceSheet } from '@/components/voices/VoiceSheet';
 import type { PublicStreamstarVoice, VoiceSlug } from '@/lib/voices/streamstarVoices';
 
 export function ArtistVoiceSection({
@@ -19,6 +19,7 @@ export function ArtistVoiceSection({
   const current = voices.some(voice => voice.slug === voiceSlug) ? (voiceSlug as VoiceSlug) : null;
   const [selected, setSelected] = useState<VoiceSlug | null>(current);
   const [saved, setSaved] = useState<VoiceSlug | null>(current);
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const shown = voices.find(voice => voice.slug === saved);
@@ -42,6 +43,7 @@ export function ArtistVoiceSection({
         return;
       }
       setSaved(selected);
+      setOpen(false);
     } catch {
       setError("Couldn't change the voice.");
     } finally {
@@ -51,24 +53,46 @@ export function ArtistVoiceSection({
 
   return (
     <div className="owner-flat-card" data-artist-voice>
-      <p className="text-sm font-medium text-[#F5F4F8]">Voice</p>
-      {shown ? (
-        <p className="mt-1 text-sm text-[#8B8896]" data-current-voice>
-          {shown.name}
-          {shown.descriptor ? ` · ${shown.descriptor}` : ''}
-        </p>
-      ) : null}
-      <div className="mt-4">
-        <VoicePicker
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-[#F5F4F8]">Voice</p>
+          {shown ? (
+            <p className="mt-1 text-sm text-[#F5F4F8]" data-current-voice>
+              {shown.name}
+              {shown.descriptor ? (
+                <span className="mt-0.5 block text-xs text-[#8B8896]">{shown.descriptor}</span>
+              ) : null}
+            </p>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          data-change-voice
+          className="text-sm font-medium text-[#E8E6F2]"
+          onClick={() => {
+            setSelected(saved);
+            setError(null);
+            setOpen(true);
+          }}
+        >
+          Change
+        </button>
+      </div>
+      {open ? (
+        <VoiceSheet
           voices={voices}
           selected={selected}
           currentSlug={saved}
+          confirm
+          busy={busy}
+          title="Change the voice"
+          onClose={() => {
+            if (!busy) setOpen(false);
+          }}
           onSelect={setSelected}
           onUse={() => void save()}
-          busy={busy}
-          confirm
         />
-      </div>
+      ) : null}
       {error ? (
         <p role="alert" className="mt-2 text-sm text-[#FF4D6A]">
           {error}

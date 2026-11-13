@@ -8,8 +8,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { NextRequest } from 'next/server';
 import { GET as getVoices } from '../app/api/voices/route';
 import { POST } from '../app/api/generations/musicgpt/route';
+import { createRef } from 'react';
 import { ArtistPickList } from '../components/create/ArtistPickList';
+import { CreateFlowView } from '../components/create/CreateFlowView';
 import { VoicePicker, beginVoicePreview, nextPreviewSlug } from '../components/voices/VoicePicker';
+import { VoiceSheet } from '../components/voices/VoiceSheet';
 import { buildMusicGptCreateBody, MUSICGPT_DEFAULT_MODEL } from '../lib/ai/providers/musicgpt';
 import { singOverTextFields } from '../lib/server/singOver';
 import { isClientFunnelEvent, isFunnelEvent, sanitizeFunnelProps } from '../lib/server/funnel';
@@ -365,6 +368,79 @@ describe('curated Streamstar voices', () => {
     assert.match(artists, /aria-selected="true"/);
     assert.equal(artists.includes('<select'), false);
     assert.equal(artists.includes('#C8F542'), false);
+
+    const createProps = {
+      name: 'Jimmy',
+      onNameChange: () => {},
+      nameError: null,
+      prompt: 'a night drive',
+      onPromptChange: () => {},
+      promptError: null,
+      activeMood: null,
+      onMood: () => {},
+      lookPrompt: '',
+      onLookPromptChange: () => {},
+      faceUrl: null,
+      framingSrc: null,
+      onPickFile: () => {},
+      onUsePhoto: () => {},
+      onCancelFrame: () => {},
+      onGenerate: () => {},
+      generating: false,
+      uploading: false,
+      looks: [],
+      onPickLook: () => {},
+      onSkip: () => {},
+      faceError: null,
+      coin: null,
+      coinError: null,
+      submitError: null,
+      canSubmit: true,
+      submitting: false,
+      onSubmit: () => {},
+      fileInputRef: createRef<HTMLInputElement>(),
+      voices,
+      onVoiceSelect: () => {},
+    };
+    const closed = renderToStaticMarkup(createElement(CreateFlowView, { ...createProps, voiceSlug: null }));
+    assert.match(closed, /data-voice-trigger/);
+    assert.match(closed, /Pick a voice/);
+    assert.equal(closed.includes('data-voice-row="calla"'), false);
+    assert.equal(closed.includes('Use this voice'), false);
+    assert.ok(closed.indexOf('data-face-disc') < closed.indexOf('data-voice-trigger'));
+    assert.ok(closed.indexOf('data-voice-trigger') < closed.indexOf('Look prompt'));
+    const filled = renderToStaticMarkup(createElement(CreateFlowView, { ...createProps, voiceSlug: 'calla' }));
+    assert.match(filled, /data-voice-name[^>]*>Calla/);
+    assert.match(filled, /Bright and clear/);
+    assert.equal(filled.includes('Pick a voice'), false);
+    assert.equal(filled.includes('data-voice-picker'), false);
+
+    const createSheet = renderToStaticMarkup(
+      createElement(VoiceSheet, {
+        voices,
+        selected: null,
+        onSelect: () => {},
+        onClose: () => {},
+      })
+    );
+    assert.match(createSheet, /take-sheet-panel/);
+    assert.match(createSheet, /data-voice-row="calla"/);
+    assert.equal(createSheet.includes('Use this voice'), false);
+    const changeSheet = renderToStaticMarkup(
+      createElement(VoiceSheet, {
+        voices,
+        selected: 'harbor',
+        currentSlug: 'harbor',
+        confirm: true,
+        onSelect: () => {},
+        onClose: () => {},
+        onUse: () => {},
+      })
+    );
+    assert.match(changeSheet, /Use this voice/);
+    assert.match(changeSheet, />Current</);
+    const changeUse = changeSheet.match(/<button[^>]*data-use-voice[^>]*>/)?.[0] ?? '';
+    assert.match(changeUse, /disabled=""/);
   });
 
   it('does not let client components import the voice module', () => {
