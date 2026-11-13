@@ -25,7 +25,9 @@ import { getLyricsForSong } from '@/lib/services/lyrics';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import type { SongDocument, SongVersionDocument } from '@/types/firestore';
 import { BeatFirstScreen } from '@/components/songs/BeatFirstScreen';
+import { adminGetArtist } from '@/lib/server/artistsAdmin';
 import { savedArtistVoice } from '@/lib/server/voiceChange';
+import { publicStreamstarVoices } from '@/lib/voices/streamstarVoices';
 import type { VoiceGenerationRef, VoiceVersionRef } from '@/lib/songs/voiceChange';
 import { playableAudioUrl } from '@/lib/songs/audioAvailability';
 import { beatFeelFromOptions, unfinishedBeat } from '@/lib/songs/beatFirst';
@@ -100,7 +102,9 @@ async function SongPageBody({
   });
   const coverImageUrl = (visible.fallback ? visible.fields.coverPosterUrl : resolveCoverPoster(visible.fields)) ?? null;
   const ownerView = viewerId != null && viewerId === song.ownerId;
+  const ownerArtist = ownerView ? await adminGetArtist(song.artistId) : null;
   const artistVoice = ownerView ? await savedArtistVoice(song.artistId, song.artistVersionId) : null;
+  const voiceCard = publicStreamstarVoices().find(voice => voice.slug === ownerArtist?.voiceSlug) ?? null;
   const ownerCoverNotice = ownerView ? visible.notice : null;
   const primaryAudioUrl = playableAudioUrl(allVersions);
   const lyrics = getLyricsForSong(generations);
@@ -153,6 +157,7 @@ async function SongPageBody({
                 prompt={song.createPrompt ?? ''}
                 feel={beatFeel.feel}
                 energy={beatFeel.energy}
+                voiceDisplay={voiceCard ? { name: voiceCard.name, descriptor: voiceCard.descriptor } : null}
               />
             ) : null
           }
@@ -184,6 +189,8 @@ async function SongPageBody({
             songTitle={song.title}
             ownerId={song.ownerId}
             artistVoice={artistVoice}
+            voices={ownerView ? publicStreamstarVoices() : []}
+            songVoiceSlug={ownerView ? song.voiceSlug ?? null : null}
             song={
               ownerView
                 ? {

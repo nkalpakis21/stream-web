@@ -15,6 +15,7 @@ import { AiMark } from '@/components/brand/AiMark';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { toPlain, type Plain } from '@/lib/serialize/toPlain';
 import type { AIArtistDocument, PumpFunCoin } from '@/types/firestore';
+import type { PublicStreamstarVoice } from '@/lib/voices/streamstarVoices';
 
 interface ArtistHeroProps {
   artist: Plain<AIArtistDocument>;
@@ -24,6 +25,7 @@ interface ArtistHeroProps {
   followerCount?: number | null;
   /** Server-side. False hides Connect X. Never a key value. */
   xConfigured?: boolean;
+  voices?: readonly PublicStreamstarVoice[];
   children?: React.ReactNode;
 }
 
@@ -33,6 +35,7 @@ export function ArtistHero({
   faceSources = [],
   followerCount = null,
   xConfigured = false,
+  voices = [],
   children,
 }: ArtistHeroProps) {
   const { user, loading } = useAuth();
@@ -109,6 +112,7 @@ export function ArtistHero({
             showLaunch={showLaunch}
             followerCount={followerCount}
             xConfigured={xConfigured}
+            voices={voices}
             onLaunched={(next: PumpFunCoin) => {
               setPumpFun(toPlain(next));
               router.refresh();

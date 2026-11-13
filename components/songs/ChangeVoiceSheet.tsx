@@ -1,33 +1,35 @@
 'use client';
 
-import { useEffect, useId } from 'react';
-import type { SungGender } from '@/lib/songs/voiceChange';
+import { useEffect, useId, useState } from 'react';
+import { VoicePicker } from '@/components/voices/VoicePicker';
 import {
   CHANGING_VOICE_LABEL,
   CHANGE_VOICE_SUBTITLE,
   CHANGE_VOICE_TITLE,
   SPLIT_VOCAL_CAVEAT,
-  singVoiceLabel,
 } from '@/lib/songs/voiceChange';
+import type { PublicStreamstarVoice, VoiceSlug } from '@/lib/voices/streamstarVoices';
 import './pick-your-take.css';
 
 export function ChangeVoiceSheet({
   voices,
+  currentSlug = null,
   splitCaveat = false,
   busy,
   error,
   onClose,
   onSubmit,
 }: {
-  /** One button for the other voice, or both when the current voice is unknown. */
-  voices: readonly SungGender[];
+  voices: readonly PublicStreamstarVoice[];
+  currentSlug?: VoiceSlug | null;
   /** Finished songs that sing over a split beat. Never set on beat-first. */
   splitCaveat?: boolean;
   busy?: boolean;
   error?: string | null;
   onClose: () => void;
-  onSubmit: (voice: SungGender) => void;
+  onSubmit: (voice: VoiceSlug) => void;
 }) {
+  const [selected, setSelected] = useState<VoiceSlug | null>(null);
   const titleId = useId();
 
   useEffect(() => {
@@ -71,25 +73,17 @@ export function ChangeVoiceSheet({
             {CHANGING_VOICE_LABEL}
           </p>
         ) : (
-          <div
-            className={voices.length > 1 ? 'mt-4 grid grid-cols-2 gap-2' : 'mt-4'}
-            data-voice-buttons={voices.length > 1 ? 'both' : 'one'}
-          >
-            {voices.map((voice) => (
-              <button
-                key={voice}
-                type="button"
-                data-sing-voice={voice}
-                className={
-                  voices.length > 1
-                    ? 'inline-flex min-h-11 w-full items-center justify-center rounded-[12px] border border-[#2A2A38] bg-transparent px-3 text-sm font-semibold text-[#F5F4F8]'
-                    : 'inline-flex min-h-11 w-full items-center justify-center rounded-[12px] bg-[#E8E6F2] px-4 text-sm font-semibold text-[#0A0A10]'
-                }
-                onClick={() => onSubmit(voice)}
-              >
-                {singVoiceLabel(voice)}
-              </button>
-            ))}
+          <div className="mt-4" data-voice-list="curated">
+            <VoicePicker
+              voices={voices}
+              selected={selected}
+              currentSlug={currentSlug}
+              onSelect={setSelected}
+              onUse={() => {
+                if (selected) onSubmit(selected);
+              }}
+              busy={busy}
+            />
           </div>
         )}
       </div>

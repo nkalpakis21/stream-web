@@ -317,6 +317,14 @@ test('nobody else can delete an artist or a user', async () => {
 test('owner can create an artist, including a launched coin, and cannot seize another uid', async () => {
   const alice = dbFor('alice');
   await assertSucceeds(setDoc(doc(alice, 'artists/newArtist'), artistData({ id: 'newArtist' })));
+  await assertSucceeds(setDoc(doc(alice, 'artists/voiced'), artistData({
+    id: 'voiced',
+    voiceSlug: 'calla',
+  })));
+  await assertFails(setDoc(doc(alice, 'artists/libraryVoice'), artistData({
+    id: 'libraryVoice',
+    voiceSlug: 'gpt-voice-1',
+  })));
 
   await assertFails(setDoc(doc(alice, 'artists/stolen'), artistData({
     id: 'stolen',
@@ -395,6 +403,7 @@ test('owner can update artist profile fields and cannot change ownerId, coin, or
     updatedAt: now,
   }));
   await assertFails(updateDoc(ref, { ownerId: 'bob' }));
+  await assertFails(updateDoc(ref, { voiceSlug: 'harbor' }));
   await assertFails(updateDoc(ref, {
     pumpFun: {
       mint: 'MintAddress111',
@@ -511,6 +520,10 @@ test('owner can create a song for their artist only, with no cover or token fiel
   await assertFails(setDoc(doc(alice, 'songs/song5'), songData({
     id: 'song5',
     tokenMintAddress: 'MintAddress111',
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/songVoice'), songData({
+    id: 'songVoice',
+    voiceSlug: 'calla',
   })));
 });
 

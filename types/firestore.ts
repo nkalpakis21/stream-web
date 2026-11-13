@@ -199,6 +199,11 @@ export interface AIArtistDocument {
    * is the consistency lock until that exists. Optional for older artists.
    */
   vocalIdentity?: string | null;
+  /**
+   * Curated Streamstar voice slug. Set at artist create. The owner can change
+   * it later. Not a MusicGPT voice id. Absent on older artists.
+   */
+  voiceSlug?: string | null;
   isPublic: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -346,6 +351,11 @@ export interface SongDocument {
     words: 'artist' | 'mine';
   } | null;
   /**
+   * Server-only snapshot of the curated voice this song was made with.
+   * Changing the artist voice does not change this. Clients cannot write it.
+   */
+  voiceSlug?: string | null;
+  /**
    * Client time of the create submit. The webhook measures first_song_ready
    * elapsedMs from this. Clients may set it once and cannot change it.
    */
@@ -386,7 +396,8 @@ export interface SongDocument {
   voiceChange?: {
     used: number;
     status?: 'making' | 'ready' | 'failed' | null;
-    voice?: 'same' | 'female' | 'male' | null;
+    /** Curated slug. Older in-flight rows may still say female or male. */
+    voice?: string | null;
     /** Server time when this voice change was accepted. */
     startedAt?: Timestamp | null;
     generationId?: string | null;

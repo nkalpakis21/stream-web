@@ -42,6 +42,7 @@ import {
 } from '@/lib/songs/beatFirst';
 import { commitIdempotentSongCreate, isSongCreateIdempotencyKey, SongCreateIdTaken } from '@/lib/songs/songCreate';
 import { timestampMillis, trackFunnelEvent } from '@/lib/server/funnel';
+import { isVoiceSlug, voicedRequest } from '@/lib/voices/streamstarVoices';
 import { buildLyricsDraftPrompt, reserveLyricsDraft } from '@/lib/server/lyricsDraft';
 import { readMusicGptCreditEstimate } from '@/lib/server/musicgptUsage';
 import { saveMusicGptTaskBinding } from '@/lib/server/musicgptTaskBinding';
@@ -435,6 +436,12 @@ export async function startBeatFirst(input: {
       { songId: created.song.id, artistId: artist.id },
       input.platform
     );
+    await trackFunnelEvent(
+      input.uid,
+      'artist_picked',
+      { songId: created.song.id, artistId: artist.id },
+      input.platform
+    );
   } catch (error) {
     console.error('[funnel] beat_first_started', error instanceof Error ? error.message : 'failed');
   }
@@ -636,10 +643,9 @@ export async function addBeatVocals(input: {
     lyrics: input.lyrics,
     sessionId: input.sessionId,
   });
-  const voice: SingOverVoice = input.voice;
   const feel = song.createOptions?.feel ?? [];
   const energy = song.createOptions?.energy ?? null;
-  const singPrompt = singOverPromptText({
+  let singPrompt = singOverPromptText({
     musicStyle: buildMusicGPTStyleFromArtistContext({
       styleDNA: artistVersion?.styleDNA ?? artist.styleDNA,
       lore: artistVersion?.lore ?? artist.lore,
@@ -649,6 +655,21 @@ export async function addBeatVocals(input: {
     energy,
     idea: song.createPrompt,
   });
+  let voice: SingOverVoice = 'same';
+  const artistSlug = isVoiceSlug(artist.voiceSlug) ? artist.voiceSlug : null;
+  if (artistSlug) {
+    try {
+      const voiced = voicedRequest({ prompt: singPrompt, slug: artistSlug });
+      singPrompt = voiced.prompt;
+      voice = voiced.gender;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message === 'Voice is not ready' || message === 'Locked prompt is missing') {
+        throw new HttpError(409, "Couldn't use that voice.");
+      }
+      throw error;
+    }
+  }
 
   const db = getAdminDb();
   if (!singPrompt) throw new HttpError(400, 'Add a prompt first.');
@@ -708,11 +729,12 @@ export async function addBeatVocals(input: {
       createLyrics: lyrics,
       createOptions: {
         instrumental: false,
-        voice: input.voice,
+        voice: 'same' as const,
         feel: [...feel],
         energy: (energy === 'Slow' || energy === 'Steady' || energy === 'Fast' ? energy : 'Steady') as Energy,
         words: input.words,
       },
+      ...(artistSlug ? { voiceSlug: artistSlug } : {}),
       updatedAt: Timestamp.now(),
     },
     { merge: true }

@@ -8,6 +8,8 @@ import {
   type LyricsDraftRequest,
 } from '@/components/create/SongCustomizePanel';
 import { useSongCustomize } from '@/components/create/useSongCustomize';
+import { VoicePicker } from '@/components/voices/VoicePicker';
+import type { PublicStreamstarVoice, VoiceSlug } from '@/lib/voices/streamstarVoices';
 import { NEW_ARTIST_TEMPO, type SongCustomizeValue } from '@/lib/create/songOptions';
 import { getInitials } from '@/lib/utils/avatar';
 import {
@@ -51,6 +53,11 @@ export function CreateFlowView({
   fileInputRef,
   onCustomizeChange,
   requestDraft,
+  voices = [],
+  voiceSlug = null,
+  confirmedVoice = null,
+  onVoiceSelect,
+  onUseVoice,
 }: {
   name: string;
   onNameChange: (value: string) => void;
@@ -83,6 +90,11 @@ export function CreateFlowView({
   fileInputRef: RefObject<HTMLInputElement>;
   onCustomizeChange?: (value: SongCustomizeValue) => void;
   requestDraft?: LyricsDraftRequest;
+  voices?: readonly PublicStreamstarVoice[];
+  voiceSlug?: VoiceSlug | null;
+  confirmedVoice?: VoiceSlug | null;
+  onVoiceSelect?: (slug: VoiceSlug) => void;
+  onUseVoice?: () => void;
 }) {
   const frameRef = useRef<PhotoFrameEditorHandle>(null);
   const customize = useSongCustomize({
@@ -281,6 +293,13 @@ export function CreateFlowView({
             ) : null}
           </div>
 
+          <VoicePicker
+            voices={voices}
+            selected={voiceSlug}
+            onSelect={slug => onVoiceSelect?.(slug)}
+            onUse={() => onUseVoice?.()}
+          />
+
           <div>
             <label htmlFor="first-song" className="mb-2 block text-sm font-medium text-[#F5F4F8]">
               First song
@@ -329,6 +348,14 @@ export function CreateFlowView({
                 prompt={prompt}
                 requestDraft={requestDraft}
                 disabled={submitting}
+                voiceDisplay={
+                  confirmedVoice
+                    ? {
+                        name: voices.find(voice => voice.slug === confirmedVoice)?.name ?? '',
+                        descriptor: voices.find(voice => voice.slug === confirmedVoice)?.descriptor ?? '',
+                      }
+                    : null
+                }
               />
             </div>
           </div>

@@ -17,6 +17,7 @@ export function AddVocalsSheet({
   artistId,
   defaults,
   prompt,
+  voiceDisplay = null,
   requestDraft,
   busy,
   error,
@@ -27,6 +28,7 @@ export function AddVocalsSheet({
   artistId?: string | null;
   defaults: ArtistDefaults;
   prompt: string;
+  voiceDisplay?: { name: string; descriptor: string } | null;
   requestDraft?: (input: { sessionId: string; prompt: string; artistId?: string | null }) => Promise<LyricsDraftResult>;
   busy?: boolean;
   error?: string | null;
@@ -70,6 +72,7 @@ export function AddVocalsSheet({
             onChange={setValue}
             prompt={prompt}
             requestDraft={requestDraft}
+            voiceDisplay={voiceDisplay}
             disabled={busy}
             part="voice-words"
           />

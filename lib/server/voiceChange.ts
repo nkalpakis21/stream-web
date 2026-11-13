@@ -33,13 +33,13 @@ import {
 import { submitSingOver } from '@/lib/server/singOver';
 import { submitStemExtraction, type StemSplitResult } from '@/lib/server/stemSplit';
 import { BEAT_FIRST_PATH, singOverPromptText } from '@/lib/songs/beatFirst';
+import { isVoiceSlug, voicedRequest } from '@/lib/voices/streamstarVoices';
 import {
   STEM_SPLIT_JOB,
   VOICE_CHANGE_CAP,
   VOICE_CHANGE_PURPOSE,
   VOICE_SPLIT_PURPOSE,
   cachedSplitInstrumental,
-  currentSungGender,
   isVoiceChangeGeneration,
   msBetween,
   readSongDurationSeconds,
@@ -52,8 +52,6 @@ import {
   voiceChangeSource,
   voiceChangeSplitsBeat,
   voiceChangesLeft,
-  type SungGender,
-  type VoiceChangeVoice,
   type VoiceGenerationRef,
 } from '@/lib/songs/voiceChange';
 import { musicGptGenerationCallback } from '@/lib/webhooks/baseUrl';
@@ -157,10 +155,10 @@ async function loadArtistVersion(versionId: string): Promise<AIArtistVersionDocu
   return snap.data() as AIArtistVersionDocument;
 }
 
-export function parseVoiceChangeRequest(raw: unknown): { voice: SungGender } {
+export function parseVoiceChangeRequest(raw: unknown): { voice: string } {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new HttpError(400, 'Invalid request');
   const voice = readVoiceChangeVoice((raw as { voice?: unknown }).voice);
-  if (voice !== 'female' && voice !== 'male') throw new HttpError(400, 'Pick a voice first');
+  if (!voice || !isVoiceSlug(voice)) throw new HttpError(400, 'Pick a voice first');
   return { voice };
 }
 
@@ -396,7 +394,8 @@ async function singAndStore(input: {
   lyrics: string;
   sourceAudioUrl: string;
   sourceVersionId: string;
-  voice: SungGender;
+  voice: 'female' | 'male';
+  slug: string;
   uid: string;
   platform: FunnelPlatform;
   webhookUrl: string;
@@ -433,7 +432,7 @@ async function singAndStore(input: {
       job: 'sing_over',
       purpose: VOICE_CHANGE_PURPOSE,
       sourceVersionId: input.sourceVersionId,
-      voice: input.voice,
+      voice: input.slug,
     },
     provider: 'musicgpt',
     status: 'pending',
@@ -485,19 +484,30 @@ async function singAndStore(input: {
 export async function startVoiceChange(input: {
   songId: string;
   uid: string;
-  voice: VoiceChangeVoice;
+  voice: string;
   platform: FunnelPlatform;
 }): Promise<{ songId: string; used: number }> {
   const webhookUrl = requireCallback();
   const song = await ownedSong(input.songId, input.uid);
   const inputs = await loadVoiceInputs(song);
   const target = await singTarget(song, inputs);
-  if (input.voice !== 'female' && input.voice !== 'male') throw new HttpError(400, 'Pick a voice first');
-  const sung = currentSungGender({
-    songVoice: song.createOptions?.voice ?? null,
-    artistVoice: inputs.artistVoice,
-  });
-  if (sung && input.voice === sung) throw new HttpError(400, 'That is already the voice');
+  if (!isVoiceSlug(input.voice)) throw new HttpError(400, 'Pick a voice first');
+  if (song.voiceSlug && song.voiceSlug === input.voice) {
+    throw new HttpError(400, 'That is already the voice');
+  }
+  let sungPrompt = inputs.prompt;
+  let sungGender: 'female' | 'male';
+  try {
+    const voiced = voicedRequest({ prompt: inputs.prompt, slug: input.voice });
+    sungPrompt = voiced.prompt;
+    sungGender = voiced.gender;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message === 'Voice is not ready' || message === 'Locked prompt is missing' || message === 'Unknown voice') {
+      throw new HttpError(409, "Couldn't use that voice.");
+    }
+    throw error;
+  }
   const db = getAdminDb();
   const ref = db.collection(COLLECTIONS.songs).doc(song.id);
   const reserved = await db.runTransaction(async (tx) => {
@@ -527,11 +537,12 @@ export async function startVoiceChange(input: {
       await singAndStore({
         song,
         reserved,
-        prompt: inputs.prompt,
+        prompt: sungPrompt,
         lyrics: inputs.lyrics,
         sourceAudioUrl: target.sourceAudioUrl,
         sourceVersionId: target.sourceVersionId,
-        voice: input.voice,
+        voice: sungGender,
+        slug: input.voice,
         uid: input.uid,
         platform: input.platform,
         webhookUrl,
@@ -661,28 +672,13 @@ export async function keepVoiceChange(input: {
   }
 
   const elapsed = msBetween(millisOf(state.startedAt), clockMs());
-  const keptVoice = voice === 'female' || voice === 'male' ? voice : null;
+  const keptSlug = isVoiceSlug(voice) ? voice : null;
   await writeVoice(
     song.id,
     {
       ...emptyVoice(state.used, state.creditEstimate),
     },
-    kept && keptVoice
-      ? {
-          createOptions: {
-            instrumental: false,
-            voice: keptVoice,
-            feel: [...(song.createOptions?.feel ?? [])],
-            energy:
-              song.createOptions?.energy === 'Slow' ||
-              song.createOptions?.energy === 'Steady' ||
-              song.createOptions?.energy === 'Fast'
-                ? song.createOptions.energy
-                : 'Steady',
-            words: song.createOptions?.words === 'mine' ? 'mine' : 'artist',
-          },
-        }
-      : undefined
+    kept && keptSlug ? { voiceSlug: keptSlug } : undefined
   );
 
   try {
@@ -783,8 +779,21 @@ export async function noteVoiceSplitReady(input: {
     const song = fresh ? { ...fresh, id: fresh.id || input.songId } : gate.song;
     const inputs = await loadVoiceInputs(song);
     const voice = gate.state.voice;
-    if (voice !== 'female' && voice !== 'male') {
+    if (!voice || !isVoiceSlug(voice)) {
       throw new HttpError(400, 'Pick a voice first');
+    }
+    let sungPrompt = inputs.prompt;
+    let sungGender: 'female' | 'male';
+    try {
+      const voiced = voicedRequest({ prompt: inputs.prompt, slug: voice });
+      sungPrompt = voiced.prompt;
+      sungGender = voiced.gender;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message === 'Voice is not ready' || message === 'Locked prompt is missing') {
+        throw new HttpError(409, "Couldn't use that voice.");
+      }
+      throw error;
     }
     const webhookUrl = requireCallback();
     await singAndStore({
@@ -798,11 +807,12 @@ export async function noteVoiceSplitReady(input: {
         sourceVersionId: gate.cache.sourceVersionId,
         startedAt: song.voiceChange?.startedAt ?? gate.state.startedAt,
       },
-      prompt: inputs.prompt,
+      prompt: sungPrompt,
       lyrics: inputs.lyrics,
       sourceAudioUrl: input.instrumentalUrl,
       sourceVersionId: gate.cache.sourceVersionId,
-      voice,
+      voice: sungGender,
+      slug: voice,
       uid: song.ownerId,
       platform,
       webhookUrl,

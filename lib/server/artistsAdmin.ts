@@ -8,6 +8,7 @@ import { getAdminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import { MAX_ARTIST_BIO_LENGTH } from '@/lib/brand/bio';
 import type { AIArtistDocument, AIArtistVersionDocument } from '@/types/firestore';
+import type { VoiceSlug } from '@/lib/voices/streamstarVoices';
 import { isMissingIndexError } from '@/lib/server/indexError';
 
 export async function adminGetArtist(artistId: string): Promise<AIArtistDocument | null> {
@@ -190,4 +191,23 @@ export async function adminUpdateArtistLore(
   const updated = await adminGetArtistFrom(db, artistId);
   if (!updated) throw new Error('Failed to retrieve updated artist');
   return updated;
+}
+
+/** Owner changes the voice on the artist. Songs already made are not rewritten. */
+export async function adminSetArtistVoice(
+  artistId: string,
+  userId: string,
+  voice: VoiceSlug,
+  db: Firestore = getAdminDb()
+): Promise<void> {
+  const artist = await adminGetArtistFrom(db, artistId);
+  if (!artist || artist.deletedAt) throw new Error('Artist not found');
+  if (artist.ownerId !== userId) throw new Error('Only the owner can change this voice');
+  await db.collection(COLLECTIONS.artists).doc(artistId).set(
+    {
+      voiceSlug: voice,
+      updatedAt: Timestamp.now(),
+    },
+    { merge: true }
+  );
 }

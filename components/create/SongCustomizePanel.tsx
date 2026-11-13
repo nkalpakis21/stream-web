@@ -17,7 +17,6 @@ import {
   type FeelLabel,
   type LyricsDraftResult,
   type SongCustomizeValue,
-  type VoiceChoice,
 } from '@/lib/create/songOptions';
 
 const tileBase =
@@ -124,6 +123,7 @@ export function SongCustomizePanel({
   initialHasDraft = false,
   initialDraftError = null,
   part = 'all',
+  voiceDisplay = null,
 }: {
   artistName?: string | null;
   artistId?: string | null;
@@ -139,8 +139,10 @@ export function SongCustomizePanel({
   initialRemaining?: number;
   initialHasDraft?: boolean;
   initialDraftError?: string | null;
-  /** `voice-words` is Add vocals. `feel-energy` is Change the feel. `voice` is Change the voice. No tone row. */
+  /** `voice-words` is Add vocals. `feel-energy` is Change the feel. No tone row. */
   part?: 'all' | 'voice-words' | 'feel-energy' | 'voice';
+  /** The artist's voice. Display only. Song create does not pick another. */
+  voiceDisplay?: { name: string; descriptor: string } | null;
 }) {
   const [open, setOpen] = useState(initialExpanded);
   const [drafting, setDrafting] = useState(initialDrafting);
@@ -278,31 +280,19 @@ export function SongCustomizePanel({
           )}
 
           {showVoice ? (
-            <div>
+            <div data-voice-display="only">
               <SectionLabel>Voice</SectionLabel>
-              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                {(
-                  [
-                    ['same', `Same as ${named}`],
-                    ['female', 'Her voice'],
-                    ['male', 'His voice'],
-                  ] as const
-                ).map(([id, label]) => {
-                  const selected = value.voice === id;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      aria-pressed={selected}
-                      data-voice={id}
-                      disabled={disabled}
-                      onClick={() => patch({ voice: id as VoiceChoice })}
-                      className={`${tileBase} ${selected ? tileOn : tileOff}`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
+              <div className="mt-2 rounded-[12px] border border-transparent bg-[#14141C] px-4 py-3">
+                {voiceDisplay?.name ? (
+                  <>
+                    <p className="text-sm font-medium text-[#F5F4F8]">{voiceDisplay.name}</p>
+                    <p className="mt-1 text-xs text-[#8B8896]">{voiceDisplay.descriptor}</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-[#8B8896]">
+                    {named === 'the artist' ? 'Their voice' : `${named}'s voice`}
+                  </p>
+                )}
               </div>
             </div>
           ) : null}

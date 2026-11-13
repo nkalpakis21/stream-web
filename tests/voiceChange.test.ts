@@ -613,10 +613,15 @@ describe('voice change server', () => {
     await seedReady(memory);
     const funnel = funnelMemory();
     setFunnelStoreForTests(funnel.store);
-    const calls: Array<{ sourceAudioUrl: string; lyrics: string; voice: string }> = [];
+    const calls: Array<{ sourceAudioUrl: string; lyrics: string; voice: string; prompt: string }> = [];
     setVoiceChangeDepsForTests({
       async submit(input) {
-        calls.push({ sourceAudioUrl: input.sourceAudioUrl, lyrics: input.lyrics, voice: input.voice });
+        calls.push({
+          sourceAudioUrl: input.sourceAudioUrl,
+          lyrics: input.lyrics,
+          voice: input.voice,
+          prompt: input.prompt,
+        });
         return {
           result: {
             taskId: 'task-voice',
@@ -633,7 +638,7 @@ describe('voice change server', () => {
     const started = await startVoiceChange({
       songId: 'song-1',
       uid: 'owner-1',
-      voice: 'female',
+      voice: 'vesper',
       platform: 'web',
     });
     assert.equal(started.used, 1);
@@ -642,10 +647,13 @@ describe('voice change server', () => {
     assert.equal(calls[0].sourceAudioUrl, BEAT_URL);
     assert.equal(calls[0].lyrics, '[Verse]\nhello night');
     assert.equal(calls[0].voice, 'female');
+    assert.ok(calls[0].prompt.startsWith('low, smoky female vocal, warm chest tone, slow intimate delivery'));
+    assert.match(calls[0].prompt, /a night drive/);
+    assert.notEqual(calls[0].prompt, 'low, smoky female vocal, warm chest tone, slow intimate delivery');
     const stored = memory.read(COLLECTIONS.songs, 'song-1')?.voiceChange as { used: number; status: string; voice: string };
     assert.equal(stored.used, 1);
     assert.equal(stored.status, 'making');
-    assert.equal(stored.voice, 'female');
+    assert.equal(stored.voice, 'vesper');
     const generation = [...memory.ids(COLLECTIONS.generations)]
       .map((id) => memory.read(COLLECTIONS.generations, id))
       .find((item) => (item?.parameters as { purpose?: string } | undefined)?.purpose === 'voice_change');
@@ -680,7 +688,7 @@ describe('voice change server', () => {
       source: string;
       split: boolean;
     };
-    assert.equal(props.voice, 'female');
+    assert.equal(props.voice, 'vesper');
     assert.equal(props.kept, true);
     assert.equal(props.source, 'beat_first');
     assert.equal(props.split, false);
@@ -738,7 +746,7 @@ describe('voice change server', () => {
       },
     });
     await assert.rejects(
-      () => startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'female', platform: 'web' }),
+      () => startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'vesper', platform: 'web' }),
       (error: unknown) => error instanceof HttpError && error.status === 409 && error.message === 'No voice changes left'
     );
 
@@ -770,13 +778,13 @@ describe('voice change server', () => {
       beatFirst: { stage: 'instrumental', chosenVersionId: 'ver-beat' },
     }));
     await assert.rejects(
-      () => startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'female', platform: 'web' }),
+      () => startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'vesper', platform: 'web' }),
       (error: unknown) => error instanceof HttpError && error.message === 'This song is instrumental'
     );
 
     await memory.put(COLLECTIONS.songs, 'song-1', song({ path: null, duration: 241 }));
     await assert.rejects(
-      () => startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'female', platform: 'web' }),
+      () => startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'vesper', platform: 'web' }),
       (error: unknown) =>
         error instanceof HttpError && error.status === 400 && error.message === 'This song is too long to change the voice'
     );
@@ -789,7 +797,7 @@ describe('voice change server', () => {
       voiceChange: null,
     }));
     await assert.rejects(
-      () => startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'female', platform: 'web' }),
+      () => startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'vesper', platform: 'web' }),
       (error: unknown) => error instanceof HttpError && error.message === 'Add a prompt first.'
     );
     assert.equal((memory.read(COLLECTIONS.songs, 'song-1')?.voiceChange as { used?: number } | undefined)?.used ?? 0, 0);
@@ -804,7 +812,7 @@ describe('voice change server', () => {
       },
     });
     await assert.rejects(() =>
-      startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'female', platform: 'web' })
+      startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'vesper', platform: 'web' })
     );
     const stored = memory.read(COLLECTIONS.songs, 'song-1')?.voiceChange as { used: number; status: string | null };
     assert.equal(stored.used, 0);
@@ -1011,7 +1019,7 @@ describe('voice change on a normal song', () => {
     const started = await startVoiceChange({
       songId: 'song-1',
       uid: 'owner-1',
-      voice: 'female',
+      voice: 'vesper',
       platform: 'web',
     });
     assert.equal(started.used, 0);
@@ -1081,7 +1089,7 @@ describe('voice change on a normal song', () => {
     const again = await startVoiceChange({
       songId: 'song-1',
       uid: 'owner-1',
-      voice: 'male',
+      voice: 'harbor',
       platform: 'web',
     });
     assert.equal(again.used, 2);
@@ -1091,7 +1099,7 @@ describe('voice change on a normal song', () => {
     await keepVoiceChange({ songId: 'song-1', uid: 'owner-1', versionId: null, platform: 'web' });
 
     await assert.rejects(
-      () => startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'female', platform: 'web' }),
+      () => startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'vesper', platform: 'web' }),
       (error: unknown) => error instanceof HttpError && error.status === 409 && error.message === 'No voice changes left'
     );
     assert.deepEqual(splits, [MIX_URL]);
@@ -1109,7 +1117,7 @@ describe('voice change on a normal song', () => {
       },
     });
     await assert.rejects(() =>
-      startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'female', platform: 'web' })
+      startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'vesper', platform: 'web' })
     );
     const afterReject = memory.read(COLLECTIONS.songs, 'song-1')?.voiceChange as { used: number; status: string | null };
     assert.equal(afterReject.used, 1);
@@ -1136,7 +1144,7 @@ describe('voice change on a normal song', () => {
       bucket: storageBucket(),
       fetchImpl: (async () => new Response('mp3', { status: 200 })) as typeof fetch,
     });
-    await startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'female', platform: 'web' });
+    await startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'vesper', platform: 'web' });
     const failedWebhook = await processMusicGptWebhook({
       success: true,
       conversion_type: 'Extraction',
@@ -1173,7 +1181,7 @@ describe('voice change on a normal song', () => {
     const retried = await startVoiceChange({
       songId: 'song-1',
       uid: 'owner-1',
-      voice: 'male',
+      voice: 'harbor',
       platform: 'web',
     });
     assert.equal(retried.used, 1);
@@ -1194,7 +1202,7 @@ describe('voice change on a normal song', () => {
         throw new Error('should not sing');
       },
     });
-    await startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'female', platform: 'web' });
+    await startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'vesper', platform: 'web' });
     await noteVoiceSplitFailed('song-1', 'missing');
     const splitFailed = memory.read(COLLECTIONS.songs, 'song-1')?.voiceChange as { used: number; status: string };
     assert.equal(splitFailed.used, 0);
@@ -1215,7 +1223,7 @@ describe('voice change on a normal song', () => {
       },
     });
     await assert.rejects(
-      () => startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'female', platform: 'web' }),
+      () => startVoiceChange({ songId: 'song-1', uid: 'owner-1', voice: 'vesper', platform: 'web' }),
       (error: unknown) => error instanceof HttpError && error.message === 'No voice changes left'
     );
     assert.equal(splits, 0);

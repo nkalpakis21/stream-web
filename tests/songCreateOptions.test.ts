@@ -118,7 +118,7 @@ describe('music style composition', () => {
     assert.deepEqual(resolved.used, ['instrumental', 'feel', 'energy']);
   });
 
-  it('maps her voice and his voice to gender and omits it for the artist voice', () => {
+  it('does not apply a song-level voice at create', () => {
     const defaults = artistDefaults(styleInputFromArtistContext(dna));
     const female = resolveCreateRequest({
       musicStyle: 'pop',
@@ -135,10 +135,12 @@ describe('music style composition', () => {
       options: { instrumental: false, voice: 'same', feel: null, energy: null },
       defaults,
     });
-    assert.equal(female.gender, 'female');
-    assert.equal(male.gender, 'male');
+    assert.equal(female.gender, undefined);
+    assert.equal(male.gender, undefined);
     assert.equal(same.gender, undefined);
-    assert.deepEqual(female.used, ['voice']);
+    assert.equal(female.persisted?.voice, 'same');
+    assert.equal(male.persisted?.voice, 'same');
+    assert.deepEqual(female.used, []);
     assert.deepEqual(same.used, []);
 
     const v1 = buildMusicGptCreateBody(
@@ -198,7 +200,7 @@ describe('music style composition', () => {
     assert.equal(changed.persisted?.words, 'mine');
   });
 
-  it('strips gender words when His is picked and leaves them for the artist voice', () => {
+  it('leaves the artist style alone when a client sends her or his voice', () => {
     const style = 'warm female vocals. pop. mood: chill';
     const defaults: ArtistDefaults = { feel: [], energy: 'Steady' };
     const his = resolveCreateRequest({
@@ -206,26 +208,18 @@ describe('music style composition', () => {
       options: { instrumental: false, voice: 'male', feel: null, energy: null },
       defaults,
     });
-    assert.equal(his.gender, 'male');
-    assert.equal(his.music_style, 'warm. pop. mood: chill');
-    assert.equal(/\bfemale\b/i.test(his.music_style || ''), false);
-    assert.equal(/\bvocals\b/i.test(his.music_style || ''), false);
+    assert.equal(his.gender, undefined);
+    assert.equal(his.music_style, style);
+    assert.equal(his.persisted?.voice, 'same');
 
     const hers = resolveCreateRequest({
       musicStyle: 'her bright girl vocal',
       options: { instrumental: false, voice: 'female', feel: null, energy: null },
       defaults,
     });
-    assert.equal(hers.gender, 'female');
-    assert.equal(hers.music_style, 'bright vocal');
-
-    const same = resolveCreateRequest({
-      musicStyle: style,
-      options: { instrumental: false, voice: 'same', feel: null, energy: null },
-      defaults,
-    });
-    assert.equal(same.gender, undefined);
-    assert.equal(same.music_style, style);
+    assert.equal(hers.gender, undefined);
+    assert.equal(hers.music_style, 'her bright girl vocal');
+    assert.equal(hers.persisted?.voice, 'same');
   });
 
   it('replaces a BPM phrase with Fast and leaves it when energy is not picked', () => {
@@ -382,7 +376,8 @@ describe('POST /api/generations/musicgpt create options', { concurrency: false }
     );
     assert.equal(response.status, 200);
     await new Promise(resolve => setTimeout(resolve, 30));
-    assert.equal(seen[0].gender, 'female');
+    assert.equal('gender' in seen[0], false);
+    assert.equal(seen[0].prompt, 'a night drive');
     assert.equal(seen[0].make_instrumental, false);
     assert.equal(seen[0].lyrics, 'sing this');
     assert.match(String(seen[0].music_style), /\. Fast\./);
@@ -391,11 +386,11 @@ describe('POST /api/generations/musicgpt create options', { concurrency: false }
     assert.equal(String(seen[0].music_style).includes('Soft'), false);
     assert.equal(saved.length, 1);
     assert.equal(saved[0].songId, 'song-1');
-    assert.equal((saved[0].options as { voice: string }).voice, 'female');
+    assert.equal((saved[0].options as { voice: string }).voice, 'same');
     assert.equal('tone' in (saved[0].options as object), false);
     const used = funnel.rows.filter(row => row.event === 'create_options_used');
     assert.equal(used.length, 1);
-    assert.equal((used[0].props as { options: string }).options, 'voice,lyrics,feel,energy');
+    assert.equal((used[0].props as { options: string }).options, 'lyrics,feel,energy');
     assert.equal(parseCreateOptions(null), null);
   });
 });

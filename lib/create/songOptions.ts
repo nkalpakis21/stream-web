@@ -214,8 +214,6 @@ export function previewSentence(input: {
   const song = descriptors.length ? `a ${descriptors.join(', ')} song` : 'a song';
   let sentence = `${name} will make ${song}`;
   if (input.value.instrumental) return `${sentence}, just the beat.`;
-  if (input.value.voice === 'female') sentence += ', in her voice';
-  if (input.value.voice === 'male') sentence += ', in his voice';
   if (input.value.words === 'mine' && input.value.lyrics.trim()) sentence += ', singing your words';
   return `${sentence}.`;
 }
@@ -404,7 +402,8 @@ export function resolveCreateRequest(input: {
   const instrumental = options.instrumental;
   const feel = options.feel ?? input.defaults.feel;
   const energy = options.energy ?? input.defaults.energy;
-  const voice: VoiceChoice = instrumental ? 'same' : options.voice;
+  // Voice lives on the artist. Song create cannot pick Her or His.
+  const voice: VoiceChoice = 'same';
   const sendLyrics = !instrumental ? lyrics : undefined;
   const feelChanged = options.feel != null && !sameFeel(options.feel, input.defaults.feel);
   const energyChanged = options.energy != null && options.energy !== input.defaults.energy;
@@ -412,9 +411,6 @@ export function resolveCreateRequest(input: {
   const energyHint = energyChanged ? energy : null;
 
   let musicStyle = input.musicStyle?.trim() ?? '';
-  if (!instrumental && (voice === 'female' || voice === 'male') && musicStyle) {
-    musicStyle = stripVocalGenderWords(musicStyle);
-  }
   let energyAppend: string | null = null;
   if (energyHint) {
     if (musicStyle && new RegExp(TEMPO_PHRASE.source, 'i').test(musicStyle)) {
@@ -426,7 +422,6 @@ export function resolveCreateRequest(input: {
 
   const used: CreateOptionTag[] = [];
   if (instrumental) used.push('instrumental');
-  if (!instrumental && voice !== 'same') used.push('voice');
   if (sendLyrics) used.push('lyrics');
   if (feelHint.length) used.push('feel');
   if (energyHint) used.push('energy');
@@ -437,7 +432,6 @@ export function resolveCreateRequest(input: {
       energy: energyAppend,
     }),
     make_instrumental: instrumental,
-    ...(voice === 'female' || voice === 'male' ? { gender: voice } : {}),
     lyrics: sendLyrics,
     persisted: {
       instrumental,

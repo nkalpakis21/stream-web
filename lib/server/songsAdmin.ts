@@ -230,6 +230,17 @@ export async function adminMarkSongGenerationFailed(
  * and restarts the owner tile's 15-minute clock. Does not delete the song.
  */
 /** Server-only. The create panel's choices. Clients cannot write this field. */
+/** The curated voice this song was made with. Older songs are left alone. */
+export async function adminSaveSongVoiceSlug(songId: string, voiceSlug: string): Promise<void> {
+  await getAdminDb().collection(COLLECTIONS.songs).doc(songId).set(
+    {
+      voiceSlug,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
 export async function adminSaveSongCreateOptions(
   songId: string,
   createOptions: NonNullable<SongDocument['createOptions']>

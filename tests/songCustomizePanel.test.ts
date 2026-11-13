@@ -59,9 +59,13 @@ describe('song customize panel', () => {
     assert.match(off, /rounded-\[4px\]/);
     assert.match(off, /aria-checked="false"/);
     assert.match(off, /data-on="false"/);
-    assert.match(off, /Same as Nova/);
-    assert.match(off, /Her voice/);
-    assert.match(off, /His voice/);
+    assert.match(off, /data-voice-display="only"/);
+    assert.match(off, /Nova(?:'|&#x27;)s voice/);
+    assert.equal(off.includes('Her voice'), false);
+    assert.equal(off.includes('His voice'), false);
+    assert.equal(off.includes('Same as Nova'), false);
+    assert.equal(off.includes('data-voice="female"'), false);
+    assert.equal(off.includes('data-voice="male"'), false);
     assert.match(off, /Let Nova write it/);
     assert.match(off, /Use my words/);
     assert.match(off, /min-h-12/);

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { ArtistPickList } from '@/components/create/ArtistPickList';
 import { HearBeatFirstLink } from '@/components/create/HearBeatFirstLink';
 import { SongCreatePreview, SongCustomizePanel } from '@/components/create/SongCustomizePanel';
 import { useSongCustomize } from '@/components/create/useSongCustomize';
@@ -16,6 +17,7 @@ import { abandonFailedSongCreate, createSong } from '@/lib/services/songs';
 import { createGeneration } from '@/lib/services/generations';
 import { runSongCreateAttempt, SongCreateFailed } from '@/lib/songs/songCreate';
 import type { AIArtistDocument } from '@/types/firestore';
+import type { PublicStreamstarVoice } from '@/lib/voices/streamstarVoices';
 import { useToast, ToastContainer } from '@/components/ui/toast';
 
 export function SongCreateFailureNotice({
@@ -69,6 +71,7 @@ export function CreativeSongForm({
   const idempotencyKeyRef = useRef<string | null>(null);
   const resumeFeelRef = useRef<{ feel: FeelLabel[]; energy: Energy } | null>(null);
   const [artists, setArtists] = useState<AIArtistDocument[]>([]);
+  const [voices, setVoices] = useState<PublicStreamstarVoice[]>([]);
   const [loadingArtists, setLoadingArtists] = useState(true);
   const { toasts, showToast, dismissToast } = useToast();
   const [formData, setFormData] = useState({
@@ -118,6 +121,20 @@ export function CreativeSongForm({
       loadArtists();
     }
   }, [user, loadArtists]);
+
+  useEffect(() => {
+    let cancel = false;
+    void fetch('/api/voices')
+      .then(response => (response.ok ? response.json() : null))
+      .then(data => {
+        if (cancel || !data || !Array.isArray(data.voices)) return;
+        setVoices(data.voices as PublicStreamstarVoice[]);
+      })
+      .catch(() => {});
+    return () => {
+      cancel = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!focusFeel) return;
@@ -419,22 +436,17 @@ export function CreativeSongForm({
             </div>
 
             <div>
-              <label htmlFor="artistId" className="block text-sm font-medium mb-2 text-foreground">
-                Artist *
-              </label>
-              <select
-                id="artistId"
-                required
-                value={formData.artistId}
-                onChange={e => setFormData({ ...formData, artistId: e.target.value })}
-                className="w-full px-4 py-3 border border-border rounded-xl bg-background/50 backdrop-blur-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
-              >
-                {artists.map(artist => (
-                  <option key={artist.id} value={artist.id}>
-                    {artist.name}
-                  </option>
-                ))}
-              </select>
+              <p className="block text-sm font-medium mb-2 text-foreground">Artist *</p>
+              <ArtistPickList
+                artists={artists.map(artist => ({
+                  id: artist.id,
+                  name: artist.name,
+                  avatarURL: artist.avatarURL,
+                }))}
+                selectedId={formData.artistId}
+                onSelect={artistId => setFormData({ ...formData, artistId })}
+                disabled={loading}
+              />
             </div>
           </div>
 
@@ -483,6 +495,10 @@ export function CreativeSongForm({
             artistName={selectedForStyle?.name}
             artistId={selectedForStyle?.id}
             defaults={customize.defaults}
+            voiceDisplay={(() => {
+              const card = voices.find(voice => voice.slug === selectedForStyle?.voiceSlug);
+              return card ? { name: card.name, descriptor: card.descriptor } : null;
+            })()}
             value={customize.value}
             onChange={customize.setValue}
             prompt={formData.prompt}

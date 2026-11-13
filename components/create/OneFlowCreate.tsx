@@ -38,6 +38,7 @@ import {
   updateArtistAvatar,
 } from '@/lib/services/artists';
 import { createGeneration } from '@/lib/services/generations';
+import type { PublicStreamstarVoice, VoiceSlug } from '@/lib/voices/streamstarVoices';
 import { abandonFailedSongCreate, createSong } from '@/lib/services/songs';
 import { runSongCreateAttempt, SongCreateFailed } from '@/lib/songs/songCreate';
 import {
@@ -71,7 +72,7 @@ async function rememberFace(method: CreateFaceMethod): Promise<void> {
   }
 }
 
-export function OneFlowCreate() {
+export function OneFlowCreate({ voices = [] }: { voices?: readonly PublicStreamstarVoice[] }) {
   const { user } = useAuth();
   const router = useRouter();
   const { connection } = useConnection();
@@ -93,6 +94,8 @@ export function OneFlowCreate() {
     initialSongCustomize(artistDefaults({ tempoMin: NEW_ARTIST_TEMPO.min, tempoMax: NEW_ARTIST_TEMPO.max }))
   );
   const nameRef = useRef('');
+  const [voiceSlug, setVoiceSlug] = useState<VoiceSlug | null>(null);
+  const [confirmedVoice, setConfirmedVoice] = useState<VoiceSlug | null>(null);
   const onCustomizeChange = useCallback((value: SongCustomizeValue) => {
     customizeRef.current = value;
   }, []);
@@ -183,7 +186,7 @@ export function OneFlowCreate() {
   nameRef.current = draft.name;
 
   const nameError = artistNameError(artistNameIssue(draft.name), nameTaken);
-  const ready = canSubmitCreate(draft.name, draft.prompt) && !nameTaken;
+  const ready = canSubmitCreate(draft.name, draft.prompt) && !nameTaken && confirmedVoice != null;
 
   const patch = (next: Partial<CreateDraft>) => {
     setDraft(current => (current ? { ...current, ...next } : current));
@@ -391,6 +394,10 @@ export function OneFlowCreate() {
       return;
     }
     if (nameTaken) return;
+    if (!confirmedVoice) {
+      setSubmitError('Pick a voice first.');
+      return;
+    }
 
     submitLock.current = true;
     setSubmitting(true);
@@ -463,6 +470,7 @@ export function OneFlowCreate() {
             styleDNA,
             lore: prompt,
             vocalIdentity: null,
+            voiceSlug: confirmedVoice,
             avatarURL: faceUrlRef.current,
             isPublic: true,
             pumpFun,
@@ -610,6 +618,16 @@ export function OneFlowCreate() {
       canSubmit={ready}
       submitting={submitting}
       onSubmit={onSubmit}
+      voices={voices}
+      voiceSlug={voiceSlug}
+      confirmedVoice={confirmedVoice}
+      onVoiceSelect={slug => {
+        setVoiceSlug(slug);
+        setConfirmedVoice(current => (current === slug ? current : null));
+      }}
+      onUseVoice={() => {
+        if (voiceSlug) setConfirmedVoice(voiceSlug);
+      }}
       fileInputRef={fileInputRef}
       onCustomizeChange={onCustomizeChange}
       requestDraft={requestDraft}

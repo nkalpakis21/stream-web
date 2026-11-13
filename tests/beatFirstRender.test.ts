@@ -230,7 +230,10 @@ describe('beat-first render', () => {
     assert.match(html, /data-part="voice-words"/);
     assert.match(html, />Voice</);
     assert.match(html, />Words</);
-    assert.match(html, /Same as Nova/);
+    assert.match(html, /data-voice-display="only"/);
+    assert.match(html, /Nova(?:'|&#x27;)s voice/);
+    assert.equal(html.includes('Same as Nova'), false);
+    assert.equal(html.includes('Her voice'), false);
     assert.match(html, /Let Nova write it/);
     assert.equal(html.includes('>Feel<'), false);
     assert.equal(html.includes('>Energy<'), false);

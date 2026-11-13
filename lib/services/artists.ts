@@ -60,6 +60,7 @@ export async function createArtist(
     styleDNA: StyleDNA;
     lore: string;
     vocalIdentity?: string | null;
+    voiceSlug?: string | null;
     isPublic?: boolean;
     /** Optional artist-level pump.fun coin. Defaults to all-null (no token). */
     pumpFun?: PumpFunCoin | null;
@@ -69,6 +70,11 @@ export async function createArtist(
   const artistId = artistRef.id;
 
   const now = Timestamp.now();
+  const voiceSlug =
+    typeof data.voiceSlug === 'string' &&
+    /^(calla|vesper|sable|wren|briar|harbor|wells|flint|slate|keel)$/.test(data.voiceSlug)
+      ? data.voiceSlug
+      : null;
 
   // Create initial version
   const versionRef = doc(collection(db, COLLECTIONS.artistVersions));
@@ -101,6 +107,7 @@ export async function createArtist(
     styleDNA: data.styleDNA,
     lore: data.lore,
     vocalIdentity: data.vocalIdentity?.trim() || null,
+    ...(voiceSlug ? { voiceSlug } : {}),
     isPublic: data.isPublic ?? true,
     createdAt: now,
     updatedAt: now,

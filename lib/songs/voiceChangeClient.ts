@@ -1,4 +1,3 @@
-import type { VoiceChangeVoice } from '@/lib/songs/voiceChange';
 import { webPlatformHeaders } from '@/lib/funnel/platform';
 
 async function postJson(
@@ -19,7 +18,7 @@ async function postJson(
   return { ok: true };
 }
 
-export function postVoiceChange(input: { token: string; songId: string; voice: VoiceChangeVoice }) {
+export function postVoiceChange(input: { token: string; songId: string; voice: string }) {
   return postJson(`/api/songs/${input.songId}/voice`, input.token, { voice: input.voice });
 }
 

@@ -16,19 +16,17 @@ import {
   NO_VOICE_CHANGES_LABEL,
   buildVoiceCompareRows,
   compareHasNewAudio,
-  currentSungGender,
   defaultVoiceSelection,
-  otherVoiceChoice,
   voiceChangeActionLabel,
   voiceChangeSnapshot,
   voiceChangeSpent,
   voiceChangeSplitsBeat,
   type CompareRow,
   type CompareRowKey,
-  type SungGender,
   type VoiceGenerationRef,
   type VoiceVersionRef,
 } from '@/lib/songs/voiceChange';
+import type { PublicStreamstarVoice, VoiceSlug } from '@/lib/voices/streamstarVoices';
 
 type VoiceSong = Parameters<typeof voiceChangeSnapshot>[0]['song'];
 
@@ -46,6 +44,8 @@ export function ChangeVoice({
   songId,
   ownerId,
   artistVoice = null,
+  voices = [],
+  songVoiceSlug = null,
   song,
   versions: initialVersions,
   generations: initialGenerations,
@@ -54,6 +54,8 @@ export function ChangeVoice({
   songId: string;
   ownerId: string;
   artistVoice?: string | null;
+  voices?: readonly PublicStreamstarVoice[];
+  songVoiceSlug?: string | null;
   song: VoiceSong;
   versions: VoiceVersionRef[];
   generations: VoiceGenerationRef[];
@@ -159,14 +161,12 @@ export function ChangeVoice({
     }
   };
 
-  const sung = currentSungGender({
-    songVoice: liveSong.createOptions?.voice ?? null,
-    artistVoice,
-  });
-  const other = otherVoiceChoice(sung);
-  const sheetVoices: SungGender[] = other ? [other] : ['female', 'male'];
+  void artistVoice;
+  const currentSlug = voices.some(voice => voice.slug === songVoiceSlug)
+    ? (songVoiceSlug as VoiceSlug)
+    : null;
 
-  const start = (voice: SungGender) => {
+  const start = (voice: VoiceSlug) => {
     void run((token) => postVoiceChange({ token, songId, voice }));
   };
 
@@ -218,7 +218,8 @@ export function ChangeVoice({
       ) : null}
       {open ? (
         <ChangeVoiceSheet
-          voices={sheetVoices}
+          voices={voices}
+          currentSlug={currentSlug}
           splitCaveat={voiceChangeSplitsBeat(liveSong.path)}
           busy={busy}
           error={error}
