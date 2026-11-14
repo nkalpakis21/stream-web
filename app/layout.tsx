@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import { Figtree, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/components/providers/AuthProvider';
+import { CoverModerationProvider } from '@/components/providers/CoverModerationProvider';
+import { isCoverModerationEnabled } from '@/lib/covers/moderation';
 import { SolanaWalletProvider } from '@/components/providers/SolanaWalletProvider';
 import { SongPlayerProvider } from '@/components/songs/SongPlayerProvider';
 import { AnalyticsProvider } from '@/components/providers/AnalyticsProvider';
@@ -17,6 +20,7 @@ import {
   brandOgImageUrl,
   publicUrl,
 } from '@/lib/brand/site';
+import { SIGNED_IN_HINT_SCRIPT } from '@/lib/auth/notFoundRecovery';
 
 const figtree = Figtree({
   subsets: ['latin'],
@@ -80,21 +84,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`dark listen ${figtree.variable} ${playfairDisplay.variable}`}>
+    <html
+      lang="en"
+      className={`dark listen ${figtree.variable} ${playfairDisplay.variable}`}
+      suppressHydrationWarning
+    >
       <body className="font-sans antialiased flex flex-col min-h-screen overflow-x-hidden bg-background text-foreground">
+        <Script id="ss-signed-in-hint" strategy="beforeInteractive">
+          {SIGNED_IN_HINT_SCRIPT}
+        </Script>
         <ListenSurface />
         <AnalyticsProvider>
           <AuthProvider>
-            <SolanaWalletProvider>
-              <SongPlayerProvider>
-                <SiteHeader />
-                <div className="listen-chrome flex min-h-0 flex-1 flex-col pb-[calc(var(--tab-h,56px)+env(safe-area-inset-bottom,0px))] md:pb-0">
-                  <div className="flex-1">{children}</div>
-                  <Footer />
-                </div>
-                <MobileTabBar />
-              </SongPlayerProvider>
-            </SolanaWalletProvider>
+            <CoverModerationProvider enabled={isCoverModerationEnabled()}>
+              <SolanaWalletProvider>
+                <SongPlayerProvider>
+                  <SiteHeader />
+                  <div className="listen-chrome flex min-h-0 flex-1 flex-col pb-[calc(var(--tab-h,56px)+env(safe-area-inset-bottom,0px))] md:pb-0">
+                    <div className="flex-1">{children}</div>
+                    <Footer />
+                  </div>
+                  <MobileTabBar />
+                </SongPlayerProvider>
+              </SolanaWalletProvider>
+            </CoverModerationProvider>
           </AuthProvider>
         </AnalyticsProvider>
       </body>

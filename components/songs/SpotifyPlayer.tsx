@@ -14,6 +14,7 @@ interface SpotifyPlayerProps {
   isPlaying: boolean;
   onPlayPause: () => void;
   onClose: () => void;
+  onPlaybackError?: () => void;
 }
 
 export function SpotifyPlayer({
@@ -24,6 +25,7 @@ export function SpotifyPlayer({
   isPlaying,
   onPlayPause,
   onClose,
+  onPlaybackError,
 }: SpotifyPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -56,6 +58,10 @@ export function SpotifyPlayer({
       setCurrentTime(0);
       onPlayPause();
     };
+    const handleError = () => {
+      if (!audioUrl) return;
+      onPlaybackError?.();
+    };
 
     // Listen for seek events from lyrics
     const handleLyricsSeek = (e: Event) => {
@@ -69,15 +75,17 @@ export function SpotifyPlayer({
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
     audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
     window.addEventListener('lyrics-seek', handleLyricsSeek);
 
     return () => {
       audio.removeEventListener('timeupdate', updateTime);
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
       window.removeEventListener('lyrics-seek', handleLyricsSeek);
     };
-  }, [audioUrl, onPlayPause]);
+  }, [audioUrl, onPlayPause, onPlaybackError]);
 
   useEffect(() => {
     const audio = audioRef.current;

@@ -63,8 +63,11 @@ export function DeveloperSection({ generations, songId }: DeveloperSectionProps)
           results.push(`🔄 Fetching conversion details for ${conversionId.substring(0, 8)}...`);
           
           try {
-            // Call API route that proxies getConversionDataByConversionID
-            const response = await fetch(`/api/musicgpt/conversion/${conversionId}`);
+            // Admin-only outside production. Send the signed-in token.
+            const token = user ? await user.getIdToken() : null;
+            const response = await fetch(`/api/musicgpt/conversion/${conversionId}`, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
             
             if (response.ok) {
               const details = await response.json() as { success: boolean; conversion: Record<string, unknown> };

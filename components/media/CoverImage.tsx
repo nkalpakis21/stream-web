@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { coverArtAlt } from '@/lib/brand/site';
+import './cover-media.css';
 
 export function CoverPlaceholder({
   className = '',
@@ -31,6 +32,8 @@ interface CoverImageProps {
   rounded?: string;
   unoptimized?: boolean;
   priority?: boolean;
+  /** Fills the slot when moderation hides the cover and there is no face. */
+  emptyInitials?: string | null;
 }
 
 export function CoverImage({
@@ -41,9 +44,11 @@ export function CoverImage({
   rounded = 'rounded-cover',
   unoptimized = true,
   priority = false,
+  emptyInitials = null,
 }: CoverImageProps) {
   const [failed, setFailed] = useState(false);
   const showImage = Boolean(src) && !failed;
+  const initials = emptyInitials?.trim() || '';
 
   return (
     <>
@@ -58,6 +63,14 @@ export function CoverImage({
           priority={priority}
           onError={() => setFailed(true)}
         />
+      ) : initials ? (
+        <span
+          className={`artist-index-face-initials cover-fallback-initials absolute inset-0 ${rounded}`}
+          data-cover-fallback="initials"
+          aria-hidden
+        >
+          <span className="cover-fallback-initials-text">{initials}</span>
+        </span>
       ) : (
         <CoverPlaceholder rounded={rounded} />
       )}

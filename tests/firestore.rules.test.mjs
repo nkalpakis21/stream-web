@@ -317,6 +317,14 @@ test('nobody else can delete an artist or a user', async () => {
 test('owner can create an artist, including a launched coin, and cannot seize another uid', async () => {
   const alice = dbFor('alice');
   await assertSucceeds(setDoc(doc(alice, 'artists/newArtist'), artistData({ id: 'newArtist' })));
+  await assertSucceeds(setDoc(doc(alice, 'artists/voiced'), artistData({
+    id: 'voiced',
+    voiceSlug: 'calla',
+  })));
+  await assertFails(setDoc(doc(alice, 'artists/libraryVoice'), artistData({
+    id: 'libraryVoice',
+    voiceSlug: 'gpt-voice-1',
+  })));
 
   await assertFails(setDoc(doc(alice, 'artists/stolen'), artistData({
     id: 'stolen',
@@ -395,6 +403,7 @@ test('owner can update artist profile fields and cannot change ownerId, coin, or
     updatedAt: now,
   }));
   await assertFails(updateDoc(ref, { ownerId: 'bob' }));
+  await assertFails(updateDoc(ref, { voiceSlug: 'harbor' }));
   await assertFails(updateDoc(ref, {
     pumpFun: {
       mint: 'MintAddress111',
@@ -512,6 +521,258 @@ test('owner can create a song for their artist only, with no cover or token fiel
     id: 'song5',
     tokenMintAddress: 'MintAddress111',
   })));
+  await assertFails(setDoc(doc(alice, 'songs/songVoice'), songData({
+    id: 'songVoice',
+    voiceSlug: 'calla',
+  })));
+});
+
+test('a client can hold a song for audio and cannot mark that song ready', async () => {
+  await seedCatalog();
+  const alice = dbFor('alice');
+  await assertSucceeds(setDoc(doc(alice, 'songs/held'), songData({
+    id: 'held',
+    isPublic: false,
+    audioReady: false,
+    publicOnReady: true,
+    idempotencyKey: 'idem-key-1',
+    currentVersionId: 'heldVer',
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/readyNow'), songData({
+    id: 'readyNow',
+    audioReady: true,
+    currentVersionId: 'readyVer',
+  })));
+  await assertFails(updateDoc(doc(alice, 'songs/held'), { audioReady: true }));
+  await assertFails(updateDoc(doc(alice, 'songs/held'), { publicOnReady: false }));
+  await assertFails(updateDoc(doc(alice, 'songs/held'), { idempotencyKey: 'other-key-9' }));
+  await assertSucceeds(setDoc(doc(alice, 'songs/heldPrompt'), songData({
+    id: 'heldPrompt',
+    isPublic: false,
+    audioReady: false,
+    createPrompt: 'a rainy chorus',
+    createLyrics: 'line one',
+    currentVersionId: 'heldPromptVer',
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/clientFailed'), songData({
+    id: 'clientFailed',
+    generationStatus: 'failed',
+    currentVersionId: 'clientFailedVer',
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/clientAttempt'), songData({
+    id: 'clientAttempt',
+    generationAttemptAt: now,
+    currentVersionId: 'clientAttemptVer',
+  })));
+  await assertFails(updateDoc(doc(alice, 'songs/held'), { generationStatus: 'failed' }));
+  await assertSucceeds(updateDoc(doc(alice, 'songs/held'), {
+    title: 'Held renamed',
+    updatedAt: now,
+  }));
+  await assertSucceeds(setDoc(doc(alice, 'songs/submitted'), songData({
+    id: 'submitted',
+    isPublic: false,
+    audioReady: false,
+    createSubmittedAt: now,
+    currentVersionId: 'submittedVer',
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/badStamp'), songData({
+    id: 'badStamp',
+    createSubmittedAt: 'yesterday',
+    currentVersionId: 'badStampVer',
+  })));
+  await assertFails(updateDoc(doc(alice, 'songs/submitted'), {
+    createSubmittedAt: new Date('2026-02-01T00:00:00.000Z'),
+  }));
+  await assertSucceeds(updateDoc(doc(alice, 'songs/submitted'), {
+    title: 'Still held',
+    updatedAt: now,
+  }));
+});
+
+test('a server-marked failed shell can be retitled and the client cannot clear the flag', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'songs/failedShell'), songData({
+      id: 'failedShell',
+      isPublic: false,
+      audioReady: false,
+      generationStatus: 'failed',
+      createPrompt: 'a rainy chorus',
+      currentVersionId: 'failedVer',
+    }));
+  });
+  const alice = dbFor('alice');
+  await assertSucceeds(updateDoc(doc(alice, 'songs/failedShell'), {
+    title: 'Still mine',
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/failedShell'), { generationStatus: null }));
+  await assertFails(updateDoc(doc(alice, 'songs/failedShell'), { createPrompt: 'rewritten' }));
+  await assertFails(updateDoc(doc(alice, 'songs/failedShell'), { generationAttemptAt: now }));
+});
+
+test('clients cannot write createOptions, and a song that already has it can still be retitled', async () => {
+  await seedCatalog();
+  const alice = dbFor('alice');
+  await assertFails(setDoc(doc(alice, 'songs/clientOptions'), songData({
+    id: 'clientOptions',
+    currentVersionId: 'clientOptionsVer',
+    createOptions: { instrumental: true, voice: 'female' },
+  })));
+  await seed(async (db) => {
+    await setDoc(doc(db, 'songs/serverOptions'), songData({
+      id: 'serverOptions',
+      createOptions: {
+        instrumental: false,
+        voice: 'same',
+        feel: ['Chill'],
+        energy: 'Steady',
+        words: 'artist',
+      },
+    }));
+  });
+  await assertSucceeds(updateDoc(doc(alice, 'songs/serverOptions'), {
+    title: 'Renamed',
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/serverOptions'), {
+    createOptions: {
+      instrumental: true,
+      voice: 'female',
+      feel: ['Hype'],
+      energy: 'Fast',
+      words: 'mine',
+    },
+  }));
+});
+
+test('clients cannot write voiceSplit, and a song that already has it can still be retitled', async () => {
+  await seedCatalog();
+  const alice = dbFor('alice');
+  const split = {
+    sourceVersionId: 'ver1',
+    audioUrl: 'https://example.com/beat.mp3',
+    status: 'ready',
+    creditEstimate: 0,
+  };
+  await assertFails(setDoc(doc(alice, 'songs/clientSplit'), songData({
+    id: 'clientSplit',
+    currentVersionId: 'clientSplitVer',
+    voiceSplit: split,
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/clientSplitNull'), songData({
+    id: 'clientSplitNull',
+    currentVersionId: 'clientSplitNullVer',
+    voiceSplit: null,
+  })));
+  await seed(async (db) => {
+    await setDoc(doc(db, 'songs/serverSplit'), songData({
+      id: 'serverSplit',
+      voiceSplit: { sourceVersionId: 'ver1', audioUrl: null, status: 'splitting', creditEstimate: 0 },
+    }));
+  });
+  await assertSucceeds(updateDoc(doc(alice, 'songs/serverSplit'), {
+    title: 'Renamed',
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/serverSplit'), {
+    voiceSplit: split,
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/serverSplit'), {
+    voiceSplit: { status: 'ready', audioUrl: 'https://example.com/other.mp3' },
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/song1'), {
+    voiceSplit: split,
+    updatedAt: now,
+  }));
+});
+
+test('clients cannot write voiceChange, and a song that already has it can still be retitled', async () => {
+  await seedCatalog();
+  const alice = dbFor('alice');
+  const counter = { used: 2, status: 'ready', voice: 'female', generationId: 'gen-voice' };
+  await assertFails(setDoc(doc(alice, 'songs/clientVoice'), songData({
+    id: 'clientVoice',
+    currentVersionId: 'clientVoiceVer',
+    voiceChange: counter,
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/clientVoiceNull'), songData({
+    id: 'clientVoiceNull',
+    currentVersionId: 'clientVoiceNullVer',
+    voiceChange: null,
+  })));
+  await seed(async (db) => {
+    await setDoc(doc(db, 'songs/serverVoice'), songData({
+      id: 'serverVoice',
+      voiceChange: { used: 1, status: 'making', voice: 'male' },
+    }));
+  });
+  await assertSucceeds(updateDoc(doc(alice, 'songs/serverVoice'), {
+    title: 'Renamed',
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/serverVoice'), {
+    voiceChange: counter,
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/serverVoice'), {
+    voiceChange: { used: 0 },
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/song1'), {
+    voiceChange: counter,
+    updatedAt: now,
+  }));
+});
+
+test('coverModeration is server-only and an owner can still retitle', async () => {
+  await seedCatalog();
+  const alice = dbFor('alice');
+  const moderation = {
+    status: 'passed',
+    checkedAt: now,
+    labels: { adult: 'VERY_LIKELY', violence: 'UNLIKELY', racy: 'POSSIBLE' },
+  };
+
+  await assertFails(setDoc(doc(alice, 'songs/modCreate'), songData({
+    id: 'modCreate',
+    currentVersionId: 'modCreateVer',
+    coverModeration: moderation,
+  })));
+  await assertFails(setDoc(doc(alice, 'songs/modNull'), songData({
+    id: 'modNull',
+    currentVersionId: 'modNullVer',
+    coverModeration: null,
+  })));
+  await assertSucceeds(setDoc(doc(alice, 'songs/modOk'), songData({
+    id: 'modOk',
+    currentVersionId: 'modOkVer',
+  })));
+
+  await seed(async (db) => {
+    await setDoc(doc(db, 'songs/moderated'), songData({
+      id: 'moderated',
+      currentVersionId: 'moderatedVer',
+      coverModeration: { status: 'flagged', checkedAt: now, labels: { adult: 'LIKELY' } },
+    }));
+  });
+
+  await assertSucceeds(updateDoc(doc(alice, 'songs/moderated'), {
+    title: 'Renamed',
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/moderated'), {
+    coverModeration: moderation,
+    updatedAt: now,
+  }));
+  await assertFails(updateDoc(doc(alice, 'songs/song1'), {
+    coverModeration: moderation,
+    updatedAt: now,
+  }));
+  await assertSucceeds(updateDoc(doc(alice, 'songs/song1'), {
+    title: 'Still Mine',
+    updatedAt: now,
+  }));
 });
 
 test('owner can retitle or soft-delete a song and cannot change ownerId or covers', async () => {
@@ -868,6 +1129,28 @@ test('public user docs omit email and wallet; the private profile is owner-only'
   await assertFails(getDoc(doc(dbFor('bob'), 'users/alice/private/profile')));
   await assertFails(getDocs(collection(dbFor('bob'), 'users/alice/private')));
   await assertFails(getDocs(collection(dbFor('alice'), 'users/bob/private')));
+});
+
+test('expo push tokens are readable only by the owner and not writable by clients', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'users/alice/pushTokens/token1'), {
+      token: 'ExponentPushToken[abc12345]',
+      platform: 'ios',
+      updatedAt: now,
+    });
+  });
+  const own = await assertSucceeds(getDoc(doc(dbFor('alice'), 'users/alice/pushTokens/token1')));
+  assert.equal(own.data().platform, 'ios');
+  await assertFails(getDoc(doc(dbFor('bob'), 'users/alice/pushTokens/token1')));
+  await assertFails(getDoc(doc(dbFor(null), 'users/alice/pushTokens/token1')));
+  await assertFails(setDoc(doc(dbFor('alice'), 'users/alice/pushTokens/token2'), {
+    token: 'ExponentPushToken[zzzzzzzz]',
+    platform: 'ios',
+  }));
+  await assertFails(updateDoc(doc(dbFor('alice'), 'users/alice/pushTokens/token1'), {
+    token: 'ExponentPushToken[changed1]',
+  }));
+  await assertFails(getDocs(collection(dbFor('bob'), 'users/alice/pushTokens')));
 });
 
 test('follows are public to read and only the follower can write', async () => {
@@ -2626,6 +2909,43 @@ test('clients cannot read or write report rate limits', async () => {
     await assertFails(setDoc(doc(client, 'reportRateLimits/alice'), { count: 0 }));
     await assertFails(updateDoc(doc(client, 'reportRateLimits/alice'), { count: 0 }));
     await assertFails(deleteDoc(doc(client, 'reportRateLimits/alice')));
+  }
+});
+
+test('clients cannot read or write funnelEvents', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'funnelEvents/alice_signed_up'), {
+      uid: 'alice',
+      event: 'signed_up',
+      at: now,
+      props: {},
+      platform: 'web',
+    });
+    await setDoc(doc(db, 'funnelEvents/playAuto1'), {
+      uid: 'alice',
+      event: 'play',
+      at: now,
+      props: { songId: 'song1' },
+      platform: 'web',
+    });
+  });
+  for (const uid of [null, 'alice', 'bob']) {
+    const client = dbFor(uid);
+    await assertFails(getDoc(doc(client, 'funnelEvents/alice_signed_up')));
+    await assertFails(getDoc(doc(client, 'funnelEvents/playAuto1')));
+    await assertFails(getDocs(collection(client, 'funnelEvents')));
+    await assertFails(setDoc(doc(client, 'funnelEvents/playAuto2'), {
+      uid: 'alice',
+      event: 'play',
+      at: now,
+      props: { songId: 'song1' },
+      platform: 'ios',
+    }));
+    await assertFails(updateDoc(doc(client, 'funnelEvents/alice_signed_up'), { platform: 'ios' }));
+    await assertFails(updateDoc(doc(client, 'funnelEvents/playAuto1'), { platform: 'ios' }));
+    await assertFails(deleteDoc(doc(client, 'funnelEvents/alice_signed_up')));
+    await assertFails(getDoc(doc(client, 'funnelEvents/alice_signed_up/nested/secret')));
+    await assertFails(setDoc(doc(client, 'funnelEvents/alice_signed_up/nested/secret'), { uid: 'alice' }));
   }
 });
 

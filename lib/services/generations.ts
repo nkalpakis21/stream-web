@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from '@/lib/firebase/config';
+import { webPlatformHeaders } from '@/lib/funnel/platform';
 import {
   COLLECTIONS,
   getGenerationPath,
@@ -26,6 +27,14 @@ import type { GenerationDocument } from '@/types/firestore';
 import { aiService } from '@/lib/ai/providers';
 import { hashGeneration } from '@/lib/utils/hash';
 import { redactForLog, redactUrl } from '@/lib/webhooks/redactUrl';
+
+/** The existing MusicGPT task is still in flight. Do not start another one. */
+export class GenerationStillRunning extends Error {
+  constructor() {
+    super('still_generating');
+    this.name = 'GenerationStillRunning';
+  }
+}
 
 /**
  * Create a generation request.
@@ -63,6 +72,16 @@ export async function createGeneration(
     lyrics?: string;
     /** When set, the MusicGPT route checks this artist is owned by the caller. */
     artistId?: string;
+    /**
+     * Web create panel. Omitted by mobile, which keeps today's request.
+     * The server writes this onto the song. It is not stored on the generation.
+     */
+    createOptions?: {
+      instrumental: boolean;
+      voice: 'same' | 'female' | 'male';
+      feel: string[];
+      energy: 'Slow' | 'Steady' | 'Fast';
+    } | null;
   } & {
     /**
      * Optional provider task/job identifier for async providers.
@@ -87,10 +106,10 @@ export async function createGeneration(
       const token = await user.getIdToken();
       const apiResponse = await fetch('/api/generations/musicgpt', {
         method: 'POST',
-        headers: {
+        headers: webPlatformHeaders({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
-        },
+        }),
         body: JSON.stringify({
           prompt: data.prompt.freeText,
           // Includes locked vocalIdentity; server maps it into music_style.
@@ -99,6 +118,7 @@ export async function createGeneration(
           songId,
           ...(data.artistId ? { artistId: data.artistId } : {}),
           ...(data.lyrics && { lyrics: data.lyrics }),
+          ...(data.createOptions ? { createOptions: data.createOptions } : {}),
         }),
       });
 
@@ -110,6 +130,9 @@ export async function createGeneration(
       }
 
       const result = await apiResponse.json();
+      if (result.stillGenerating === true) {
+        throw new GenerationStillRunning();
+      }
       providerTaskId = result.taskId || null;
 
       if (!providerTaskId) {
@@ -127,8 +150,10 @@ export async function createGeneration(
       (data as { providerConversionIds?: string[]; providerMetadata?: Record<string, unknown> }).providerConversionIds = conversionIds;
       (data as { providerMetadata?: Record<string, unknown> }).providerMetadata = metadata;
     } catch (error) {
-      // Don't create generation document if API call fails
-      // The song still exists, but user can retry generation
+      if (error instanceof GenerationStillRunning) throw error;
+      // Don't create a generation document if the API call fails.
+      // The create form soft-deletes the song it just wrote so a retry
+      // does not leave an empty public shell.
       console.error('[createGeneration] MusicGPT request failed', redactForLog(error));
       throw new Error(
         `Failed to initiate MusicGPT generation: ${

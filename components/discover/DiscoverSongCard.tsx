@@ -8,8 +8,9 @@ import { CoinBadge } from '@/components/songs/CoinBadge';
 import { DiscoverCoinRow } from '@/components/discover/DiscoverCoinRow';
 import { ArtistFace } from '@/components/artists/ArtistFace';
 import { MaybeArtistLink } from '@/components/songs/MaybeArtistLink';
-import { coverFieldsFromSong } from '@/lib/covers/resolve';
+import { resolveVisibleCover } from '@/lib/covers/moderation';
 import { artistFaceSources, songCoverCandidates } from '@/lib/images/artistFace';
+import { useCoverModerationEnabled } from '@/components/providers/CoverModerationProvider';
 import type { ArtistCardDisplay } from '@/lib/artists/cardDisplay';
 
 interface DiscoverSongCardProps {
@@ -33,6 +34,12 @@ export function DiscoverSongCard({
   const name = artist?.name || artistName;
   const linkable = artist?.isPublic === true;
   const photoUrl = artist?.photoUrl ?? null;
+  const moderationEnabled = useCoverModerationEnabled();
+  const visible = resolveVisibleCover(song, {
+    enabled: moderationEnabled,
+    faceUrl: photoUrl,
+    artistName: name || 'Artist',
+  });
   return (
     <article className="block rounded-[12px] bg-card">
       <PlayableArt
@@ -40,7 +47,8 @@ export function DiscoverSongCard({
         title={song.title}
         artistName={name || 'Artist'}
         artistId={song.artistId}
-        cover={coverFieldsFromSong(song)}
+        cover={visible.fields}
+        emptyInitials={visible.initials}
         playback="visibility"
         durationSeconds={song.duration}
         href={`/songs/${song.id}`}
@@ -61,7 +69,7 @@ export function DiscoverSongCard({
               <>
                 <ArtistFace
                   name={name}
-                  sources={artistFaceSources(photoUrl, songCoverCandidates(song))}
+                  sources={artistFaceSources(photoUrl, songCoverCandidates(visible.fields))}
                   size="card"
                 />
                 <MaybeArtistLink

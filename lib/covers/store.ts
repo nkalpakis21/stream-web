@@ -7,6 +7,7 @@ import { COLLECTIONS } from '@/lib/firebase/collections';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { firestoreNow } from '@/lib/x/artistStore';
 import type {
+  CoverModeration,
   CoverMotionStatus,
   CoverProviderCrumbs,
   SongDocument,
@@ -20,6 +21,7 @@ export async function updateSongCoverFields(
     coverMotionStatus?: CoverMotionStatus | null;
     coverMotionError?: string | null;
     coverProvider?: CoverProviderCrumbs | null;
+    coverModeration?: CoverModeration | null;
   }
 ): Promise<void> {
   const payload: Record<string, unknown> = {
@@ -41,6 +43,9 @@ export async function updateSongCoverFields(
   }
   if (fields.coverProvider !== undefined) {
     payload.coverProvider = fields.coverProvider;
+  }
+  if (fields.coverModeration !== undefined) {
+    payload.coverModeration = fields.coverModeration;
   }
 
   await getAdminDb().collection(COLLECTIONS.songs).doc(songId).set(payload, {

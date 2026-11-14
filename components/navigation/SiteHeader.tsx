@@ -9,9 +9,10 @@ import { Logo } from '@/components/branding/Logo';
 import { CreateEntrySheet } from '@/components/create/CreateEntrySheet';
 import { authHref } from '@/lib/auth/returnTo';
 import { ANALYTICS_EVENTS, trackEvent } from '@/lib/analytics/track';
-import { CREATE_ARTIST_HREF, STUDIO_NEW_ARTIST_HREF } from '@/lib/create/paths';
-import { isCreatePath } from '@/lib/listen/surface';
+import { CREATE_ARTIST_HREF, createEntryTarget } from '@/lib/create/paths';
 import { useOwnedArtistCount } from '@/hooks/useOwnedArtistCount';
+import { isCreatePath } from '@/lib/listen/surface';
+import { isSongPagePath } from '@/lib/songs/paths';
 
 const navLinks = [
   { href: '/discover', label: 'Discover' },
@@ -43,10 +44,13 @@ export function SiteHeader() {
   const pathname = usePathname();
   const { hasArtists } = useOwnedArtistCount();
   const [createOpen, setCreateOpen] = useState(false);
+  const openCreateSheet = Boolean(user) && createEntryTarget({ signedIn: true, hasArtists }) === 'sheet';
   const onAuthPage = pathname === '/signin' || pathname === '/signup';
-  const hideLoggedOutCreate = onAuthPage || isCreatePath(pathname);
+  const songPage = isSongPagePath(pathname);
+  const hideLoggedOutCreate = onAuthPage || isCreatePath(pathname) || songPage;
   const returnTo = onAuthPage ? '/discover' : pathname;
-  const visibleLinks = navLinks.filter((link) => !link.requireAuth || user);
+  const visibleLinks =
+    songPage && !user ? [] : navLinks.filter((link) => !link.requireAuth || user);
 
   return (
     <header
@@ -90,7 +94,7 @@ export function SiteHeader() {
         <div className="ml-auto flex shrink-0 items-center gap-2">
           {user ? (
             <>
-              {hasArtists ? (
+              {openCreateSheet ? (
                 <button
                   type="button"
                   className="inline-flex items-center justify-center px-3 font-semibold sm:px-4"
@@ -104,7 +108,7 @@ export function SiteHeader() {
                 </button>
               ) : (
                 <Link
-                  href={STUDIO_NEW_ARTIST_HREF}
+                  href={CREATE_ARTIST_HREF}
                   className="inline-flex items-center justify-center px-3 font-semibold sm:px-4"
                   style={iceCtaStyle}
                   onClick={() => trackEvent(ANALYTICS_EVENTS.CTA_CREATE_HEADER)}

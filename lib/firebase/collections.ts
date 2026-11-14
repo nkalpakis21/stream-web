@@ -69,6 +69,21 @@ export const COLLECTIONS = {
    * The signed-in user reads and writes this doc and filters songs and artists locally.
    */
   blocks: 'blocks',
+  /**
+   * Funnel events. First-time milestones use doc id `${uid}_${event}`.
+   * play, song_shared, x_post, and create_options_used use an auto id and are
+   * written every time. x_post and create_options_used are server-only.
+   * Admin SDK only. Clients cannot read or write this collection.
+   */
+  funnelEvents: 'funnelEvents',
+  /**
+   * Lyrics Generator quota. Doc id is the uid.
+   * sessions.{sessionId} caps one create attempt at 3 drafts.
+   * dayCount caps the UTC day at 30. Admin SDK only.
+   * Enable a Firestore TTL policy on field `expireAt`
+   * (firestore.indexes.json field override).
+   */
+  lyricsDraftQuota: 'lyricsDraftQuota',
 } as const;
 
 export type CollectionName = typeof COLLECTIONS[keyof typeof COLLECTIONS];

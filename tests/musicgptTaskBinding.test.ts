@@ -227,6 +227,9 @@ function binding(partial: Partial<MusicGptTaskBinding> & Pick<MusicGptTaskBindin
     conversionIds: partial.conversionIds ?? [CONVERSION_ID],
     createdAt: partial.createdAt ?? Timestamp.fromMillis(NOW_MS),
     expireAt: partial.expireAt ?? Timestamp.fromMillis(NOW_MS + MUSICGPT_TASK_TTL_MS),
+    ...(partial.model !== undefined ? { model: partial.model } : {}),
+    ...(partial.apiVersion ? { apiVersion: partial.apiVersion } : {}),
+    ...(partial.creditEstimate !== undefined ? { creditEstimate: partial.creditEstimate } : {}),
   };
 }
 
@@ -676,6 +679,144 @@ describe('MusicGPT webhook task binding', { concurrency: false }, () => {
       assert.equal(warnings.some((line) => line === `musicgpt_task_unbound ${TASK_ID}`), true);
     });
   });
+
+  it('accepts audio_streaming without completing the conversion', async () => {
+    await withWebhookDb(async (memory) => {
+      const victimSong = song({ id: 'song-victim', ownerId: 'victim', title: 'Real' });
+      const victimGen = generation({
+        id: 'gen-victim',
+        songId: victimSong.id,
+        taskId: TASK_ID,
+        createdAt: recent(),
+      });
+      await seed(memory, {
+        songs: [victimSong],
+        generations: [victimGen],
+        taskBinding: binding({ uid: 'victim', songId: victimSong.id }),
+      });
+
+      const streaming = await processMusicGptWebhook({
+        success: true,
+        conversion_type: 'Music AI',
+        task_id: TASK_ID,
+        conversion_id: CONVERSION_ID,
+        subtype: 'audio_streaming',
+        streaming_url: 'https://cdn.example/streams/index.m3u8',
+      });
+      assert.equal(streaming.status, 200);
+      const streamingBody = await streaming.json();
+      assert.equal(streamingBody.ok, true);
+      assert.equal(streamingBody.ignored, 'audio_streaming');
+      assert.equal(versionsFor(memory, victimSong.id).length, 0);
+      const pending = memory.list(COLLECTIONS.generations).find((row) => row.id === 'gen-victim');
+      assert.equal(pending?.data.status, 'pending');
+      const task = memory.list(COLLECTIONS.musicgptTasks).find((row) => row.id === TASK_ID);
+      const streams = task?.data.streamingByConversionId as Record<string, string>;
+      assert.equal(streams[CONVERSION_ID], 'https://cdn.example/streams/index.m3u8');
+
+      const equivalent = await processMusicGptWebhook({
+        success: true,
+        conversion_type: 'Music AI',
+        task_id: TASK_ID,
+        conversion_id: 'conv-stream',
+        subtype: 'audio-streaming',
+        streaming_url: 'https://user:secret@cdn.example/streams/other.m3u8',
+      });
+      assert.equal(equivalent.status, 200);
+      const taskAfter = memory.list(COLLECTIONS.musicgptTasks).find((row) => row.id === TASK_ID);
+      const streamsAfter = taskAfter?.data.streamingByConversionId as Record<string, string>;
+      assert.equal(streamsAfter['conv-stream'], 'https://cdn.example/streams/other.m3u8');
+      assert.equal(JSON.stringify(taskAfter?.data).includes('secret'), false);
+
+      const bareStream = await processMusicGptWebhook({
+        success: true,
+        conversion_type: 'Music AI',
+        task_id: TASK_ID,
+        streaming_url: 'https://cdn.example/streams/bare.m3u8',
+      });
+      assert.equal(bareStream.status, 200);
+
+      const lyrics = await processMusicGptWebhook({
+        success: true,
+        conversion_type: 'Music AI',
+        task_id: TASK_ID,
+        conversion_id: CONVERSION_ID,
+        subtype: 'lyrics_timestamped',
+        lyrics_timestamped: '[]',
+      });
+      assert.equal(lyrics.status, 200);
+      assert.equal(versionsFor(memory, victimSong.id).length, 0);
+
+      const done = await processMusicGptWebhook(completionBody());
+      assert.equal(done.status, 200);
+      assert.equal(versionsFor(memory, victimSong.id).length, 1);
+      const completed = memory.list(COLLECTIONS.generations).find((row) => row.id === 'gen-victim');
+      assert.equal(completed?.data.status, 'completed');
+    });
+  });
+
+  it('records model, cost, and duration when the job completes', async () => {
+    await withWebhookDb(async (memory) => {
+      const started = Date.now() - 8_000;
+      const logs: string[] = [];
+      const originalLog = console.log;
+      console.log = (...args: unknown[]) => {
+        logs.push(args.map(String).join(' '));
+      };
+      try {
+        const victimSong = song({ id: 'song-victim', ownerId: 'victim', title: 'Real' });
+        const victimGen = generation({
+          id: 'gen-victim',
+          songId: victimSong.id,
+          taskId: TASK_ID,
+          createdAt: Timestamp.fromMillis(started),
+        });
+        await seed(memory, {
+          songs: [victimSong],
+          generations: [victimGen],
+          taskBinding: binding({
+            uid: 'victim',
+            songId: victimSong.id,
+            createdAt: Timestamp.fromMillis(started),
+            model: 'v6',
+            apiVersion: 'v2',
+            creditEstimate: 0.035,
+          }),
+        });
+
+        const response = await processMusicGptWebhook({
+          ...completionBody(),
+          cost: 0.035,
+        });
+        assert.equal(response.status, 200);
+        const stored = memory.list(COLLECTIONS.generations).find((row) => row.id === 'gen-victim');
+        const usage = stored?.data.musicGptUsage as {
+          model: string;
+          apiVersion: string;
+          creditEstimate: number;
+          chargedCost: number;
+          durationMs: number;
+          taskId: string;
+          songId: string;
+          generationId: string;
+        };
+        assert.equal(usage.model, 'v6');
+        assert.equal(usage.apiVersion, 'v2');
+        assert.equal(usage.creditEstimate, 0.035);
+        assert.equal(usage.chargedCost, 0.035);
+        assert.equal(usage.taskId, TASK_ID);
+        assert.equal(usage.songId, victimSong.id);
+        assert.equal(usage.generationId, 'gen-victim');
+        assert.ok(usage.durationMs >= 8_000);
+        assert.ok(usage.durationMs < 60_000);
+        assert.equal(stored?.data.status, 'completed');
+        assert.ok(logs.some((line) => line.includes('musicgpt_generation_complete')));
+        assert.equal(logs.some((line) => line.includes('test-musicgpt-key')), false);
+      } finally {
+        console.log = originalLog;
+      }
+    });
+  });
 });
 
 describe('POST /api/generations/musicgpt song binding', { concurrency: false }, () => {
@@ -696,6 +837,7 @@ describe('POST /api/generations/musicgpt song binding', { concurrency: false }, 
   ) {
     setEnv('WEBHOOK_BASE_URL', 'https://configured.example');
     setEnv('MUSICGPT_WEBHOOK_SECRET', 'webhook-secret');
+    setEnv('MUSICGPT_API_VERSION', undefined);
     setMusicGptGenerationDepsForTests(deps);
     return POST(request(body));
   }
@@ -756,6 +898,9 @@ describe('POST /api/generations/musicgpt song binding', { concurrency: false }, 
         uid: 'victim',
         songId: 'song-victim',
         conversionIds: ['c1', 'c2'],
+        model: 'v6',
+        apiVersion: 'v2',
+        platform: 'unknown',
       },
     ]);
   });

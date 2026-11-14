@@ -24,6 +24,7 @@ export interface ListenTrack {
   artistPhotoUrl: string | null;
   artistLinkable: boolean;
   cover: CoverFields;
+  emptyInitials?: string | null;
   playCount: number;
   ticker: string | null;
   coinIcon: string | null;
@@ -38,6 +39,7 @@ interface FeaturedTrack {
   artistPhotoUrl: string | null;
   artistLinkable: boolean;
   cover: CoverFields;
+  emptyInitials?: string | null;
   audioUrl: string;
   ticker: string | null;
   coinIcon: string | null;
@@ -112,6 +114,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                   artistName={featured.artistName}
                   artistId={featured.artistId}
                   cover={featured.cover}
+                  emptyInitials={featured.emptyInitials}
                   playback="always"
                   audioUrl={featured.audioUrl}
                 />
@@ -181,6 +184,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
               artistPhotoUrl: track.artistPhotoUrl,
               artistLinkable: track.artistLinkable,
               cover: track.cover,
+              emptyInitials: track.emptyInitials,
               coin: track.coin,
             }))}
           />
@@ -221,6 +225,7 @@ export function HomeListenShell({ featured, heat, live }: HomeListenShellProps) 
                     title={track.title}
                     playback="visibility"
                     sizes="200px"
+                    emptyInitials={track.emptyInitials}
                   />
                 </div>
                 <p className="mt-2 truncate text-sm font-medium" data-entity="track">{track.title}</p>

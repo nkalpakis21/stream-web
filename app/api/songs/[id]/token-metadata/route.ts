@@ -11,6 +11,7 @@ import { adminGetSong } from '@/lib/server/songsAdmin';
 import { verifiedViewerIdFromRequest } from '@/lib/server/viewer';
 import { songIsVisible } from '@/lib/songs/visibility';
 import { getArtistCardContext } from '@/lib/server/artistDisplay';
+import { coverIsPublic, isCoverModerationEnabled } from '@/lib/covers/moderation';
 import { resolveCoverPoster } from '@/lib/covers/resolve';
 
 export const dynamic = 'force-dynamic';
@@ -39,7 +40,10 @@ export async function GET(
       process.env.NEXT_PUBLIC_APP_URL || 'https://streamstar.xyz';
     const songUrl = `${baseUrl}/songs/${songId}`;
 
-    const coverPath = resolveCoverPoster(song);
+    const moderationOn = isCoverModerationEnabled();
+    const coverPath = coverIsPublic(song, moderationOn)
+      ? resolveCoverPoster(song)
+      : artist?.photoUrl ?? null;
     const imageUrl = coverPath
       ? coverPath.startsWith('http')
         ? coverPath

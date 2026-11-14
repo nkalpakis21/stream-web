@@ -7,7 +7,7 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { CreateEntrySheet } from '@/components/create/CreateEntrySheet';
 import { authHref } from '@/lib/auth/returnTo';
 import { ANALYTICS_EVENTS, trackEvent } from '@/lib/analytics/track';
-import { CREATE_ARTIST_HREF, STUDIO_NEW_ARTIST_HREF } from '@/lib/create/paths';
+import { CREATE_ARTIST_HREF, createEntryTarget } from '@/lib/create/paths';
 import { useOwnedArtistCount } from '@/hooks/useOwnedArtistCount';
 
 const tabs = [
@@ -60,14 +60,7 @@ export function MobileTabBar() {
   const youLabel = user ? 'You' : 'Log in';
   const youActive = pathname.startsWith('/dashboard') || pathname.startsWith('/me') || pathname.startsWith('/signin') || pathname.startsWith('/signup');
   const createActive = pathname.startsWith('/create');
-  const createHref = user ? STUDIO_NEW_ARTIST_HREF : CREATE_ARTIST_HREF;
-
-  const onCreateClick = () => {
-    trackEvent(ANALYTICS_EVENTS.CTA_CREATE_HEADER);
-    if (user && hasArtists) {
-      setCreateOpen(true);
-    }
-  };
+  const openCreateSheet = Boolean(user) && createEntryTarget({ signedIn: true, hasArtists }) === 'sheet';
 
   return (
     <nav
@@ -95,10 +88,13 @@ export function MobileTabBar() {
             </Link>
           );
         })}
-        {user && hasArtists ? (
+        {openCreateSheet ? (
           <button
             type="button"
-            onClick={onCreateClick}
+            onClick={() => {
+              trackEvent(ANALYTICS_EVENTS.CTA_CREATE_HEADER);
+              setCreateOpen(true);
+            }}
             className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium ${
               createActive || createOpen ? 'text-primary' : 'text-muted-foreground'
             }`}
@@ -108,8 +104,8 @@ export function MobileTabBar() {
           </button>
         ) : (
           <Link
-            href={createHref}
-            onClick={onCreateClick}
+            href={CREATE_ARTIST_HREF}
+            onClick={() => trackEvent(ANALYTICS_EVENTS.CTA_CREATE_HEADER)}
             className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium ${
               createActive ? 'text-primary' : 'text-muted-foreground'
             }`}

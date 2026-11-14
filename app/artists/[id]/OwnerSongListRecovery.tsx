@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { shouldRefreshOwnerCatalog } from '@/lib/artists/ownerSongs';
+import { webPlatformHeaders } from '@/lib/funnel/platform';
 
 const REFRESH_PREFIX = 'ss-owner-songs-refresh:';
 
@@ -38,7 +39,7 @@ export function OwnerSongListRecovery({
         const session = await fetch('/api/auth/viewer', {
           method: 'POST',
           cache: 'no-store',
-          headers: { Authorization: `Bearer ${token}` },
+          headers: webPlatformHeaders({ Authorization: `Bearer ${token}` }),
         });
         if (!session.ok || cancelled) return;
         sessionStorage.setItem(key, '1');

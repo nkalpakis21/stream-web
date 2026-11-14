@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes } from 'crypto';
+import type { FunnelPlatform } from '@/lib/funnel/platform';
 import { getXClientSecret } from './config';
 
 export function base64Url(buf: Buffer): string {
@@ -23,6 +24,8 @@ export interface XOAuthSession {
   state: string;
   verifier: string;
   artistId: string;
+  /** Platform header from POST /api/x/connect. The X redirect does not resend it. */
+  platform?: FunnelPlatform;
 }
 
 function signingKey(): string {
@@ -55,7 +58,15 @@ export function verifyOAuthSession(value: string | undefined): XOAuthSession | n
       typeof json.verifier === 'string' &&
       typeof json.artistId === 'string'
     ) {
-      return json as XOAuthSession;
+      const session: XOAuthSession = {
+        state: json.state,
+        verifier: json.verifier,
+        artistId: json.artistId,
+      };
+      if (json.platform === 'web' || json.platform === 'ios' || json.platform === 'unknown') {
+        session.platform = json.platform;
+      }
+      return session;
     }
   } catch {
     return null;

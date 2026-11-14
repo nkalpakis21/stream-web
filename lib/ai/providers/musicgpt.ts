@@ -7,7 +7,118 @@
  */
 
 import { AIProvider, AIGenerationRequest, AIGenerationResponse } from '../types';
+import { isFalCoverPipeline } from '@/lib/covers/config';
 import { redactForLog, redactSecrets, redactUrl } from '@/lib/webhooks/redactUrl';
+
+/**
+ * MusicAI v2 default. Docs list v6 as the fast everyday model.
+ * Do not send v7 / v7-pro from this path.
+ */
+export const MUSICGPT_DEFAULT_MODEL = 'v6';
+
+export type MusicGptApiVersion = 'v1' | 'v2';
+
+/**
+ * `MUSICGPT_API_VERSION=v1` rolls the create call back to deprecated MusicAI.
+ * Anything else, including unset, uses v2.
+ */
+export function musicGptApiVersion(
+  raw: string | undefined = process.env.MUSICGPT_API_VERSION
+): MusicGptApiVersion {
+  return raw?.trim().toLowerCase() === 'v1' ? 'v1' : 'v2';
+}
+
+/**
+ * Origin for `/api/public/{version}/...`.
+ * `MUSICGPT_BASE_URL` may be the host or may already end in `/api/public/v1`.
+ */
+export function musicGptPublicOrigin(baseUrl: string): string {
+  const trimmed = baseUrl.trim().replace(/\/+$/, '');
+  const match = trimmed.match(/^(.*)\/api\/public(?:\/v[12](?:\/.*)?)?$/i);
+  if (match?.[1]) return match[1].replace(/\/+$/, '');
+  return trimmed;
+}
+
+export function musicGptEndpointUrl(
+  baseUrl: string,
+  version: MusicGptApiVersion,
+  endpoint: 'MusicAI' | 'byId'
+): string {
+  return `${musicGptPublicOrigin(baseUrl)}/api/public/${version}/${endpoint}`;
+}
+
+export function musicGptCreateUrl(
+  baseUrl: string,
+  version: MusicGptApiVersion = musicGptApiVersion()
+): string {
+  return musicGptEndpointUrl(baseUrl, version, 'MusicAI');
+}
+
+/** Conversion lookup stays on GET /v1/byId. */
+export function musicGptByIdUrl(baseUrl: string): string {
+  return musicGptEndpointUrl(baseUrl, 'v1', 'byId');
+}
+
+/**
+ * Lyrics Generator. Documented only as GET /v1/prompt_to_lyrics?prompt=
+ * https://docs.musicgpt.com/api-documentation/conversions/lyrics_generator
+ * Prod MusicAI stays on v1 via MUSICGPT_API_VERSION. Develop may create on v2.
+ * This call stays on v1 either way, because that is the documented lyrics path.
+ */
+export function musicGptPromptToLyricsUrl(baseUrl: string): string {
+  return `${musicGptPublicOrigin(baseUrl)}/api/public/v1/prompt_to_lyrics`;
+}
+
+/**
+ * MusicGPT covers when COVER_PIPELINE is not fal. Fal posters are the source
+ * of truth once COVER_PIPELINE=fal, so we do not ask MusicGPT for a cover.
+ */
+export function musicGptGenerateAlbumCover(): boolean {
+  return !isFalCoverPipeline();
+}
+
+export type MusicGptCreateInput = {
+  prompt: string;
+  lyrics?: string;
+  music_style?: string;
+  make_instrumental?: boolean;
+  /**
+   * Documented on MusicAI v1 and v2 as `male`, `female`, or `neutral`.
+   * We send male or female only. Omitting the field leaves the artist's voice.
+   * https://docs.musicgpt.com/api-documentation/conversions/musicai
+   * https://docs.musicgpt.com/api-documentation/conversions/musicaiv2
+   */
+  gender?: 'male' | 'female';
+  webhook_url?: string;
+  title?: string;
+};
+
+/**
+ * v2 needs lyrics_timestamps explicitly (the API default is false).
+ * v1 does not document that flag or `model`, so rollback omits both.
+ * `num_outputs` is not a documented MusicAI field and is not sent.
+ */
+export function buildMusicGptCreateBody(
+  payload: MusicGptCreateInput,
+  options?: { version?: MusicGptApiVersion; generateAlbumCover?: boolean }
+): Record<string, unknown> {
+  const version = options?.version ?? musicGptApiVersion();
+  const body: Record<string, unknown> = {
+    prompt: payload.prompt,
+    make_instrumental: payload.make_instrumental ?? false,
+    generate_album_cover: options?.generateAlbumCover ?? musicGptGenerateAlbumCover(),
+  };
+  if (payload.lyrics) body.lyrics = payload.lyrics;
+  if (payload.music_style) body.music_style = payload.music_style;
+  if (payload.gender === 'male' || payload.gender === 'female') body.gender = payload.gender;
+  if (payload.webhook_url) body.webhook_url = payload.webhook_url;
+  if (payload.title) body.title = payload.title;
+  if (version === 'v2') {
+    body.lyrics_timestamps = true;
+    body.model = MUSICGPT_DEFAULT_MODEL;
+  }
+  return body;
+}
 
 /** Token embedded in the callback URL, used only to scrub logs. */
 function callbackToken(webhookUrl?: string): string | null {
@@ -22,7 +133,7 @@ function callbackToken(webhookUrl?: string): string | null {
 type ArtistContext = NonNullable<AIGenerationRequest['artistContext']>;
 
 /** MusicGPT prompt guidance is ~280 chars; style can be longer, but keep it bounded. */
-const MUSIC_STYLE_MAX_LENGTH = 1000;
+export const MUSIC_STYLE_MAX_LENGTH = 1000;
 
 /**
  * Map an artist's full style DNA into MusicGPT request fields.
@@ -80,7 +191,9 @@ export function buildMusicGPTStyleFromArtistContext(artistContext?: ArtistContex
 
   return {
     ...(music_style ? { music_style } : {}),
-    make_instrumental: trimmedLore.toLowerCase().includes('instrumental'),
+    // Lore text can mention "instrumental" without asking for a beat-only track.
+    // Only the create panel switch sets make_instrumental.
+    make_instrumental: false,
   };
 }
 
@@ -110,42 +223,15 @@ function getMusicGPTConfig() {
  * The exact payload shape is kept narrow and vendor-specific here so the rest
  * of the app can work with higher-level abstractions.
  */
-export async function createMusicGPTSong(payload: {
-  prompt: string;
-  lyrics?: string;
-  music_style?: string;
-  make_instrumental?: boolean;
-  webhook_url?: string;
-  /**
-   * MusicGPT defaults to 2 audio conversions per request.
-   * Default to 1 unless the caller explicitly asks for more.
-   */
-  num_outputs?: 1 | 2;
-}) {
+export async function createMusicGPTSong(payload: MusicGptCreateInput) {
   const { MUSICGPT_BASE_URL, MUSICGPT_API_KEY } = getMusicGPTConfig();
   
   if (!MUSICGPT_BASE_URL || !MUSICGPT_API_KEY) {
     throw new Error('MusicGPT configuration is missing');
   }
 
-  // Construct base URL - handle case where BASE_URL might already include /api/public/v1
-  let baseUrl = MUSICGPT_BASE_URL;
-  if (!baseUrl.includes('/api/public/v1')) {
-    baseUrl = `${baseUrl}/api/public/v1`;
-  }
-  
-  const url = `${baseUrl}/MusicAI`;
-  
-  // Include webhook_url in payload if provided.
-  // num_outputs defaults to 1 so we do not pay for a second unused conversion.
-  const requestPayload: Record<string, unknown> = {
-    prompt: payload.prompt,
-    ...(payload.lyrics && { lyrics: payload.lyrics }),
-    ...(payload.music_style && { music_style: payload.music_style }),
-    make_instrumental: payload.make_instrumental ?? false,
-    num_outputs: payload.num_outputs ?? 1,
-    ...(payload.webhook_url && { webhook_url: payload.webhook_url }),
-  };
+  const url = musicGptCreateUrl(MUSICGPT_BASE_URL);
+  const requestPayload = buildMusicGptCreateBody(payload);
   
   const callbackSecret = callbackToken(payload.webhook_url);
   console.log('[MusicGPT] Making request to:', redactUrl(url));
@@ -247,13 +333,7 @@ export async function getConversionDataByTaskID(
   }
 
   try {
-    // Construct base URL - handle case where BASE_URL might already include /api/public/v1
-    let baseUrl = MUSICGPT_BASE_URL;
-    if (!baseUrl.includes('/api/public/v1')) {
-      baseUrl = `${baseUrl}/api/public/v1`;
-    }
-    
-    const url = new URL(`${baseUrl}/byId`);
+    const url = new URL(musicGptByIdUrl(MUSICGPT_BASE_URL));
     url.searchParams.append('conversionType', conversionType);
     url.searchParams.append('task_id', taskId);
 
@@ -308,13 +388,7 @@ export async function getConversionDataByConversionID(
   }
 
   try {
-    // Construct base URL - handle case where BASE_URL might already include /api/public/v1
-    let baseUrl = MUSICGPT_BASE_URL;
-    if (!baseUrl.includes('/api/public/v1')) {
-      baseUrl = `${baseUrl}/api/public/v1`;
-    }
-    
-    const url = new URL(`${baseUrl}/byId`);
+    const url = new URL(musicGptByIdUrl(MUSICGPT_BASE_URL));
     url.searchParams.append('conversionType', conversionType);
     url.searchParams.append('conversion_id', conversionId);
 
@@ -348,6 +422,41 @@ export async function getConversionDataByConversionID(
 }
 
 /**
+ * Lyrics Generator. GET /v1/prompt_to_lyrics.
+ * The prompt must already be 1–1000 characters.
+ * Returns the `lyrics` string from a successful body.
+ */
+export async function createMusicGptLyrics(prompt: string): Promise<string> {
+  const { MUSICGPT_BASE_URL, MUSICGPT_API_KEY } = getMusicGPTConfig();
+  if (!MUSICGPT_BASE_URL || !MUSICGPT_API_KEY) {
+    throw new Error('MusicGPT configuration is missing');
+  }
+  const url = new URL(musicGptPromptToLyricsUrl(MUSICGPT_BASE_URL));
+  url.searchParams.set('prompt', prompt);
+  const res = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      Authorization: MUSICGPT_API_KEY,
+      accept: 'application/json',
+    },
+  });
+  const responseText = await res.text();
+  if (!res.ok) {
+    throw new Error(`MusicGPT lyrics request failed with status ${res.status}`);
+  }
+  let parsed: { lyrics?: unknown };
+  try {
+    parsed = JSON.parse(responseText) as { lyrics?: unknown };
+  } catch {
+    throw new Error('MusicGPT lyrics response was not JSON');
+  }
+  if (typeof parsed.lyrics !== 'string' || !parsed.lyrics.trim()) {
+    throw new Error('MusicGPT did not return lyrics');
+  }
+  return parsed.lyrics.trim();
+}
+
+/**
  * MusicGPT AIProvider implementation.
  *
  * Note: MusicGPT is asynchronous – it does not return final audio here.
@@ -369,7 +478,6 @@ export class MusicGPTProvider implements AIProvider {
     const response = await createMusicGPTSong({
       prompt: request.prompt.freeText,
       ...style,
-      num_outputs: 1,
     });
 
     // Try a few common keys for the remote task identifier.

@@ -20,6 +20,26 @@ function clip(value: string, max: number): string {
   return `${trimmed.slice(0, Math.max(0, max - 1)).trim()}…`;
 }
 
+/**
+ * Posts are never replies, @mentions, or cashtags.
+ * `$TICKER` and hashtags that contain `$` are removed. `@` is stripped.
+ */
+export function stripXMentions(value: string): string {
+  return value
+    .replace(/@/g, '')
+    .replace(/#[^\s#]*\$[^\s#]*/g, ' ')
+    .replace(/\$[A-Za-z][A-Za-z0-9_]*/g, ' ')
+    .replace(/\$/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+/** First lore sentence, before stripping. The blocklist sees this line. */
+export function rawLoreLine(lore: string): string {
+  const first = (lore || '').split(/[\n.!?]/)[0] || lore || '';
+  return first.replace(/\s+/g, ' ').trim();
+}
+
 function hashString(value: string): number {
   let h = 0;
   for (let i = 0; i < value.length; i++) {
@@ -36,8 +56,7 @@ function vibe(styleDNA: StyleDNA): string {
 }
 
 function loreLine(lore: string, max: number): string {
-  const first = lore.split(/[\n.!?]/)[0] || lore;
-  return clip(first, max);
+  return clip(stripXMentions(rawLoreLine(lore)), max);
 }
 
 /**
@@ -45,9 +64,9 @@ function loreLine(lore: string, max: number): string {
  * No LLM. Rotates templates so we do not repeat the last ~20 posts.
  */
 export function composeSongLivePost(input: ComposeSongPostInput): string {
-  const name = clip(input.artistName || 'Artist', 40);
-  const title = clip(input.songTitle || 'a new song', 80);
-  const vibeText = vibe(input.styleDNA);
+  const name = clip(stripXMentions(input.artistName || 'Artist'), 40);
+  const title = clip(stripXMentions(input.songTitle || 'a new song'), 80);
+  const vibeText = stripXMentions(vibe(input.styleDNA));
   const recent = new Set(
     (input.recentPostTexts || []).map(t => t.trim().toLowerCase())
   );
@@ -91,17 +110,18 @@ export function composeSongLivePost(input: ComposeSongPostInput): string {
   if (!characterLine) {
     characterLine = clip(`${name}: "${title}"`, charBudget);
   }
+  characterLine = clip(stripXMentions(characterLine), charBudget);
 
   const body = `${characterLine}\n\n${titleLine}\n${input.songUrl}`;
   return body;
 }
 
 export function composeProfileBio(lore: string, artistName: string): string {
-  const prefix = clip(artistName, 40);
-  const rest = clip(lore || `${prefix} on Streamstar.`, 160);
+  const prefix = clip(stripXMentions(artistName), 40);
+  const rest = clip(stripXMentions(lore || `${prefix} on Streamstar.`), 160);
   return rest.slice(0, 160);
 }
 
 export function composeProfileName(artistName: string): string {
-  return clip(artistName, 50);
+  return clip(stripXMentions(artistName), 50);
 }

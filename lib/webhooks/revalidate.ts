@@ -2,6 +2,9 @@ import { absoluteHttpBaseUrl } from '@/lib/webhooks/baseUrl';
 
 export const REVALIDATE_BASE_URL_MISSING = 'revalidate_base_url_missing';
 
+/** Homepage (New + Heat) and Discover, including Discover's New sort. */
+export const CATALOG_REVALIDATE_PATHS = ['/', '/discover'] as const;
+
 type FetchLike = (url: string, init?: RequestInit) => Promise<unknown>;
 
 /**

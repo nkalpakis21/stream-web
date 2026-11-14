@@ -2,21 +2,23 @@
 
 import { useMemo, useState } from 'react';
 import { PlayableArt } from '@/components/songs/PlayableArt';
+import { CoverModerationNotice } from '@/components/songs/CoverModerationNotice';
 import { ShareButton } from '@/components/songs/ShareButton';
-import { CoinBadge } from '@/components/songs/CoinBadge';
-import { SongCoinCluster } from '@/components/songs/SongCoinCluster';
 import { ArtistFace } from '@/components/artists/ArtistFace';
 import { MaybeArtistLink } from '@/components/songs/MaybeArtistLink';
 import { AiMark } from '@/components/brand/AiMark';
 import { useSongPlayer } from '@/components/songs/SongPlayerProvider';
-import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
+import { reportSharePagePlay } from '@/lib/analytics/sharePlay';
 import { coverFieldsFromSong, playerCoverPayload, type CoverFields } from '@/lib/covers/resolve';
 import { artistFaceSources, songCoverCandidates } from '@/lib/images/artistFace';
+import { createDebouncedPlayTracker } from '@/lib/utils/playTracking';
+import { SongCoverStack } from '@/components/songs/SongCoverStack';
 
 interface VersionOption {
   id: string;
   audioURL: string | null;
   isPrimary: boolean;
+  audioExpired?: boolean;
   duration?: number | null;
 }
 
@@ -32,13 +34,17 @@ interface SongStageProps {
   audioUrl: string | null;
   versions: VersionOption[];
   durationSeconds?: number | null;
-  ticker?: string | null;
-  coinIcon?: string | null;
-  coin?: ArtistCoinQuote | null;
-  buyUrl?: string | null;
   shareUrl: string;
   pending?: boolean;
   children?: React.ReactNode;
+  emptyInitials?: string | null;
+  ownerCoverNotice?: {
+    message: string;
+    action: 'replace' | 'retry';
+    buttonLabel: string;
+  } | null;
+  /** Beat player. Sits under the cover, not in a separate screen. */
+  belowCover?: React.ReactNode;
 }
 
 function formatClock(total: number): string {
@@ -70,19 +76,19 @@ export function SongStage({
   audioUrl,
   versions,
   durationSeconds = null,
-  ticker = null,
-  coinIcon = null,
-  coin = null,
-  buyUrl = null,
   shareUrl,
   pending = false,
   children,
+  emptyInitials = null,
+  ownerCoverNotice = null,
+  belowCover = null,
 }: SongStageProps) {
   const playable = useMemo(
-    () => versions.filter(v => v.audioURL),
+    () => versions.filter(v => v.audioURL && v.audioExpired !== true),
     [versions]
   );
   const { play } = useSongPlayer();
+  const trackPlay = useMemo(() => createDebouncedPlayTracker(500), []);
   const [activeId, setActiveId] = useState(
     playable.find(v => v.isPrimary)?.id || playable[0]?.id || null
   );
@@ -92,24 +98,44 @@ export function SongStage({
     durationSeconds != null && Number.isFinite(durationSeconds) && durationSeconds > 0
       ? formatClock(durationSeconds)
       : versionClock(active || { id: '', audioURL: null, isPrimary: false }, null);
-  const coverFields = coverFieldsFromSong({
-    ...cover,
-    albumCoverPath: cover?.albumCoverPath ?? albumCoverUrl,
-    albumCoverThumbnail: cover?.albumCoverThumbnail ?? albumCoverUrl,
-  });
+  const coverFields = cover
+    ? coverFieldsFromSong(cover)
+    : coverFieldsFromSong({
+        albumCoverPath: albumCoverUrl,
+        albumCoverThumbnail: albumCoverUrl,
+      });
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start">
-      <PlayableArt
-        songId={songId}
-        title={songTitle}
-        artistName={artistName}
-        artistId={artistId || undefined}
-        cover={coverFields}
-        playback="always"
-        audioUrl={currentAudio}
-        durationSeconds={durationSeconds}
-        className="w-full"
+      <SongCoverStack
+        cover={
+          <>
+            <PlayableArt
+              songId={songId}
+              title={songTitle}
+              artistName={artistName}
+              artistId={artistId || undefined}
+              cover={coverFields}
+              emptyInitials={emptyInitials}
+              playback="always"
+              audioUrl={currentAudio}
+              durationSeconds={durationSeconds}
+              sharePage
+              className="w-full"
+            />
+            {ownerCoverNotice ? (
+              <div className="mt-3">
+                <CoverModerationNotice
+                  songId={songId}
+                  message={ownerCoverNotice.message}
+                  action={ownerCoverNotice.action}
+                  buttonLabel={ownerCoverNotice.buttonLabel}
+                />
+              </div>
+            ) : null}
+          </>
+        }
+        below={belowCover}
       />
       <div className="min-w-0">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -137,12 +163,10 @@ export function SongStage({
           >
             {artistName}
           </MaybeArtistLink>
-          <CoinBadge ticker={ticker} iconSrc={coinIcon} />
         </div>
-        <SongCoinCluster artistId={artistId} quote={coin} buyUrl={buyUrl} linkable={artistLinkable} />
         {pending && !currentAudio && (
           <div
-            className="mt-6 rounded-xl border px-4 py-5"
+            className="mt-6 rounded-lg border px-4 py-5"
             style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}
           >
             <p className="text-sm font-medium text-foreground">Making the track</p>
@@ -171,6 +195,8 @@ export function SongStage({
                         ...playerCoverPayload(coverFields),
                         audioUrl: version.audioURL,
                       });
+                      reportSharePagePlay(songId, artistId || undefined);
+                      trackPlay(songId, { skipFunnel: true });
                     }
                   }}
                   className={`song-stage-chip ${selected ? 'is-selected' : ''}`}
@@ -182,7 +208,13 @@ export function SongStage({
           </div>
         )}
         <div className="mt-6">
-          <ShareButton url={shareUrl} title={songTitle} artistName={artistName} />
+          <ShareButton
+            url={shareUrl}
+            title={songTitle}
+            artistName={artistName}
+            songId={songId}
+            artistId={artistId || undefined}
+          />
         </div>
         {children}
       </div>

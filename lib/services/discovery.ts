@@ -21,7 +21,8 @@ import { db } from '@/lib/firebase/config';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import type { SongDocument, AIArtistDocument, DiscoveryQuery } from '@/types/firestore';
 import { searchArtistsByName } from '@/lib/services/artists';
-import { getArtistSongs } from '@/lib/services/songs';
+import { getArtistSongs, omitExpiredAudioSongs, unplayablePublicSongIds } from '@/lib/services/songs';
+import { takePlayablePage } from '@/lib/songs/audioAvailability';
 
 /**
  * Search songs by prompt (free-text search)
@@ -38,7 +39,7 @@ export async function searchSongsByPrompt(
     collection(db, COLLECTIONS.songs),
     where('isPublic', '==', true),
     orderBy('createdAt', 'desc'),
-    limit(limitCount * 2) // Get more to account for filtering
+    limit(limitCount * 4) // Extra rows so unplayable audio does not shrink the page
   );
   
   const snapshot = await getDocs(q);
@@ -48,8 +49,8 @@ export async function searchSongsByPrompt(
   const allSongs = snapshot.docs
     .map(doc => doc.data() as SongDocument)
     .filter(song => !song.deletedAt && song.title.toLowerCase().includes(queryLower));
-  
-  return allSongs.slice(0, limitCount);
+
+  return (await omitExpiredAudioSongs(allSongs)).slice(0, limitCount);
 }
 
 /**
@@ -65,15 +66,16 @@ export async function getSongsByGenres(
     collection(db, COLLECTIONS.songs),
     where('isPublic', '==', true),
     orderBy('createdAt', 'desc'),
-    limit(limitCount)
+    limit(Math.min(limitCount * 4, 80))
   );
   
   const snapshot = await getDocs(q);
   // Filter out deleted songs in memory (Firestore doesn't handle null comparisons well)
   // Handle both null and undefined (for older documents without deletedAt field)
-  return snapshot.docs
+  const songs = snapshot.docs
     .map(doc => doc.data() as SongDocument)
     .filter(song => !song.deletedAt);
+  return (await omitExpiredAudioSongs(songs)).slice(0, limitCount);
 }
 
 /**
@@ -88,15 +90,16 @@ export async function getSongsByArtist(
     where('artistId', '==', artistId),
     where('isPublic', '==', true),
     orderBy('createdAt', 'desc'),
-    limit(limitCount)
+    limit(Math.min(limitCount * 4, 80))
   );
   
   const snapshot = await getDocs(q);
   // Filter out deleted songs in memory (Firestore doesn't handle null comparisons well)
   // Handle both null and undefined (for older documents without deletedAt field)
-  return snapshot.docs
+  const songs = snapshot.docs
     .map(doc => doc.data() as SongDocument)
     .filter(song => !song.deletedAt);
+  return (await omitExpiredAudioSongs(songs)).slice(0, limitCount);
 }
 
 /**
@@ -109,39 +112,38 @@ export async function getRecentSongs(
     collection(db, COLLECTIONS.songs),
     where('isPublic', '==', true),
     orderBy('createdAt', 'desc'),
-    limit(limitCount)
+    limit(Math.min(limitCount * 4, 80))
   );
   
   const snapshot = await getDocs(q);
   // Filter out deleted songs in memory (Firestore doesn't handle null comparisons well)
   // Handle both null and undefined (for older documents without deletedAt field)
-  return snapshot.docs
+  const songs = snapshot.docs
     .map(doc => doc.data() as SongDocument)
     .filter(song => !song.deletedAt);
+  return (await omitExpiredAudioSongs(songs)).slice(0, limitCount);
 }
 
-/**
- * Get paginated public songs with cursor-based pagination
- * Uses the composite index: (isPublic, deletedAt, createdAt)
- */
-export async function getPaginatedPublicSongs(
-  limitCount: number = 20,
-  cursor: string | null = null
-): Promise<{
-  songs: SongDocument[];
-  nextCursor: string | null;
-  hasMore: boolean;
-}> {
+const PUBLIC_WINDOW_CAP = 100;
+
+function publicWindowSize(limitCount: number): number {
+  return Math.min(Math.max(limitCount * 4, limitCount), PUBLIC_WINDOW_CAP);
+}
+
+async function fetchPublicSongBatch(
+  batchSize: number,
+  cursor: string | null
+): Promise<SongDocument[]> {
+  const size = Math.max(1, batchSize);
   try {
     let q = query(
       collection(db, COLLECTIONS.songs),
       where('isPublic', '==', true),
       where('deletedAt', '==', null),
       orderBy('createdAt', 'desc'),
-      limit(limitCount + 1) // Fetch one extra to check if there are more
+      limit(size)
     );
 
-    // Add cursor if provided
     if (cursor) {
       try {
         const cursorDoc = await getDoc(doc(db, COLLECTIONS.songs, cursor));
@@ -152,7 +154,7 @@ export async function getPaginatedPublicSongs(
             where('deletedAt', '==', null),
             orderBy('createdAt', 'desc'),
             startAfter(cursorDoc),
-            limit(limitCount + 1)
+            limit(size)
           );
         }
       } catch (error) {
@@ -161,35 +163,15 @@ export async function getPaginatedPublicSongs(
     }
 
     const snapshot = await getDocs(q);
-    const docs = snapshot.docs;
-    
-    // Check if there are more results
-    const hasMore = docs.length > limitCount;
-    const songs = docs
-      .slice(0, limitCount)
-      .map(doc => doc.data() as SongDocument);
-
-    // Get next cursor (last document ID)
-    const nextCursor = hasMore && songs.length > 0 
-      ? songs[songs.length - 1].id 
-      : null;
-
-    return {
-      songs,
-      nextCursor,
-      hasMore,
-    };
+    return snapshot.docs.map(songDoc => songDoc.data() as SongDocument);
   } catch (error: any) {
-    // Fallback if composite index doesn't exist
     if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
       console.warn('[getPaginatedPublicSongs] Composite index missing, using fallback');
-      
-      // Simple fallback: fetch without deletedAt filter
       let q = query(
         collection(db, COLLECTIONS.songs),
         where('isPublic', '==', true),
         orderBy('createdAt', 'desc'),
-        limit(limitCount * 2 + 1) // Fetch more to account for deleted songs
+        limit(size)
       );
 
       if (cursor) {
@@ -201,27 +183,71 @@ export async function getPaginatedPublicSongs(
               where('isPublic', '==', true),
               orderBy('createdAt', 'desc'),
               startAfter(cursorDoc),
-              limit(limitCount * 2 + 1)
+              limit(size)
             );
           }
-        } catch (error) {
-          console.warn('[getPaginatedPublicSongs] Invalid cursor in fallback:', error);
+        } catch (cursorError) {
+          console.warn('[getPaginatedPublicSongs] Invalid cursor in fallback:', cursorError);
         }
       }
 
       const snapshot = await getDocs(q);
-      const allDocs = snapshot.docs
-        .map(doc => doc.data() as SongDocument)
-        .filter(song => !song.deletedAt);
-
-      const hasMore = allDocs.length > limitCount;
-      const songs = allDocs.slice(0, limitCount);
-      const nextCursor = hasMore && songs.length > 0 ? songs[songs.length - 1].id : null;
-
-      return { songs, nextCursor, hasMore };
+      return snapshot.docs
+        .map(songDoc => songDoc.data() as SongDocument)
+        .filter(song => !song.deletedAt)
+        .slice(0, size);
     }
     throw error;
   }
+}
+
+/**
+ * Get paginated public songs with cursor-based pagination
+ * Uses the composite index: (isPublic, deletedAt, createdAt).
+ * Shells and expired audio are omitted and do not occupy a page slot.
+ * `audioReady` is not an equality filter: older songs omit it and stay
+ * listed when a version still has playable audio.
+ */
+export async function getPaginatedPublicSongs(
+  limitCount: number = 20,
+  cursor: string | null = null
+): Promise<{
+  songs: SongDocument[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}> {
+  const window = publicWindowSize(limitCount);
+  const collected: SongDocument[] = [];
+  let cursorNow: string | null = cursor;
+  let hasMore = false;
+
+  for (let round = 0; round < 4 && collected.length < limitCount; round += 1) {
+    const docs = await fetchPublicSongBatch(window + 1, cursorNow);
+    if (docs.length === 0) {
+      hasMore = false;
+      cursorNow = null;
+      break;
+    }
+    const full = docs.length > window;
+    const batch = full ? docs.slice(0, window) : docs;
+    const blocked = await unplayablePublicSongIds(batch);
+    const page = takePlayablePage(
+      batch,
+      song => blocked.has(song.id),
+      limitCount - collected.length,
+      full
+    );
+    collected.push(...page.songs);
+    hasMore = page.hasMore;
+    cursorNow = page.nextCursor;
+    if (!page.hasMore || collected.length >= limitCount || !cursorNow) break;
+  }
+
+  return {
+    songs: collected.slice(0, limitCount),
+    nextCursor: hasMore ? cursorNow : null,
+    hasMore,
+  };
 }
 
 /**
@@ -243,12 +269,13 @@ export async function searchSongsByPromptPaginated(
   
   // Fetch a larger batch and filter in memory
   // In production, this should use a proper search service
+  const fetchLimit = Math.min(limitCount * 5 + 1, 100);
   let q = query(
     collection(db, COLLECTIONS.songs),
     where('isPublic', '==', true),
     where('deletedAt', '==', null),
     orderBy('createdAt', 'desc'),
-    limit(limitCount * 3 + 1) // Fetch more to account for filtering
+    limit(fetchLimit)
   );
 
   if (cursor) {
@@ -261,7 +288,7 @@ export async function searchSongsByPromptPaginated(
           where('deletedAt', '==', null),
           orderBy('createdAt', 'desc'),
           startAfter(cursorDoc),
-          limit(limitCount * 3 + 1)
+          limit(fetchLimit)
         );
       }
     } catch (error) {
@@ -290,9 +317,13 @@ export async function searchSongsByPromptPaginated(
     allSongs.push(song);
   }
 
-  const hasMore = titleMatches.length > limitCount;
-  const songs = allSongs.slice(0, limitCount);
-  const nextCursor = hasMore && songs.length > 0 ? songs[songs.length - 1].id : null;
+  const playable = await omitExpiredAudioSongs(allSongs);
+  const windowFull = snapshot.docs.length >= fetchLimit;
+  const hasMore = playable.length > limitCount || windowFull;
+  const songs = playable.slice(0, limitCount);
+  const nextCursor = hasMore
+    ? songs[songs.length - 1]?.id ?? snapshot.docs[snapshot.docs.length - 1]?.id ?? null
+    : null;
 
   return {
     songs,

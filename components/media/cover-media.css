@@ -6,6 +6,23 @@
   inset: 0;
   overflow: hidden;
   border-radius: var(--radius-cover, min(28px, 22%));
+  container-type: size;
+}
+
+/* Same type as ArtistFace initials. 36cqmin tracks the cover slot, from a 40px Heat tile to the song page. */
+.cover-fallback-initials.artist-index-face-initials {
+  container-type: size;
+  background: #14141c;
+  color: #f5f4f8;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.cover-fallback-initials-text {
+  font-size: 36cqmin;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .cover-media-video {

@@ -19,6 +19,7 @@ import { db } from '@/lib/firebase/config';
 import { COLLECTIONS, getSongPath } from '@/lib/firebase/collections';
 import type { SongDocument } from '@/types/firestore';
 import { getFollowingArtistIds } from './follows';
+import { omitExpiredAudioSongs } from './songs';
 
 /**
  * Get paginated songs from artists the user follows
@@ -79,8 +80,9 @@ export async function getFollowedArtistsSongs(
 
     // Apply limit
     const hasMore = filteredSongs.length > limitCount;
-    const songs = filteredSongs.slice(0, limitCount);
-    const nextCursor = hasMore && songs.length > 0 ? songs[songs.length - 1].id : null;
+    const page = filteredSongs.slice(0, limitCount);
+    const songs = await omitExpiredAudioSongs(page);
+    const nextCursor = hasMore ? page[page.length - 1]?.id ?? null : null;
 
     return {
       songs,
@@ -147,12 +149,11 @@ async function getSongsFromArtists(
 
     // Check if there are more results
     const hasMore = filteredDocs.length > limitCount;
-    const songs = filteredDocs
-      .slice(0, limitCount)
-      .map(doc => doc.data() as SongDocument);
+    const page = filteredDocs.slice(0, limitCount).map(doc => doc.data() as SongDocument);
+    const songs = await omitExpiredAudioSongs(page);
 
-    // Get next cursor (last document ID)
-    const nextCursor = hasMore && songs.length > 0 ? songs[songs.length - 1].id : null;
+    // Cursor stays on the last document read so a shell does not end the feed.
+    const nextCursor = hasMore ? page[page.length - 1]?.id ?? null : null;
 
     return {
       songs,
@@ -191,8 +192,9 @@ async function getSongsFromArtists(
       }
 
       const hasMore = filteredSongs.length > limitCount;
-      const songs = filteredSongs.slice(0, limitCount);
-      const nextCursor = hasMore && songs.length > 0 ? songs[songs.length - 1].id : null;
+      const page = filteredSongs.slice(0, limitCount);
+      const songs = await omitExpiredAudioSongs(page);
+      const nextCursor = hasMore ? page[page.length - 1]?.id ?? null : null;
 
       return {
         songs,
