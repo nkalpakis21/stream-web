@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { PhotoFrameEditor, type PhotoFrameEditorHandle } from '@/components/artists/PhotoFrameEditor';
 import {
   SongCreatePreview,
@@ -8,6 +8,8 @@ import {
   type LyricsDraftRequest,
 } from '@/components/create/SongCustomizePanel';
 import { useSongCustomize } from '@/components/create/useSongCustomize';
+import { VoiceSheet } from '@/components/voices/VoiceSheet';
+import type { PublicStreamstarVoice, VoiceSlug } from '@/lib/voices/streamstarVoices';
 import { NEW_ARTIST_TEMPO, type SongCustomizeValue } from '@/lib/create/songOptions';
 import { getInitials } from '@/lib/utils/avatar';
 import {
@@ -51,6 +53,9 @@ export function CreateFlowView({
   fileInputRef,
   onCustomizeChange,
   requestDraft,
+  voices = [],
+  voiceSlug = null,
+  onVoiceSelect,
 }: {
   name: string;
   onNameChange: (value: string) => void;
@@ -83,6 +88,9 @@ export function CreateFlowView({
   fileInputRef: RefObject<HTMLInputElement>;
   onCustomizeChange?: (value: SongCustomizeValue) => void;
   requestDraft?: LyricsDraftRequest;
+  voices?: readonly PublicStreamstarVoice[];
+  voiceSlug?: VoiceSlug | null;
+  onVoiceSelect?: (slug: VoiceSlug) => void;
 }) {
   const frameRef = useRef<PhotoFrameEditorHandle>(null);
   const customize = useSongCustomize({
@@ -96,6 +104,8 @@ export function CreateFlowView({
   }, [customize.value, onCustomizeChange]);
   const trimmedName = name.trim();
   const initials = trimmedName ? getInitials(trimmedName) : '';
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const pickedVoice = voices.find(voice => voice.slug === voiceSlug) ?? null;
 
   return (
     <form
@@ -144,6 +154,36 @@ export function CreateFlowView({
               </svg>
             )}
           </div>
+
+          <button
+            type="button"
+            data-voice-trigger
+            onClick={() => setVoiceOpen(true)}
+            className="mt-4 flex w-full flex-col items-start rounded-[12px] bg-[#14141C] px-4 py-3 text-left"
+          >
+            <span className="text-xs text-[#8B8896]">Voice</span>
+            {pickedVoice ? (
+              <>
+                <span className="mt-1 text-sm font-medium text-[#F5F4F8]" data-voice-name>
+                  {pickedVoice.name}
+                </span>
+                <span className="text-xs text-[#8B8896]" data-voice-descriptor>
+                  {pickedVoice.descriptor}
+                </span>
+              </>
+            ) : (
+              <span className="mt-1 text-sm text-[#F5F4F8]">Pick a voice</span>
+            )}
+          </button>
+          {voiceOpen ? (
+            <VoiceSheet
+              voices={voices}
+              selected={voiceSlug}
+              title="Voice"
+              onClose={() => setVoiceOpen(false)}
+              onSelect={slug => onVoiceSelect?.(slug)}
+            />
+          ) : null}
 
           <label className="mt-4 block text-xs text-[#8B8896]" htmlFor="look-prompt">
             Look prompt, optional
@@ -329,6 +369,14 @@ export function CreateFlowView({
                 prompt={prompt}
                 requestDraft={requestDraft}
                 disabled={submitting}
+                voiceDisplay={
+                  voiceSlug
+                    ? {
+                        name: voices.find(voice => voice.slug === voiceSlug)?.name ?? '',
+                        descriptor: voices.find(voice => voice.slug === voiceSlug)?.descriptor ?? '',
+                      }
+                    : null
+                }
               />
             </div>
           </div>

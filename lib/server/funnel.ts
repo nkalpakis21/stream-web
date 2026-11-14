@@ -4,8 +4,9 @@
  * Client Firebase Analytics records page views and CTA clicks. It cannot see
  * the MusicGPT webhook. First-time milestones use doc id `${uid}_${event}`
  * and create-if-absent. `play`, `song_shared`, `x_post`, `create_options_used`,
- * `take_picked`, `voice_change`, and the beat-first events are a new auto-id doc each time.
- * `x_post`, `create_options_used`, `take_picked`, `voice_change`, and the beat-first events
+ * `take_picked`, `voice_change`, `artist_picked`, `voice_picked`, and the beat-first events are a new auto-id doc each time.
+ * `x_post`, `create_options_used`, `take_picked`, `voice_change`, `artist_picked`,
+ * `voice_picked`, and the beat-first events
  * are server-only. `platform` is
  * `web`, `ios`, or `unknown` (`lib/funnel/platform.ts`).
  * Anonymous share-page plays are auto-id docs with `uid: null`, `visitorId`,
@@ -48,11 +49,13 @@ export const REPEAT_FUNNEL_EVENTS = [
   'vocals_added',
   'used_as_instrumental',
   'voice_change',
+  'artist_picked',
+  'voice_picked',
 ] as const;
 
 /**
  * Repeat events the browser may report. `x_post`, `create_options_used`,
- * `take_picked`, `voice_change`, and the beat-first events stay server-only.
+ * `take_picked`, `voice_change`, `artist_picked`, `voice_picked`, and the beat-first events stay server-only.
  */
 const CLIENT_REPEAT_EVENTS = ['play', 'song_shared'] as const;
 
@@ -103,6 +106,19 @@ const CREATE_OPTION_TAGS = ['instrumental', 'voice', 'lyrics', 'feel', 'energy']
 const OPTIONS_PROP =
   /^(instrumental|voice|lyrics|feel|energy)(,(instrumental|voice|lyrics|feel|energy))*$/;
 const PROP_VALUE = /^[A-Za-z0-9_-]{1,128}$/;
+/** Slugs only. This list stays here so funnel code does not import locked prompts into a client graph. */
+const CURATED_VOICE_SLUGS = [
+  'calla',
+  'vesper',
+  'sable',
+  'wren',
+  'briar',
+  'harbor',
+  'wells',
+  'flint',
+  'slate',
+  'keel',
+] as const;
 /** Drop a clock that is negative or longer than a month. */
 const MAX_ELAPSED_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -221,7 +237,12 @@ export function sanitizeFunnelProps(
     out.retriesUsed = props.retriesUsed;
   }
   if (typeof props.vocalsAdded === 'boolean') out.vocalsAdded = props.vocalsAdded;
-  if (props.voice === 'same' || props.voice === 'female' || props.voice === 'male') {
+  if (
+    props.voice === 'same' ||
+    props.voice === 'female' ||
+    props.voice === 'male' ||
+    (typeof props.voice === 'string' && (CURATED_VOICE_SLUGS as readonly string[]).includes(props.voice))
+  ) {
     out.voice = props.voice;
   }
   if (typeof props.kept === 'boolean') out.kept = props.kept;

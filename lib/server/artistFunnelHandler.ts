@@ -9,12 +9,14 @@ import {
   recordFunnelEvent,
   timestampMillis,
 } from '@/lib/server/funnel';
+import { isVoiceSlug } from '@/lib/voices/streamstarVoices';
 
 type ArtistSnap = {
   ownerId?: unknown;
   deletedAt?: unknown;
   createdAt?: unknown;
   avatarURL?: unknown;
+  voiceSlug?: unknown;
 };
 
 type TokenVerifier = (idToken: string) => Promise<{ uid: string }>;
@@ -79,6 +81,9 @@ export async function POST(
       }
       if (plan.faceSet) {
         recordFunnelEvent(uid, 'face_set', { artistId }, platform);
+      }
+      if (plan.artistCreated && isVoiceSlug(artist.voiceSlug)) {
+        recordFunnelEvent(uid, 'voice_picked', { artistId, voice: artist.voiceSlug }, platform);
       }
     } catch (error) {
       console.error(

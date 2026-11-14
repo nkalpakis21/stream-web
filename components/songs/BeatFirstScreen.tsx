@@ -35,6 +35,7 @@ export function BeatFirstScreen({
   prompt,
   feel,
   energy,
+  voiceDisplay = null,
 }: {
   songId: string;
   artistId: string;
@@ -45,6 +46,7 @@ export function BeatFirstScreen({
   prompt: string;
   feel: FeelLabel[];
   energy: Energy;
+  voiceDisplay?: { name: string; descriptor: string } | null;
 }) {
   const { user } = useAuth();
   const router = useRouter();
@@ -184,6 +186,7 @@ export function BeatFirstScreen({
           artistId={artistId}
           defaults={artistDefaults({})}
           prompt={prompt}
+          voiceDisplay={voiceDisplay}
           requestDraft={(input) => requestLyricsDraft({ ...input, sessionId })}
           busy={busy}
           error={error}

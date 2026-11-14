@@ -4,9 +4,20 @@
  */
 
 let boundAudio: HTMLAudioElement | null = null;
+let boundPause: (() => void) | null = null;
 
 export function bindPlayerAudio(audio: HTMLAudioElement | null): void {
   boundAudio = audio;
+}
+
+/** The provider registers this so a preview can stop the mini-player in the same click. */
+export function bindPlayerPause(pause: (() => void) | null): void {
+  boundPause = pause;
+}
+
+export function pausePlayerAudio(): void {
+  boundAudio?.pause();
+  boundPause?.();
 }
 
 export function startPlayerAudio(url: string): void {

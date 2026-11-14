@@ -247,7 +247,7 @@ export type VoiceChangeSnapshot = {
   show: boolean;
   used: number;
   status: VoiceChangeStatus | null;
-  voice: VoiceChangeVoice | null;
+  voice: string | null;
   generationId: string | null;
   originalVersionId: string | null;
   originalAudioUrl: string | null;
@@ -291,8 +291,12 @@ export function readVoiceChangeStatus(value: unknown): VoiceChangeStatus | null 
   return null;
 }
 
-export function readVoiceChangeVoice(value: unknown): VoiceChangeVoice | null {
+const CURATED_VOICE_SLUG = /^(calla|vesper|sable|wren|briar|harbor|wells|flint|slate|keel)$/;
+
+/** Legacy her/his values, or one curated slug. Anything else is dropped. */
+export function readVoiceChangeVoice(value: unknown): string | null {
   if (value === 'same' || value === 'female' || value === 'male') return value;
+  if (typeof value === 'string' && CURATED_VOICE_SLUG.test(value)) return value;
   return null;
 }
 

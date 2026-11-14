@@ -26,7 +26,7 @@ import {
   musicGptTaskLogId,
   saveMusicGptTaskBinding,
 } from '@/lib/server/musicgptTaskBinding';
-import type { SongDocument } from '@/types/firestore';
+import type { AIArtistDocument, SongDocument } from '@/types/firestore';
 import {
   musicGptGenerationCallback,
   musicGptWebhookUrlForLog,
@@ -37,6 +37,8 @@ import { platformFromRequest } from '@/lib/funnel/platform';
 import { recordFunnelEvent } from '@/lib/server/funnel';
 import { assertNoObjectionableContent } from '@/lib/server/objectionable';
 import { readMusicGptCreditEstimate } from '@/lib/server/musicgptUsage';
+import { adminSaveSongVoiceSlug } from '@/lib/server/songsAdmin';
+import { isVoiceSlug, voicedRequest, VOICE_FEATURE_CREDIT } from '@/lib/voices/streamstarVoices';
 
 export type MusicGptGenerationDeps = {
   verifyToken?: (idToken: string) => Promise<{ uid: string }>;
@@ -45,6 +47,8 @@ export type MusicGptGenerationDeps = {
   saveTaskBinding?: typeof saveMusicGptTaskBinding;
   gateRetry?: typeof gateSongGenerationRetry;
   saveCreateOptions?: typeof adminSaveSongCreateOptions;
+  getArtist?: (artistId: string) => Promise<AIArtistDocument | null>;
+  saveVoiceSlug?: (songId: string, voiceSlug: string) => Promise<void>;
 };
 
 let depsForTests: MusicGptGenerationDeps | null = null;
@@ -108,8 +112,9 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
       defaults: artistDefaults(styleInputFromArtistContext(artistContext)),
     });
 
+    let artistVoiceSlug: string | null = null;
     if (typeof artistId === 'string' && artistId.trim()) {
-      const artist = await adminGetArtist(artistId.trim());
+      const artist = await (deps.getArtist ?? adminGetArtist)(artistId.trim());
       if (!artist) {
         return NextResponse.json({ error: 'Artist not found' }, { status: 404 });
       }
@@ -119,6 +124,7 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
           { status: 403 }
         );
       }
+      artistVoiceSlug = isVoiceSlug(artist.voiceSlug) ? artist.voiceSlug : null;
     }
 
     const songIdResult = readOptionalSongId(songIdRaw);
@@ -145,6 +151,25 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
     assertNoObjectionableContent(prompt, resolved.lyrics, songTitle);
+    if (VOICE_FEATURE_CREDIT !== 0) {
+      throw new Error('Voice feature must not add a credit');
+    }
+    let musicPrompt = prompt;
+    let gender = resolved.gender;
+    const sungSlug = !resolved.make_instrumental && isVoiceSlug(artistVoiceSlug) ? artistVoiceSlug : null;
+    if (sungSlug) {
+      try {
+        const voiced = voicedRequest({ prompt, slug: sungSlug });
+        musicPrompt = voiced.prompt;
+        gender = voiced.gender;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (message === 'Voice is not ready' || message === 'Locked prompt is missing' || message === 'Unknown voice') {
+          return NextResponse.json({ error: "Couldn't use that voice." }, { status: 409 });
+        }
+        throw error;
+      }
+    }
 
     const webhookUrl = callback.webhookUrl;
     if (!musicGptWebhookSecret()) {
@@ -199,11 +224,11 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
 
     const createMusic = deps.createMusic ?? createMusicGPTSong;
     const response = await createMusic({
-      prompt,
+      prompt: musicPrompt,
       lyrics: resolved.lyrics,
       music_style: resolved.music_style,
       make_instrumental: resolved.make_instrumental,
-      ...(resolved.gender ? { gender: resolved.gender } : {}),
+      ...(gender ? { gender } : {}),
       webhook_url: webhookUrl,
     });
 
@@ -253,11 +278,24 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
       }
       if (resolved.persisted) {
         try {
-          await (deps.saveCreateOptions ?? adminSaveSongCreateOptions)(songId, resolved.persisted);
+          await (deps.saveCreateOptions ?? adminSaveSongCreateOptions)(songId, {
+            ...resolved.persisted,
+            voice: 'same',
+          });
         } catch (error) {
           const message = error instanceof Error ? error.message : '';
           if (!message.includes('Firebase Admin') && !message.includes('not initialized')) {
             console.error('[MusicGPT API Route] Could not save create options', error);
+          }
+        }
+      }
+      if (sungSlug) {
+        try {
+          await (deps.saveVoiceSlug ?? adminSaveSongVoiceSlug)(songId, sungSlug);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : '';
+          if (!message.includes('Firebase Admin') && !message.includes('not initialized')) {
+            console.error('[MusicGPT API Route] Could not save the song voice', error);
           }
         }
       }
@@ -274,6 +312,17 @@ export async function postMusicGptGeneration(request: NextRequest): Promise<Next
         },
         platform
       );
+      if (trimmedArtistId) {
+        recordFunnelEvent(
+          userId,
+          'artist_picked',
+          {
+            artistId: trimmedArtistId,
+            ...(songId ? { songId } : {}),
+          },
+          platform
+        );
+      }
       if (resolved.used.length > 0) {
         recordFunnelEvent(
           userId,

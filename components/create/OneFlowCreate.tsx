@@ -38,6 +38,7 @@ import {
   updateArtistAvatar,
 } from '@/lib/services/artists';
 import { createGeneration } from '@/lib/services/generations';
+import type { PublicStreamstarVoice, VoiceSlug } from '@/lib/voices/streamstarVoices';
 import { abandonFailedSongCreate, createSong } from '@/lib/services/songs';
 import { runSongCreateAttempt, SongCreateFailed } from '@/lib/songs/songCreate';
 import {
@@ -71,7 +72,7 @@ async function rememberFace(method: CreateFaceMethod): Promise<void> {
   }
 }
 
-export function OneFlowCreate() {
+export function OneFlowCreate({ voices = [] }: { voices?: readonly PublicStreamstarVoice[] }) {
   const { user } = useAuth();
   const router = useRouter();
   const { connection } = useConnection();
@@ -93,6 +94,7 @@ export function OneFlowCreate() {
     initialSongCustomize(artistDefaults({ tempoMin: NEW_ARTIST_TEMPO.min, tempoMax: NEW_ARTIST_TEMPO.max }))
   );
   const nameRef = useRef('');
+  const [voiceSlug, setVoiceSlug] = useState<VoiceSlug | null>(null);
   const onCustomizeChange = useCallback((value: SongCustomizeValue) => {
     customizeRef.current = value;
   }, []);
@@ -183,7 +185,7 @@ export function OneFlowCreate() {
   nameRef.current = draft.name;
 
   const nameError = artistNameError(artistNameIssue(draft.name), nameTaken);
-  const ready = canSubmitCreate(draft.name, draft.prompt) && !nameTaken;
+  const ready = canSubmitCreate(draft.name, draft.prompt) && !nameTaken && voiceSlug != null;
 
   const patch = (next: Partial<CreateDraft>) => {
     setDraft(current => (current ? { ...current, ...next } : current));
@@ -390,7 +392,7 @@ export function OneFlowCreate() {
       setPromptError('Keep the prompt to 300 characters.');
       return;
     }
-    if (nameTaken) return;
+    if (nameTaken || !voiceSlug) return;
 
     submitLock.current = true;
     setSubmitting(true);
@@ -463,6 +465,7 @@ export function OneFlowCreate() {
             styleDNA,
             lore: prompt,
             vocalIdentity: null,
+            voiceSlug,
             avatarURL: faceUrlRef.current,
             isPublic: true,
             pumpFun,
@@ -610,6 +613,9 @@ export function OneFlowCreate() {
       canSubmit={ready}
       submitting={submitting}
       onSubmit={onSubmit}
+      voices={voices}
+      voiceSlug={voiceSlug}
+      onVoiceSelect={setVoiceSlug}
       fileInputRef={fileInputRef}
       onCustomizeChange={onCustomizeChange}
       requestDraft={requestDraft}

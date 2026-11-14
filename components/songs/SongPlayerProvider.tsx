@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { SpotifyPlayer } from './SpotifyPlayer';
 import { ListenPlayer } from '@/components/player/ListenPlayer';
@@ -8,7 +8,7 @@ import { isStudioPath } from '@/lib/listen/surface';
 import { getSongVersions } from '@/lib/services/songs';
 import { audioUrlForPlayback } from '@/lib/songs/audioAvailability';
 import { advanceToPlayable } from '@/lib/player/skipQueue';
-import { startPlayerAudio } from '@/lib/player/boundAudio';
+import { bindPlayerPause, startPlayerAudio } from '@/lib/player/boundAudio';
 import { isSongPagePath } from '@/lib/songs/paths';
 import type { CoverFields } from '@/lib/covers/resolve';
 
@@ -109,6 +109,11 @@ export function SongPlayerProvider({ children }: { children: ReactNode }) {
   const pause = useCallback(() => {
     setIsPlaying(false);
   }, []);
+
+  useEffect(() => {
+    bindPlayerPause(pause);
+    return () => bindPlayerPause(null);
+  }, [pause]);
 
   const togglePlayPause = useCallback(() => {
     setIsPlaying(prev => !prev);

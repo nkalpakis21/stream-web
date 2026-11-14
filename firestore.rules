@@ -345,6 +345,7 @@ service cloud.firestore {
           && request.resource.data.createLyrics.size() <= 2000
         ))
         && !('createOptions' in request.resource.data)
+        && !('voiceSlug' in request.resource.data)
         && !('path' in request.resource.data)
         && !('beatFirst' in request.resource.data)
         && !('singOver' in request.resource.data)
@@ -352,6 +353,20 @@ service cloud.firestore {
         && !('voiceSplit' in request.resource.data)
         && (!('createSubmittedAt' in request.resource.data)
           || request.resource.data.createSubmittedAt is timestamp);
+    }
+
+    function curatedVoiceSlug(slug) {
+      return slug == 'calla' || slug == 'vesper' || slug == 'sable' || slug == 'wren'
+        || slug == 'briar' || slug == 'harbor' || slug == 'wells' || slug == 'flint'
+        || slug == 'slate' || slug == 'keel';
+    }
+
+    function voiceSlugOnCreate() {
+      return !('voiceSlug' in request.resource.data)
+        || (
+          request.resource.data.voiceSlug is string
+          && curatedVoiceSlug(request.resource.data.voiceSlug)
+        );
     }
 
     function coinMetadataClean() {
@@ -476,6 +491,7 @@ service cloud.firestore {
         && pumpFunOnCreate()
         && xOnCreate()
         && coinMetadataClean()
+        && voiceSlugOnCreate()
         && !('mintSweepExemptAt' in request.resource.data)
         && !('mintFirstSeenAt' in request.resource.data);
 

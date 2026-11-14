@@ -7,48 +7,48 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ChangeVoiceSheet } from '../components/songs/ChangeVoiceSheet';
 import { VoiceCompare } from '../components/songs/VoiceCompare';
 import { buildVoiceCompareRows } from '../lib/songs/voiceChange';
+import { publicStreamstarVoices } from '../lib/voices/streamstarVoices';
+
+const voices = publicStreamstarVoices();
 
 describe('change the voice render', () => {
-  it('offers the other voice as one Ice button, and both voices as equal ghost buttons', () => {
+  it('lists the curated voices and keeps the sheet copy', () => {
     const known = renderToStaticMarkup(
       createElement(ChangeVoiceSheet, {
-        voices: ['male'],
+        voices,
+        currentSlug: 'harbor',
         onClose: () => {},
         onSubmit: () => {},
       })
     );
     assert.match(known, /Change the voice/);
     assert.match(known, /Same beat and words, sung fresh in a new voice\./);
+    assert.match(known, /This is how they sing\./);
+    assert.match(known, /data-voice-list="curated"/);
+    assert.match(known, /data-voice-row="calla"/);
+    assert.match(known, /Bright and clear/);
+    assert.match(known, /data-voice-row="keel"/);
+    assert.match(known, /Use this voice/);
     assert.equal(known.includes('You may hear a little of the old vocal.'), false);
     assert.equal(known.includes('data-voice-split-caveat'), false);
-    assert.match(known, /data-voice-buttons="one"/);
-    assert.match(known, /Sing it in his voice/);
+    assert.equal(known.includes('Sing it in his voice'), false);
     assert.equal(known.includes('Sing it in her voice'), false);
-    assert.equal(known.includes('Same as'), false);
+    assert.equal(known.includes('sounds like'), false);
     assert.match(known, /bg-\[#E8E6F2\]/);
     assert.match(known, /text-\[#0A0A10\]/);
     assert.equal(known.includes('data-part="voice"'), false);
+    assert.equal(known.includes('#C8F542'), false);
     assert.doesNotMatch(known, /animate-spin|spinner/i);
-
-    const unknown = renderToStaticMarkup(
-      createElement(ChangeVoiceSheet, {
-        voices: ['female', 'male'],
-        onClose: () => {},
-        onSubmit: () => {},
-      })
-    );
-    assert.match(unknown, /data-voice-buttons="both"/);
-    assert.match(unknown, /grid-cols-2/);
-    assert.match(unknown, /Sing it in her voice/);
-    assert.match(unknown, /Sing it in his voice/);
-    assert.match(unknown, /border-\[#2A2A38\]/);
-    assert.match(unknown, /text-\[#F5F4F8\]/);
-    assert.equal(unknown.includes('bg-[#E8E6F2]'), false);
-    assert.equal(unknown.includes('aria-pressed'), false);
+    assert.match(known, /data-current="true"/);
+    assert.match(known, /border-transparent/);
+    const currentRow = known.slice(known.indexOf('data-voice-row="harbor"'), known.indexOf('data-voice-row="wells"'));
+    assert.match(currentRow, />Current</);
+    assert.match(currentRow, /#8B8896/);
+    assert.equal(currentRow.includes('opacity-40'), false);
 
     const making = renderToStaticMarkup(
       createElement(ChangeVoiceSheet, {
-        voices: ['male'],
+        voices,
         busy: true,
         onClose: () => {},
         onSubmit: () => {},
@@ -57,11 +57,11 @@ describe('change the voice render', () => {
     assert.match(making, /Changing the voice… about 4 min/);
     assert.match(making, /#8B8896/);
     assert.doesNotMatch(making, /animate-spin|spinner/i);
-    assert.equal(making.includes('Sing it in his voice'), false);
+    assert.equal(making.includes('Use this voice'), false);
 
     const split = renderToStaticMarkup(
       createElement(ChangeVoiceSheet, {
-        voices: ['male'],
+        voices,
         splitCaveat: true,
         onClose: () => {},
         onSubmit: () => {},

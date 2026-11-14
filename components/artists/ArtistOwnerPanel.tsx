@@ -5,6 +5,8 @@ import { ArtistLookPicker } from '@/components/artists/ArtistLookPicker';
 import { ArtistBioEditor } from '@/components/artists/ArtistBioEditor';
 import { ArtistOwnerStats } from '@/components/artists/ArtistOwnerStats';
 import { ArtistXPanel } from '@/components/artists/ArtistXPanel';
+import { ArtistVoiceSection } from '@/components/artists/ArtistVoiceSection';
+import type { PublicStreamstarVoice } from '@/lib/voices/streamstarVoices';
 import { LaunchExistingArtistCoin } from '@/components/artists/LaunchExistingArtistCoin';
 import { FollowersList } from '@/components/artists/FollowersList';
 import { CoinBadge } from '@/components/songs/CoinBadge';
@@ -26,6 +28,7 @@ interface ArtistOwnerPanelProps {
   followerCount?: number | null;
   xConfigured?: boolean;
   onLaunched: (coin: PumpFunCoin) => void;
+  voices?: readonly PublicStreamstarVoice[];
 }
 
 export function ArtistOwnerPanel({
@@ -40,6 +43,7 @@ export function ArtistOwnerPanel({
   followerCount = null,
   xConfigured = false,
   onLaunched,
+  voices = [],
 }: ArtistOwnerPanelProps) {
   const coinBadge = coinBadgeFromArtist({ ...artist, avatarURL });
   const hasBio = isHonestBio(lore, artist.name);
@@ -98,6 +102,8 @@ export function ArtistOwnerPanel({
           />
         </div>
       </div>
+
+      <ArtistVoiceSection artistId={artist.id} voiceSlug={artist.voiceSlug} voices={voices} />
 
       <div className="owner-flat-card">
         <Suspense fallback={null}>

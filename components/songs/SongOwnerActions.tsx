@@ -3,6 +3,7 @@
 import { useAuth } from '@/components/providers/AuthProvider';
 import { ChangeVoice } from '@/components/songs/ChangeVoice';
 import type { VoiceGenerationRef, VoiceVersionRef } from '@/lib/songs/voiceChange';
+import type { PublicStreamstarVoice } from '@/lib/voices/streamstarVoices';
 import { DeleteSongButton } from './DeleteSongButton';
 
 interface SongOwnerActionsProps {
@@ -10,6 +11,8 @@ interface SongOwnerActionsProps {
   songTitle: string;
   ownerId: string;
   artistVoice?: string | null;
+  voices?: readonly PublicStreamstarVoice[];
+  songVoiceSlug?: string | null;
   song: {
     path?: string | null;
     currentVersionId?: string | null;
@@ -35,6 +38,8 @@ export function SongOwnerActions({
   songTitle,
   ownerId,
   artistVoice = null,
+  voices = [],
+  songVoiceSlug = null,
   song,
   versions,
   generations,
@@ -50,6 +55,8 @@ export function SongOwnerActions({
       songId={songId}
       ownerId={ownerId}
       artistVoice={artistVoice}
+      voices={voices}
+      songVoiceSlug={songVoiceSlug}
       song={song}
       versions={versions}
       generations={generations}

@@ -24,6 +24,7 @@ import { coinBadgeFromArtist, hasLaunchedCoin } from '@/lib/brand/coin';
 import { ArtistPageSkeleton } from '@/components/artists/ArtistPageSkeleton';
 import type { AIArtistDocument } from '@/types/firestore';
 import { fetchArtistCoinModule } from '@/lib/solana/fetchArtistCoinModule';
+import { publicStreamstarVoices } from '@/lib/voices/streamstarVoices';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import { EmptyAction } from '@/components/states/EmptyAction';
 import { OwnerSongListRecovery } from '@/app/artists/[id]/OwnerSongListRecovery';
@@ -104,6 +105,7 @@ async function ArtistPageBody({
     audioExpired
   ).map(song => ({
     ...song,
+    voiceSlug: ownerView ? song.voiceSlug ?? null : null,
     audioUnavailable: ownerView && audioExpired(song),
   }));
 
@@ -123,7 +125,7 @@ async function ArtistPageBody({
     faceSources,
     followerCount,
   });
-  const view = clientProps.artist;
+  const view = ownerView ? clientProps.artist : { ...clientProps.artist, voiceSlug: null };
   const coinBadge = coinBadgeFromArtist(view);
   const style = view.styleDNA;
   const showTempo = !isDefaultTempoRange(style.tempoRange);
@@ -144,6 +146,7 @@ async function ArtistPageBody({
           faceSources={clientProps.faceSources}
           followerCount={clientProps.followerCount}
           xConfigured={isXConfigured()}
+          voices={ownerView ? publicStreamstarVoices() : []}
         >
           {hasStyle ? (
             <div className="mb-12 grid grid-cols-1 gap-4 border-t border-border pt-6 sm:grid-cols-2">
