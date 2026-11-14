@@ -5,23 +5,26 @@ import { artistShareMetadata, hiddenArtistPageMetadata } from '@/lib/artists/vis
 import { rejectHiddenArtist } from '@/lib/artists/pageGate';
 import { artistPageClientProps } from '@/lib/artists/pageProps';
 import { artistHeroFaceSources } from '@/lib/images/artistFace';
-import {
-  artistPageFaceSong,
-  isArtistOwner,
-  selectArtistPageSongs,
-} from '@/lib/artists/ownerSongs';
+import { ClearOwnerRecovery } from '@/components/states/ClearOwnerRecovery';
+import { isArtistOwner, selectArtistPageSongs } from '@/lib/artists/ownerSongs';
+import { songAudioExpired } from '@/lib/songs/audioAvailability';
+import { isCoverModerationEnabled, resolveVisibleCover, withPublicSongCover } from '@/lib/covers/moderation';
 import { adminGetArtist } from '@/lib/server/artistsAdmin';
-import { adminListOwnerArtistSongs } from '@/lib/server/songsAdmin';
+import { adminCountFollowers } from '@/lib/server/followsCount';
+import { isXConfigured } from '@/lib/x/config';
+import { adminListOwnerArtistSongs, adminListVersionsForSongs } from '@/lib/server/songsAdmin';
 import { getArtistCardContext } from '@/lib/server/artistDisplay';
 import { verifiedViewerIdFromPage } from '@/lib/server/viewer';
 import { SITE_NAME, publicUrl, isDefaultTempoRange, shareImageUrl, brandOgImageUrl } from '@/lib/brand/site';
 import { getArtistSongs } from '@/lib/services/songs';
 import { SongCard } from '@/components/songs/SongCard';
+import { UnavailableAudioRow } from '@/components/songs/UnavailableAudioRow';
 import { ArtistHero } from '@/components/artists/ArtistHero';
 import { coinBadgeFromArtist, hasLaunchedCoin } from '@/lib/brand/coin';
 import { ArtistPageSkeleton } from '@/components/artists/ArtistPageSkeleton';
 import type { AIArtistDocument } from '@/types/firestore';
 import { fetchArtistCoinModule } from '@/lib/solana/fetchArtistCoinModule';
+import { publicStreamstarVoices } from '@/lib/voices/streamstarVoices';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import { EmptyAction } from '@/components/states/EmptyAction';
 import { OwnerSongListRecovery } from '@/app/artists/[id]/OwnerSongListRecovery';
@@ -83,27 +86,46 @@ async function ArtistPageBody({
   viewerId: string | null;
 }) {
   const ownerView = isArtistOwner(viewerId, artist.ownerId);
-  const [fetchedSongs, coin, cards] = await Promise.all([
+  const [fetchedSongs, coin, cards, followerCount] = await Promise.all([
     ownerView
       ? adminListOwnerArtistSongs(artist.id, artist.ownerId)
       : getArtistSongs(artist.id, 20),
     fetchArtistCoinModule(artist.pumpFun?.mint),
     getArtistCardContext([artist.id]),
+    adminCountFollowers(artist.id),
   ]);
+  const versionsBySong = await adminListVersionsForSongs(fetchedSongs.map(song => song.id));
+  const audioExpired = (song: { id: string }) =>
+    songAudioExpired(versionsBySong.get(song.id) ?? []);
   const songs = selectArtistPageSongs(
     fetchedSongs,
     ownerView ? viewerId : null,
     artist.ownerId,
-    artist.id
-  );
+    artist.id,
+    audioExpired
+  ).map(song => ({
+    ...song,
+    voiceSlug: ownerView ? song.voiceSlug ?? null : null,
+    audioUnavailable: ownerView && audioExpired(song),
+  }));
 
+  const moderationEnabled = isCoverModerationEnabled();
+  const photoUrl = cards.displays.get(artist.id)?.photoUrl ?? null;
+  const faceSongs = songs.filter(song => song.isPublic === true && !song.audioUnavailable);
+  const faceList = faceSongs.length > 0 ? faceSongs : ownerView ? songs : [];
   const faceSources = artistHeroFaceSources({
-    lockedLookUrl: cards.displays.get(artist.id)?.photoUrl ?? null,
+    lockedLookUrl: photoUrl,
     avatarURL: artist.avatarURL,
-    song: artistPageFaceSong(songs, ownerView),
+    songs: faceList.map(song => withPublicSongCover(song, moderationEnabled)),
   });
-  const clientProps = artistPageClientProps({ artist, songs, coin, faceSources });
-  const view = clientProps.artist;
+  const clientProps = artistPageClientProps({
+    artist,
+    songs,
+    coin,
+    faceSources,
+    followerCount,
+  });
+  const view = ownerView ? clientProps.artist : { ...clientProps.artist, voiceSlug: null };
   const coinBadge = coinBadgeFromArtist(view);
   const style = view.styleDNA;
   const showTempo = !isDefaultTempoRange(style.tempoRange);
@@ -116,8 +138,16 @@ async function ArtistPageBody({
 
   return (
     <div className="min-h-screen bg-background">
+      <ClearOwnerRecovery kind="artist" id={artist.id} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        <ArtistHero artist={view} coin={clientProps.coin} faceSources={clientProps.faceSources}>
+        <ArtistHero
+          artist={view}
+          coin={clientProps.coin}
+          faceSources={clientProps.faceSources}
+          followerCount={clientProps.followerCount}
+          xConfigured={isXConfigured()}
+          voices={ownerView ? publicStreamstarVoices() : []}
+        >
           {hasStyle ? (
             <div className="mb-12 grid grid-cols-1 gap-4 border-t border-border pt-6 sm:grid-cols-2">
               {style.genres.length > 0 && (
@@ -177,16 +207,47 @@ async function ArtistPageBody({
           </div>
           {songs.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {clientProps.songs.map(song => (
-                <SongCard
-                  key={song.id}
-                  song={song}
-                  artistName={view.name}
-                  ticker={coinBadge?.ticker}
-                  coinIcon={coinBadge?.iconSrc}
-                  ownerCatalog={ownerView}
-                />
-              ))}
+              {clientProps.songs.map(song => {
+                const visible = resolveVisibleCover(song, {
+                  enabled: moderationEnabled,
+                  faceUrl: photoUrl,
+                  artistName: view.name,
+                });
+                return song.audioUnavailable ? (
+                  <UnavailableAudioRow
+                    key={song.id}
+                    songId={song.id}
+                    title={song.title}
+                    cover={visible.fields}
+                    emptyInitials={visible.initials}
+                    coverNotice={
+                      visible.notice
+                        ? {
+                            songId: song.id,
+                            message: visible.notice.message,
+                            action: visible.notice.action,
+                            buttonLabel: visible.notice.buttonLabel,
+                          }
+                        : null
+                    }
+                  />
+                ) : (
+                  <SongCard
+                    key={song.id}
+                    song={song}
+                    artistName={view.name}
+                    artist={{
+                      id: view.id,
+                      name: view.name,
+                      photoUrl,
+                      isPublic: view.isPublic === true,
+                    }}
+                    ticker={coinBadge?.ticker}
+                    coinIcon={coinBadge?.iconSrc}
+                    ownerCatalog={ownerView}
+                  />
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-xl border-2 border-dashed border-border bg-muted/30 p-12 text-center">

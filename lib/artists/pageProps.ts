@@ -12,17 +12,24 @@ export function artistPageClientProps<TArtist, TSong, TCoin>(input: {
   songs: readonly TSong[];
   coin: TCoin;
   faceSources?: readonly string[];
+  followerCount?: number | null;
 }): {
   artist: Plain<TArtist>;
   songs: Plain<TSong>[];
   coin: Plain<TCoin>;
   faceSources: string[];
+  followerCount: number | null;
 } {
+  const followerCount =
+    typeof input.followerCount === 'number' && Number.isFinite(input.followerCount)
+      ? input.followerCount
+      : null;
   return {
     artist: toPlain(input.artist),
     songs: toPlain(input.songs),
     coin: toPlain(input.coin),
     faceSources: toPlain([...(input.faceSources ?? [])]),
+    followerCount: toPlain(followerCount),
   };
 }
 

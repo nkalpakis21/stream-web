@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { PlayerCoinChip } from './PlayerCoinChip';
 import { CoverMedia } from '@/components/media/CoverMedia';
 import { coverFieldsFromSong, type CoverFields } from '@/lib/covers/resolve';
+import { bindPlayerAudio } from '@/lib/player/boundAudio';
 import './listen-player.css';
 
 interface PlayingTrack extends CoverFields {
@@ -23,6 +24,8 @@ interface ListenPlayerProps {
   onPrev: () => void;
   onNext: () => void;
   onEnded: () => void;
+  onPlaybackError: () => void;
+  showCoin?: boolean;
 }
 
 function formatTime(seconds: number): string {
@@ -48,6 +51,8 @@ export function ListenPlayer({
   onPrev,
   onNext,
   onEnded,
+  onPlaybackError,
+  showCoin = true,
 }: ListenPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -55,6 +60,11 @@ export function ListenPlayer({
   const [volume, setVolume] = useState(1);
 
   const audioUrl = nowPlaying?.audioUrl ?? '';
+
+  useEffect(() => {
+    bindPlayerAudio(audioRef.current);
+    return () => bindPlayerAudio(null);
+  }, []);
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
   const hasTrack = Boolean(nowPlaying);
 
@@ -76,6 +86,10 @@ export function ListenPlayer({
       setCurrentTime(0);
       onEnded();
     };
+    const handleError = () => {
+      if (!audioUrl) return;
+      onPlaybackError();
+    };
     const handleLyricsSeek = (e: Event) => {
       const customEvent = e as CustomEvent<{ timestamp: number }>;
       if (audio && Number.isFinite(customEvent.detail.timestamp)) {
@@ -87,15 +101,17 @@ export function ListenPlayer({
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
     audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
     window.addEventListener('lyrics-seek', handleLyricsSeek);
 
     return () => {
       audio.removeEventListener('timeupdate', updateTime);
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
       window.removeEventListener('lyrics-seek', handleLyricsSeek);
     };
-  }, [audioUrl, onEnded]);
+  }, [audioUrl, onEnded, onPlaybackError]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -172,7 +188,7 @@ export function ListenPlayer({
             <p className="listen-player-artist" data-entity="artist">
               {nowPlaying?.artistName || ''}
             </p>
-            <PlayerCoinChip artistId={nowPlaying?.artistId} />
+            {showCoin ? <PlayerCoinChip artistId={nowPlaying?.artistId} /> : null}
           </div>
         </div>
 

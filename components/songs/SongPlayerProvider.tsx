@@ -1,11 +1,15 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { SpotifyPlayer } from './SpotifyPlayer';
 import { ListenPlayer } from '@/components/player/ListenPlayer';
 import { isStudioPath } from '@/lib/listen/surface';
 import { getSongVersions } from '@/lib/services/songs';
+import { audioUrlForPlayback } from '@/lib/songs/audioAvailability';
+import { advanceToPlayable } from '@/lib/player/skipQueue';
+import { bindPlayerPause, startPlayerAudio } from '@/lib/player/boundAudio';
+import { isSongPagePath } from '@/lib/songs/paths';
 import type { CoverFields } from '@/lib/covers/resolve';
 
 export interface PlayerTrack extends CoverFields {
@@ -43,14 +47,15 @@ function sameTrack(a: PlayerTrack, b: PlayerTrack) {
 }
 
 async function resolveAudio(item: PlayerTrack): Promise<string | null> {
-  if (item.audioUrl) return item.audioUrl;
-  if (!item.songId) return null;
-  const versions = await getSongVersions(item.songId);
-  return (
-    versions.find(v => v.isPrimary && v.audioURL)?.audioURL ||
-    versions.find(v => v.audioURL)?.audioURL ||
-    null
-  );
+  if (item.songId) {
+    try {
+      const versions = await getSongVersions(item.songId);
+      if (versions.length > 0) return audioUrlForPlayback(versions, item.audioUrl);
+    } catch {
+      // A direct URL is only used when versions cannot be read.
+    }
+  }
+  return audioUrlForPlayback(null, item.audioUrl);
 }
 
 export function SongPlayerProvider({ children }: { children: ReactNode }) {
@@ -60,66 +65,89 @@ export function SongPlayerProvider({ children }: { children: ReactNode }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [queue, setQueue] = useState<PlayerTrack[]>([]);
   const [index, setIndex] = useState(0);
+  const queueRef = useRef<PlayerTrack[]>([]);
+  const indexRef = useRef(0);
+  const playRequest = useRef(0);
+
+  const land = useCallback(async (start: number, direction: 1 | -1, ifNone: 'pause' | 'clear') => {
+    const list = queueRef.current;
+    const request = ++playRequest.current;
+    const landed = await advanceToPlayable(list, start, direction, resolveAudio);
+    if (playRequest.current !== request) return;
+    if (!landed) {
+      setIsPlaying(false);
+      if (ifNone === 'clear') setNowPlaying(null);
+      return;
+    }
+    indexRef.current = landed.index;
+    setIndex(landed.index);
+    setNowPlaying({ ...list[landed.index], audioUrl: landed.audioUrl });
+    setIsPlaying(true);
+  }, []);
 
   const play = useCallback((song: NowPlaying, nextQueue?: PlayerTrack[]) => {
     const list = nextQueue && nextQueue.length > 0 ? nextQueue : [song];
     const found = list.findIndex(item => sameTrack(item, song));
-    setQueue(list);
-    setIndex(found >= 0 ? found : 0);
-    setNowPlaying(song);
-    setIsPlaying(true);
-  }, []);
+    const start = found >= 0 ? found : 0;
+    const seeded = list.map((item, itemIndex) =>
+      itemIndex === start ? { ...item, audioUrl: song.audioUrl || item.audioUrl } : item
+    );
+    queueRef.current = seeded;
+    indexRef.current = start;
+    setQueue(seeded);
+    setIndex(start);
+    const url = seeded[start]?.audioUrl;
+    if (url && !studio) {
+      setNowPlaying({ ...seeded[start], audioUrl: url });
+      setIsPlaying(true);
+      startPlayerAudio(url);
+      return;
+    }
+    void land(start, 1, 'clear');
+  }, [land, studio]);
 
   const pause = useCallback(() => {
     setIsPlaying(false);
   }, []);
+
+  useEffect(() => {
+    bindPlayerPause(pause);
+    return () => bindPlayerPause(null);
+  }, [pause]);
 
   const togglePlayPause = useCallback(() => {
     setIsPlaying(prev => !prev);
   }, []);
 
   const close = useCallback(() => {
+    playRequest.current += 1;
+    queueRef.current = [];
+    indexRef.current = 0;
     setNowPlaying(null);
     setIsPlaying(false);
     setQueue([]);
     setIndex(0);
   }, []);
 
-  const jumpTo = useCallback(
-    async (start: number, direction: 1 | -1) => {
-      if (queue.length === 0) return;
-      let cursor = start;
-      while (cursor >= 0 && cursor < queue.length) {
-        const item = queue[cursor];
-        const url = await resolveAudio(item);
-        if (url) {
-          setIndex(cursor);
-          setNowPlaying({ ...item, audioUrl: url });
-          setIsPlaying(true);
-          return;
-        }
-        cursor += direction;
-      }
-      setIsPlaying(false);
-    },
-    [queue]
-  );
-
   const playPrev = useCallback(() => {
-    void jumpTo(index - 1, -1);
-  }, [jumpTo, index]);
+    void land(indexRef.current - 1, -1, 'pause');
+  }, [land]);
 
   const playNext = useCallback(() => {
-    void jumpTo(index + 1, 1);
-  }, [jumpTo, index]);
+    void land(indexRef.current + 1, 1, 'pause');
+  }, [land]);
 
   const skipEnded = useCallback(() => {
-    if (index + 1 < queue.length) {
-      void jumpTo(index + 1, 1);
+    if (indexRef.current + 1 < queueRef.current.length) {
+      void land(indexRef.current + 1, 1, 'pause');
       return;
     }
     setIsPlaying(false);
-  }, [jumpTo, index, queue.length]);
+  }, [land]);
+
+  const skipFailed = useCallback(() => {
+    void land(indexRef.current + 1, 1, 'clear');
+  }, [land]);
 
   const value = useMemo<SongPlayerContextType>(
     () => ({
@@ -151,6 +179,7 @@ export function SongPlayerProvider({ children }: { children: ReactNode }) {
             isPlaying={isPlaying}
             onPlayPause={togglePlayPause}
             onClose={close}
+            onPlaybackError={skipFailed}
           />
         ) : null
       ) : (
@@ -163,6 +192,8 @@ export function SongPlayerProvider({ children }: { children: ReactNode }) {
           onPrev={playPrev}
           onNext={playNext}
           onEnded={skipEnded}
+          onPlaybackError={skipFailed}
+          showCoin={!isSongPagePath(pathname)}
         />
       )}
     </SongPlayerContext.Provider>

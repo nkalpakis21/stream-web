@@ -11,7 +11,9 @@ import { parseLyricsFromMetadata } from '@/lib/utils/lyrics';
 import { getArtistAdmin, getSongAdmin } from '@/lib/x/artistStore';
 import type { GenerationDocument, SongDocument } from '@/types/firestore';
 import { isFalCoverPipeline } from './config';
+import { isCoverModerationEnabled, readCoverModerationStatus } from './moderation';
 import { clipCoverError, buildCoverLoopPrompt, buildCoverPosterPrompt } from './prompt';
+import { pendingCoverModeration, screenSongCover } from '@/lib/server/coverModeration';
 import { mergeCoverProvider, updateSongCoverFields } from './store';
 import {
   COVER_LOOP_OBJECT,
@@ -160,6 +162,8 @@ export async function generateSongCover(songId: string): Promise<CoverJobResult>
     };
 
     let coverProvider = song.coverProvider || null;
+    const moderationOn = isCoverModerationEnabled();
+    let wrotePoster = false;
 
     if (posterLanded) {
       // Video-only retry: never re-run Flux once a poster URL exists.
@@ -192,8 +196,23 @@ export async function generateSongCover(songId: string): Promise<CoverJobResult>
         coverMotionStatus: 'poster_ready',
         coverMotionError: null,
         coverProvider,
+        ...(moderationOn ? { coverModeration: pendingCoverModeration() } : {}),
       });
       posterLanded = true;
+      wrotePoster = true;
+    }
+
+    if (moderationOn) {
+      const previous = wrotePoster ? null : readCoverModerationStatus(song);
+      if (!wrotePoster && previous === 'flagged') {
+        return { ok: true, songId, status: 'poster_ready', reason: 'cover_not_public' };
+      }
+      if (wrotePoster || previous !== 'passed') {
+        const screened = await screenSongCover(song.id);
+        if (screened.status !== 'passed') {
+          return { ok: true, songId, status: 'poster_ready', reason: 'cover_not_public' };
+        }
+      }
     }
 
     const loop = await generateCoverLoop({

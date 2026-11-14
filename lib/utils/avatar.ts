@@ -22,21 +22,22 @@ export function getAvatarGradient(name: string): string {
 }
 
 /**
- * Get initials from a name (up to 2 letters)
+ * Face fallback. One word is a single initial ("Jimmy" → "J").
+ * Two or more words use the first letter of the first and last words.
+ * The create screen and the share card both use this.
  */
 export function getInitials(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) return '?';
-  
+
   const words = trimmed.split(/\s+/).filter(Boolean);
-  
+  const first = words[0]?.[0];
+  if (!first) return '?';
   if (words.length >= 2) {
-    // First letter of first word + first letter of last word
-    return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+    const last = words[words.length - 1]?.[0];
+    return last ? (first + last).toUpperCase() : first.toUpperCase();
   }
-  
-  // Single word: take first 2 characters
-  return trimmed.substring(0, 2).toUpperCase();
+  return first.toUpperCase();
 }
 
 /** Header chip label: first name, or "You" when none. */

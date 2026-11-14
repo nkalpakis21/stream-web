@@ -17,6 +17,7 @@ import {
   Timestamp,
   serverTimestamp,
 } from 'firebase/firestore';
+import { reportArtistObserved } from '@/lib/analytics/reportFunnel';
 import { auth, db } from '@/lib/firebase/config';
 import { getFreshIdToken, userFacingApiError } from '@/lib/api/clientAuth';
 import {
@@ -59,6 +60,7 @@ export async function createArtist(
     styleDNA: StyleDNA;
     lore: string;
     vocalIdentity?: string | null;
+    voiceSlug?: string | null;
     isPublic?: boolean;
     /** Optional artist-level pump.fun coin. Defaults to all-null (no token). */
     pumpFun?: PumpFunCoin | null;
@@ -68,6 +70,11 @@ export async function createArtist(
   const artistId = artistRef.id;
 
   const now = Timestamp.now();
+  const voiceSlug =
+    typeof data.voiceSlug === 'string' &&
+    /^(calla|vesper|sable|wren|briar|harbor|wells|flint|slate|keel)$/.test(data.voiceSlug)
+      ? data.voiceSlug
+      : null;
 
   // Create initial version
   const versionRef = doc(collection(db, COLLECTIONS.artistVersions));
@@ -100,6 +107,7 @@ export async function createArtist(
     styleDNA: data.styleDNA,
     lore: data.lore,
     vocalIdentity: data.vocalIdentity?.trim() || null,
+    ...(voiceSlug ? { voiceSlug } : {}),
     isPublic: data.isPublic ?? true,
     createdAt: now,
     updatedAt: now,
@@ -112,6 +120,12 @@ export async function createArtist(
   // Write both documents
   await setDoc(artistRef, artist);
   await setDoc(versionRef, version);
+
+  try {
+    reportArtistObserved(artistId);
+  } catch (error) {
+    console.error('[funnel] artist_created', error instanceof Error ? error.message : 'failed');
+  }
 
   return artist;
 }
@@ -468,6 +482,12 @@ export async function updateArtistAvatar(
   }
 
   await createArtistVersion(artistId, userId, { avatarURL: trimmed });
+
+  try {
+    reportArtistObserved(artistId);
+  } catch (error) {
+    console.error('[funnel] face_set', error instanceof Error ? error.message : 'failed');
+  }
 
   const updatedArtist = await getArtist(artistId);
   if (!updatedArtist) {

@@ -3,7 +3,10 @@
 import { Suspense } from 'react';
 import { ArtistLookPicker } from '@/components/artists/ArtistLookPicker';
 import { ArtistBioEditor } from '@/components/artists/ArtistBioEditor';
+import { ArtistOwnerStats } from '@/components/artists/ArtistOwnerStats';
 import { ArtistXPanel } from '@/components/artists/ArtistXPanel';
+import { ArtistVoiceSection } from '@/components/artists/ArtistVoiceSection';
+import type { PublicStreamstarVoice } from '@/lib/voices/streamstarVoices';
 import { LaunchExistingArtistCoin } from '@/components/artists/LaunchExistingArtistCoin';
 import { FollowersList } from '@/components/artists/FollowersList';
 import { CoinBadge } from '@/components/songs/CoinBadge';
@@ -22,7 +25,10 @@ interface ArtistOwnerPanelProps {
   onLoreSaved: (lore: string) => void;
   locking: boolean;
   showLaunch: boolean;
+  followerCount?: number | null;
+  xConfigured?: boolean;
   onLaunched: (coin: PumpFunCoin) => void;
+  voices?: readonly PublicStreamstarVoice[];
 }
 
 export function ArtistOwnerPanel({
@@ -34,7 +40,10 @@ export function ArtistOwnerPanel({
   onLoreSaved,
   locking,
   showLaunch,
+  followerCount = null,
+  xConfigured = false,
   onLaunched,
+  voices = [],
 }: ArtistOwnerPanelProps) {
   const coinBadge = coinBadgeFromArtist({ ...artist, avatarURL });
   const hasBio = isHonestBio(lore, artist.name);
@@ -44,6 +53,7 @@ export function ArtistOwnerPanel({
 
   return (
     <section className="owner-panel">
+      <ArtistOwnerStats artistId={artist.id} ownerId={artist.ownerId} xConfigured={xConfigured} />
       <div className="owner-panel-kicker">
         <p className="owner-panel-kicker-text">
           <span className="owner-panel-kicker-lead">Artist settings</span>
@@ -55,6 +65,7 @@ export function ArtistOwnerPanel({
       <div className="owner-panel-top">
         <ArtistLookPicker
           mode="lock"
+          artistId={artist.id}
           artistName={artist.name}
           lore={lore}
           genres={artist.styleDNA.genres.join(', ')}
@@ -76,7 +87,7 @@ export function ArtistOwnerPanel({
             </div>
           ) : null}
           <div className="owner-identity-followers">
-            <FollowersList artistId={artist.id} />
+            <FollowersList artistId={artist.id} count={followerCount} />
           </div>
           <p
             className="owner-identity-bio"
@@ -92,9 +103,15 @@ export function ArtistOwnerPanel({
         </div>
       </div>
 
+      <ArtistVoiceSection artistId={artist.id} voiceSlug={artist.voiceSlug} voices={voices} />
+
       <div className="owner-flat-card">
         <Suspense fallback={null}>
-          <ArtistXPanel artistId={artist.id} ownerId={artist.ownerId} />
+          <ArtistXPanel
+            artistId={artist.id}
+            ownerId={artist.ownerId}
+            configured={xConfigured}
+          />
         </Suspense>
         {showLaunch ? (
           <>

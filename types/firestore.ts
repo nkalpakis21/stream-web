@@ -110,6 +110,22 @@ export interface XPostLogEntry {
   createdAt: Timestamp;
 }
 
+/** Soonest cap-deferred song. Shown on the owner auto-post row. */
+export interface XPendingDeferred {
+  songId: string;
+  title: string;
+  notBeforeMs: number;
+}
+
+/**
+ * In-flight post slot. Counted toward the cap until the post lands or it expires.
+ * Server-only. Not part of the client create shape.
+ */
+export interface XPostReservation {
+  songId: string;
+  atMs: number;
+}
+
 export interface XConnectionPublic {
   status: XConnectionStatus;
   /** X handle without @. Null until OAuth completes. */
@@ -127,6 +143,31 @@ export interface XConnectionPublic {
   recentPostTexts: string[];
   /** Activity log of posts we made (newest first, capped). */
   posts: XPostLogEntry[];
+  /**
+   * Owner opt-in for song-live posts. Absent on connections made before the
+   * flag. `resolveAutoPost` treats status `connected` with no field as on.
+   * New connects write false. Not part of the client create shape.
+   */
+  autoPost?: boolean;
+  /**
+   * Server time of the last switch-on, or the migration stamp for a
+   * grandfathered connection. Songs ready earlier are never posted.
+   */
+  autoPostEnabledAt?: Timestamp | null;
+  /** Milliseconds of the latest successful post. */
+  lastPostedAt?: number | null;
+  /** When the next deferred song may post. Null when nothing is waiting. */
+  nextPostAtMs?: number | null;
+  /** Soonest deferred song for the owner status line. */
+  pendingDeferred?: XPendingDeferred | null;
+  /**
+   * Title of the last song dropped because it missed the 24h post window.
+   * Cleared on the next successful post.
+   */
+  lastSkippedTitle?: string | null;
+  lastSkippedAtMs?: number | null;
+  /** Short-lived claim slots so two songs cannot pass the cap together. */
+  reservations?: XPostReservation[];
 }
 
 export function emptyXConnection(): XConnectionPublic {
@@ -158,6 +199,11 @@ export interface AIArtistDocument {
    * is the consistency lock until that exists. Optional for older artists.
    */
   vocalIdentity?: string | null;
+  /**
+   * Curated Streamstar voice slug. Set at artist create. The owner can change
+   * it later. Not a MusicGPT voice id. Absent on older artists.
+   */
+  voiceSlug?: string | null;
   isPublic: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -226,6 +272,21 @@ export type CollaborationType = 'fork' | 'remix' | 'response' | 'extension';
  */
 export type CoverMotionStatus = 'pending' | 'poster_ready' | 'ready' | 'failed';
 
+/** SafeSearch result stored on the song. Server-written. Absent when moderation is off. */
+export type CoverModerationStatus = 'pending' | 'passed' | 'flagged' | 'error';
+
+export interface CoverModerationLabels {
+  adult?: string | null;
+  violence?: string | null;
+  racy?: string | null;
+}
+
+export interface CoverModeration {
+  status: CoverModerationStatus;
+  checkedAt: Timestamp | null;
+  labels?: CoverModerationLabels | null;
+}
+
 export interface CoverProviderCrumbs {
   posterModel?: string | null;
   loopModel?: string | null;
@@ -239,7 +300,126 @@ export interface SongDocument {
   artistId: string; // AI Artist ID
   artistVersionId: string; // Specific artist version used
   title: string;
-  isPublic: boolean; // Public by default
+  /**
+   * Public shelves query this. New songs stay false until the first audio
+   * file is stored, then the webhook sets it true when `publicOnReady` is set.
+   * A caller that passes isPublic false keeps the song private.
+   */
+  isPublic: boolean;
+  /**
+   * False until the first playable audio is stored. Missing on songs created
+   * before this field. Those stay on public shelves only when a version still
+   * has playable audio. Clients may create it as false and cannot change it.
+   */
+  audioReady?: boolean;
+  /**
+   * Set when the create caller wants the song public once audio exists.
+   * The webhook is the only writer that turns isPublic on for that case.
+   * Absent means "do not auto-publish" (older songs and private creates).
+   */
+  publicOnReady?: boolean;
+  /**
+   * Client id for one create attempt. A retry with the same key, from this
+   * owner, inside the window, returns this song. Absent on older songs.
+   */
+  idempotencyKey?: string | null;
+  /**
+   * Server-only. `failed` when MusicGPT reported a failure or a shell could
+   * not be soft-deleted. Clients cannot write it. Absent while generating.
+   */
+  generationStatus?: 'failed' | null;
+  /**
+   * Server time of the latest MusicGPT accept for this song.
+   * The owner tile's 15-minute clock uses this, then createdAt.
+   * Clients cannot write it.
+   */
+  generationAttemptAt?: Timestamp | null;
+  /** Prompt from the create attempt. Used to retry a failed shell. */
+  createPrompt?: string | null;
+  /** Optional lyrics from the create attempt. */
+  createLyrics?: string | null;
+  /**
+   * Web create panel choices. Written by the MusicGPT route (Admin SDK).
+   * Absent on mobile creates and on songs made before the panel.
+   * Clients cannot set or change it.
+   */
+  createOptions?: {
+    instrumental: boolean;
+    voice: 'same' | 'female' | 'male';
+    feel: string[];
+    energy: 'Slow' | 'Steady' | 'Fast';
+    words: 'artist' | 'mine';
+  } | null;
+  /**
+   * Server-only snapshot of the curated voice this song was made with.
+   * Changing the artist voice does not change this. Clients cannot write it.
+   */
+  voiceSlug?: string | null;
+  /**
+   * Client time of the create submit. The webhook measures first_song_ready
+   * elapsedMs from this. Clients may set it once and cannot change it.
+   */
+  createSubmittedAt?: Timestamp | null;
+  /**
+   * Server-only create path. `beat_first` is excluded from the time-to-song
+   * clock (first_song_ready elapsedMs). Clients cannot set or change it.
+   */
+  path?: 'beat_first' | null;
+  /**
+   * Server-only beat-first progress. Clients cannot set or change it.
+   * `retriesUsed` is the number of extra beats after the first, capped at 2.
+   */
+  beatFirst?: {
+    stage: 'generating' | 'ready' | 'singing' | 'vocals' | 'instrumental';
+    retriesUsed: number;
+    chosenVersionId?: string | null;
+    firstBeatAt?: Timestamp | null;
+    vocalsAdded?: boolean;
+    creditEstimate?: number | null;
+  } | null;
+  /**
+   * Server-only Sing Over accounting, shared by beat-first and later
+   * re-sings. Clients cannot set or change it.
+   * Voice changes also add to this cost record. They do not use `attempts`
+   * as their cap, and they do not create a song.
+   */
+  singOver?: {
+    attempts: number;
+    creditEstimate: number | null;
+    lastGenerationId?: string | null;
+  } | null;
+  /**
+   * Server-only voice changes on this song. `used` is how many Sing Over
+   * jobs were accepted, capped at 2. Clients cannot set or change it.
+   * A voice change does not count toward a song-creation quota.
+   */
+  voiceChange?: {
+    used: number;
+    status?: 'making' | 'ready' | 'failed' | null;
+    /** Curated slug. Older in-flight rows may still say female or male. */
+    voice?: string | null;
+    /** Server time when this voice change was accepted. */
+    startedAt?: Timestamp | null;
+    generationId?: string | null;
+    originalVersionId?: string | null;
+    sourceVersionId?: string | null;
+    creditEstimate?: number | null;
+  } | null;
+  /**
+   * Server-only cached instrumental from a MusicGPT stem split of this song.
+   * The next voice change reuses `audioUrl` and does not split again.
+   * Clients cannot set or change it. `creditEstimate` is the extraction
+   * credit_estimate (0 while the stem_preset promotion applies).
+   */
+  voiceSplit?: {
+    sourceVersionId: string;
+    audioUrl: string | null;
+    musicgptAudioUrl?: string | null;
+    status: 'splitting' | 'ready' | 'failed';
+    taskId?: string | null;
+    generationId?: string | null;
+    creditEstimate?: number | null;
+  } | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   deletedAt: Timestamp | null;
@@ -282,6 +462,12 @@ export interface SongDocument {
    * Provider/model crumbs for the last cover attempt.
    */
   coverProvider?: CoverProviderCrumbs | null;
+  /**
+   * Server-only SafeSearch result for the current cover.
+   * Public surfaces show the cover only when status is `passed` and
+   * COVER_MODERATION_ENABLED is the string `true`. Absent when moderation is off.
+   */
+  coverModeration?: CoverModeration | null;
   /**
    * Total number of times this song has been played.
    * Incremented atomically when users play the song.
@@ -358,6 +544,26 @@ export interface SongVersionDocument {
 // Generation
 // ============================================================================
 
+/**
+ * Admin webhook write when a MusicGPT job finishes. Clients do not set this.
+ * Search server logs for `musicgpt_generation_complete` or read this map.
+ */
+export interface MusicGptUsageRecord {
+  model: string | null;
+  apiVersion: 'v1' | 'v2' | null;
+  /** Provider estimate from the create response, webhook, or byId. */
+  creditEstimate: number | null;
+  /** Billed amount when the provider sends one. Not a copy of the estimate. */
+  chargedCost: number | null;
+  /** completedAt minus task start, in milliseconds. */
+  durationMs: number | null;
+  taskId: string;
+  songId: string;
+  generationId: string;
+  startedAtMs: number | null;
+  completedAtMs: number;
+}
+
 export interface GenerationParameters {
   duration?: number; // Seconds
   quality?: 'low' | 'medium' | 'high';
@@ -407,6 +613,11 @@ export interface GenerationDocument {
    * Used for idempotency and to determine when generation is fully complete.
    */
   providerProcessedConversions: string[];
+  /**
+   * Conversion ids MusicGPT reported as failed. Admin webhook only.
+   * A failed second take does not unpublish the song when the first take has audio.
+   */
+  providerFailedConversions?: string[];
   output: {
     audioURL: string | null; // Main audio file
     stems: string[] | null; // Individual stem URLs if available
@@ -417,6 +628,11 @@ export interface GenerationDocument {
   completedAt: Timestamp | null;
   // Hash for proof-ready ownership (can be minted on-chain later)
   contentHash: string | null; // Hash of prompt + output references
+  /**
+   * Present after the MusicGPT webhook marks the job completed.
+   * Older generations omit it.
+   */
+  musicGptUsage?: MusicGptUsageRecord;
 }
 
 // ============================================================================

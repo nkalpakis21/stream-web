@@ -9,7 +9,9 @@ import {
   playerCoverPayload,
   type CoverFields,
 } from '@/lib/covers/resolve';
+import { reportSharePagePlay } from '@/lib/analytics/sharePlay';
 import { getSongVersions } from '@/lib/services/songs';
+import { playableAudioUrl } from '@/lib/songs/audioAvailability';
 import { createDebouncedPlayTracker } from '@/lib/utils/playTracking';
 
 function formatClock(total: number): string {
@@ -30,6 +32,10 @@ interface PlayableArtProps {
   durationSeconds?: number | null;
   href?: string;
   className?: string;
+  /** Set on /songs/[id] so a start is a share-page play. */
+  sharePage?: boolean;
+  /** Initials when moderation hides the cover and the artist has no face. */
+  emptyInitials?: string | null;
 }
 
 export function PlayableArt({
@@ -43,6 +49,8 @@ export function PlayableArt({
   durationSeconds = null,
   href,
   className = '',
+  sharePage = false,
+  emptyInitials = null,
 }: PlayableArtProps) {
   const { play, nowPlaying, isPlaying, togglePlayPause } = useSongPlayer();
   const [resolvedAudio, setResolvedAudio] = useState<string | null>(audioUrlProp ?? null);
@@ -62,35 +70,49 @@ export function PlayableArt({
       : null;
 
   const startPlayback = async () => {
-    let url = resolvedAudio;
-    if (!url) {
-      setLoading(true);
+    setLoading(true);
+    try {
+      let url: string | null = null;
       try {
         const versions = await getSongVersions(songId);
-        url =
-          versions.find(v => v.isPrimary && v.audioURL)?.audioURL ||
-          versions.find(v => v.audioURL)?.audioURL ||
-          null;
-        setResolvedAudio(url);
-      } finally {
-        setLoading(false);
+        url = versions.length > 0 ? playableAudioUrl(versions) : audioUrlProp ?? resolvedAudio;
+      } catch {
+        url = audioUrlProp ?? resolvedAudio;
       }
+      setResolvedAudio(url);
+      if (!url) return;
+      play({
+        songId,
+        songTitle: title,
+        artistName,
+        artistId,
+        ...playerCoverPayload(coverFields),
+        audioUrl: url,
+      });
+      if (sharePage) reportSharePagePlay(songId, artistId);
+      trackPlay(songId, sharePage ? { skipFunnel: true } : undefined);
+    } finally {
+      setLoading(false);
     }
-    if (!url) return;
-    play({
-      songId,
-      songTitle: title,
-      artistName,
-      artistId,
-      ...playerCoverPayload(coverFields),
-      audioUrl: url,
-    });
-    trackPlay(songId);
   };
 
   const onPlay = () => {
     if (isCurrent) {
       togglePlayPause();
+      return;
+    }
+    const immediate = (audioUrlProp ?? resolvedAudio)?.trim() || '';
+    if (immediate) {
+      play({
+        songId,
+        songTitle: title,
+        artistName,
+        artistId,
+        ...playerCoverPayload(coverFields),
+        audioUrl: immediate,
+      });
+      if (sharePage) reportSharePagePlay(songId, artistId);
+      trackPlay(songId, sharePage ? { skipFunnel: true } : undefined);
       return;
     }
     void startPlayback();
@@ -109,6 +131,7 @@ export function PlayableArt({
               title={title}
               playback={playback}
               sizes="(max-width: 768px) 50vw, 25vw"
+              emptyInitials={emptyInitials}
             />
           </Link>
         ) : (
@@ -117,13 +140,14 @@ export function PlayableArt({
             title={title}
             playback={playback}
             sizes="(max-width: 768px) 50vw, 25vw"
+            emptyInitials={emptyInitials}
           />
         )}
 
         <button
           type="button"
           onClick={onPlay}
-          className="absolute inset-0 z-10 m-auto flex h-12 w-12 items-center justify-center rounded-full bg-black/55 text-white shadow-lg"
+          className="song-play-orb absolute inset-0 z-10 m-auto flex h-12 w-12 items-center justify-center bg-black/55 text-white shadow-lg"
           aria-label={showPause ? `Pause ${title}` : `Play ${title}`}
         >
           {loading ? (

@@ -51,6 +51,40 @@ export async function adminListOwnerArtistSongs(
   return selectArtistPageSongs(docs, ownerId, ownerId, artistId).slice(0, limitCount);
 }
 
+/** Versions for many songs. Used to tell expired audio from playable audio. */
+export async function adminListVersionsForSongs(
+  songIds: readonly string[]
+): Promise<Map<string, SongVersionDocument[]>> {
+  const ids = [...new Set(songIds.filter(id => typeof id === 'string' && id.length > 0))];
+  const map = new Map<string, SongVersionDocument[]>();
+  if (ids.length === 0) return map;
+  const versions = getAdminDb().collection(COLLECTIONS.songVersions);
+  try {
+    for (let i = 0; i < ids.length; i += 30) {
+      const chunk = ids.slice(i, i + 30);
+      const snap = await versions.where('songId', 'in', chunk).get();
+      for (const doc of snap.docs) {
+        const data = doc.data() as SongVersionDocument;
+        const songId = typeof data.songId === 'string' ? data.songId : '';
+        if (!songId) continue;
+        const list = map.get(songId) ?? [];
+        list.push(data.id ? data : { ...data, id: doc.id });
+        map.set(songId, list);
+      }
+    }
+    return map;
+  } catch (error) {
+    console.warn('[adminListVersionsForSongs] batch read failed, reading per song', error);
+    const filled = new Map<string, SongVersionDocument[]>();
+    await Promise.all(
+      ids.map(async songId => {
+        filled.set(songId, await adminGetSongVersions(songId));
+      })
+    );
+    return filled;
+  }
+}
+
 export async function adminGetSong(songId: string): Promise<SongDocument | null> {
   const snap = await getAdminDb().collection(COLLECTIONS.songs).doc(songId).get();
   if (!snap.exists) return null;
@@ -160,6 +194,98 @@ export async function adminSoftDeleteSong(songId: string): Promise<void> {
     updatedAt: FieldValue.serverTimestamp(),
   });
   await batch.commit();
+}
+
+function versionHasPlayableUrl(version: { audioURL?: string | null }): boolean {
+  return typeof version.audioURL === 'string' && version.audioURL.trim().length > 0;
+}
+
+/**
+ * Server-only failed mark. No-op once the song has playable audio.
+ * Returns true when the flag was written.
+ */
+export async function adminMarkSongGenerationFailed(
+  songId: string,
+  input?: { prompt?: string | null; lyrics?: string | null }
+): Promise<boolean> {
+  const song = await adminGetSong(songId);
+  if (!song || song.deletedAt) return false;
+  if (song.audioReady === true) return false;
+  const versions = await adminGetSongVersions(songId);
+  if (versions.some(versionHasPlayableUrl)) return false;
+  const updates: Record<string, unknown> = {
+    generationStatus: 'failed',
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  const prompt = typeof input?.prompt === 'string' ? input.prompt.trim() : '';
+  const lyrics = typeof input?.lyrics === 'string' ? input.lyrics.trim() : '';
+  if (prompt) updates.createPrompt = prompt.slice(0, 300);
+  if (lyrics) updates.createLyrics = lyrics.slice(0, 2000);
+  await getAdminDb().collection(COLLECTIONS.songs).doc(songId).set(updates, { merge: true });
+  return true;
+}
+
+/**
+ * MusicGPT accepted a job for this song. Clears a failed or timed-out flag
+ * and restarts the owner tile's 15-minute clock. Does not delete the song.
+ */
+/** Server-only. The create panel's choices. Clients cannot write this field. */
+/** The curated voice this song was made with. Older songs are left alone. */
+export async function adminSaveSongVoiceSlug(songId: string, voiceSlug: string): Promise<void> {
+  await getAdminDb().collection(COLLECTIONS.songs).doc(songId).set(
+    {
+      voiceSlug,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+export async function adminSaveSongCreateOptions(
+  songId: string,
+  createOptions: NonNullable<SongDocument['createOptions']>
+): Promise<void> {
+  await getAdminDb().collection(COLLECTIONS.songs).doc(songId).set(
+    {
+      createOptions,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+export async function adminNoteSongGenerationAccepted(songId: string): Promise<void> {
+  const song = await adminGetSong(songId);
+  if (!song || song.deletedAt) return;
+  await getAdminDb().collection(COLLECTIONS.songs).doc(songId).set(
+    {
+      generationAttemptAt: FieldValue.serverTimestamp(),
+      generationStatus: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+/**
+ * Soft-delete a song that never received audio, the same write as
+ * adminSoftDeleteSong. Marks the shell failed first so a delete that does
+ * not land still shows Failed instead of Generating. A song that already
+ * has audio is left in place.
+ */
+export async function adminAbandonOrphanSong(
+  songId: string,
+  input?: { prompt?: string | null; lyrics?: string | null }
+): Promise<'deleted' | 'has-audio' | 'missing'> {
+  const song = await adminGetSong(songId);
+  if (!song) return 'missing';
+  if (song.deletedAt != null) return 'deleted';
+  if (song.audioReady === true) return 'has-audio';
+  const versions = await adminGetSongVersions(songId);
+  if (versions.some(versionHasPlayableUrl)) return 'has-audio';
+  await adminMarkSongGenerationFailed(songId, input);
+  await adminSoftDeleteSong(songId);
+  return 'deleted';
 }
 
 export async function adminSetPrimarySongVersion(

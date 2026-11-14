@@ -12,6 +12,8 @@ import {
   GoogleAuthProvider,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
+import { webPlatformHeaders } from '@/lib/funnel/platform';
+import { syncSignedInHint } from '@/lib/auth/notFoundRecovery';
 
 async function publishViewerCookie(token: string | null): Promise<void> {
   if (!token) {
@@ -21,7 +23,7 @@ async function publishViewerCookie(token: string | null): Promise<void> {
   await fetch('/api/auth/viewer', {
     method: 'POST',
     cache: 'no-store',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: webPlatformHeaders({ Authorization: `Bearer ${token}` }),
   });
 }
 
@@ -45,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onIdTokenChanged(auth, user => {
       setUser(user);
       setLoading(false);
+      syncSignedInHint(window.localStorage, Boolean(user));
       if (!user) {
         void publishViewerCookie(null).catch(() => {});
         return;
@@ -76,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const handleSignOut = async () => {
+    syncSignedInHint(window.localStorage, false);
     try {
       await publishViewerCookie(null);
     } catch {

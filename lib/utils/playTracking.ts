@@ -4,6 +4,8 @@
  * Handles debounced play count tracking with session-based deduplication.
  */
 
+import { reportClientFunnelEvent } from '@/lib/analytics/reportFunnel';
+
 /**
  * Check if a song has already been played in this session
  */
@@ -48,13 +50,23 @@ function debounce<T extends (...args: any[]) => any>(
  * Track a play for a song
  * Uses debounce and session storage to prevent duplicate counts
  */
-export async function trackPlay(songId: string): Promise<void> {
+export async function trackPlay(
+  songId: string,
+  options?: { skipFunnel?: boolean }
+): Promise<void> {
   // Check if already played in this session
   if (hasPlayedInSession(songId)) {
     return;
   }
   
   try {
+    if (!options?.skipFunnel) {
+      try {
+        reportClientFunnelEvent('play', { songId });
+      } catch (error) {
+        console.error('[funnel] play', error instanceof Error ? error.message : 'failed');
+      }
+    }
     const response = await fetch(`/api/songs/${songId}`, {
       method: 'PATCH',
       headers: {
@@ -77,7 +89,14 @@ export async function trackPlay(songId: string): Promise<void> {
 /**
  * Create a debounced play tracking function
  */
-export function createDebouncedPlayTracker(waitMs: number = 500): (songId: string) => void {
-  return debounce(trackPlay, waitMs);
+export function createDebouncedPlayTracker(
+  waitMs: number = 500
+): (songId: string, options?: { skipFunnel?: boolean }) => void {
+  return debounce(
+    (songId: string, options?: { skipFunnel?: boolean }) => {
+      void trackPlay(songId, options);
+    },
+    waitMs
+  );
 }
 

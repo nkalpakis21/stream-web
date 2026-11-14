@@ -1,14 +1,10 @@
-'use client';
+import Link from 'next/link';
+import { CREATE_ARTIST_HREF } from '@/lib/create/paths';
 
-interface CreateArtistCardProps {
-  onClick: () => void;
-}
-
-export function CreateArtistCard({ onClick }: CreateArtistCardProps) {
+export function CreateArtistCard() {
   return (
-    <button
-      onClick={onClick}
-      type="button"
+    <Link
+      href={CREATE_ARTIST_HREF}
       className="block text-center group w-full p-0 m-0 bg-transparent border-0"
     >
       <div className="relative w-full aspect-square rounded-full overflow-hidden bg-gradient-to-br from-muted/50 to-muted/30 mb-3 ring-2 ring-dashed ring-border group-hover:ring-accent/50 transition-all duration-300 group-hover:scale-105 flex items-center justify-center">
@@ -33,7 +29,6 @@ export function CreateArtistCard({ onClick }: CreateArtistCardProps) {
       <h3 className="font-medium text-sm text-foreground group-hover:text-accent transition-colors line-clamp-1">
         New artist
       </h3>
-    </button>
+    </Link>
   );
 }
-

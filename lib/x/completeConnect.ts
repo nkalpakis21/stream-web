@@ -1,5 +1,8 @@
+import type { FunnelPlatform } from '@/lib/funnel/platform';
+import { recordFunnelEvent } from '@/lib/server/funnel';
 import { composeProfileBio, composeProfileName } from './compose';
 import { getXUserMe, syncXProfile } from './client';
+import { resolveAutoPost } from './autoPost';
 import { firestoreNow, getArtistAdmin, updateArtistX } from './artistStore';
 import { isProfileSyncUnavailableError } from './profileSyncUnavailable';
 import { deleteXAuth, saveXAuth } from './tokens';
@@ -29,6 +32,7 @@ export async function completeXConnect(input: {
   artistId: string;
   ownerId: string;
   tokens: XTokenSet;
+  platform?: FunnelPlatform;
 }): Promise<{ username: string; profileSyncDetail: string | null }> {
   const artist = await getArtistAdmin(input.artistId);
   if (!artist) {
@@ -59,6 +63,9 @@ export async function completeXConnect(input: {
 
   const now = firestoreNow();
   const profileSyncUnavailableOnly = isProfileSyncUnavailableError(sync.detail);
+  // New connects stay off. A grandfathered connected artist (no flag yet) stays on.
+  // An explicit true/false is kept. enabledAt is stamped on the next post check,
+  // or when the owner turns the switch on.
   await updateArtistX(input.artistId, {
     status: 'connected',
     username: me.username,
@@ -69,7 +76,19 @@ export async function completeXConnect(input: {
       sync.ok || profileSyncUnavailableOnly ? null : sync.detail,
     lastErrorAt: sync.ok || profileSyncUnavailableOnly ? null : now,
     profileSyncedAt: sync.ok ? now : null,
+    autoPost: resolveAutoPost(artist.x),
   });
+
+  try {
+    recordFunnelEvent(
+      input.ownerId,
+      'x_connected',
+      { artistId: input.artistId },
+      input.platform ?? 'unknown'
+    );
+  } catch (error) {
+    console.error('[funnel] x_connected', error instanceof Error ? error.message : 'failed');
+  }
 
   return { username: me.username, profileSyncDetail: sync.detail };
 }

@@ -10,6 +10,7 @@ export interface SongVisibilityInput {
   deletedAt?: unknown;
   ownerId?: unknown;
   title?: unknown;
+  audioReady?: unknown;
 }
 
 export function songIsVisible<T extends SongVisibilityInput>(
@@ -17,8 +18,11 @@ export function songIsVisible<T extends SongVisibilityInput>(
   viewerId: string | null | undefined
 ): song is T {
   if (!song || song.deletedAt) return false;
-  if (song.isPublic === true) return true;
-  return typeof viewerId === 'string' && viewerId.length > 0 && song.ownerId === viewerId;
+  const owner =
+    typeof viewerId === 'string' && viewerId.length > 0 && song.ownerId === viewerId;
+  if (owner) return true;
+  // A shell waiting on its first file stays off the public page.
+  return song.isPublic === true && song.audioReady !== false;
 }
 
 /**

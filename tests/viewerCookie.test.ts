@@ -40,6 +40,7 @@ const NO_STORE_ROUTES = [
   'app/api/artists/followed/route.ts',
   'app/api/artists/[id]/name/route.ts',
   'app/api/artists/[id]/bio/route.ts',
+  'app/api/artists/[id]/stats/route.ts',
   'app/api/auth/viewer/route.ts',
   'app/api/x/connect/route.ts',
   'app/api/x/pause/route.ts',
@@ -52,11 +53,13 @@ const NO_STORE_ROUTES = [
   'app/api/conversations/[id]/route.ts',
   'app/api/conversations/[id]/messages/route.ts',
   'app/api/songs/[id]/route.ts',
+  'app/api/songs/[id]/cover-moderation/route.ts',
   'app/api/songs/[id]/token-metadata/route.ts',
   'app/songs/[id]/page.tsx',
   'app/api/users/link-wallet/route.ts',
   'app/api/generations/[id]/status/route.ts',
   'app/api/generations/musicgpt/route.ts',
+  'app/api/lyrics/draft/route.ts',
   'app/api/artists/looks/route.ts',
   'app/api/artists/looks/upload/route.ts',
   'app/api/artists/pump-fun/metadata/route.ts',
@@ -316,12 +319,14 @@ describe('viewer cache and private artist 404', () => {
     assert.equal(covered('/api/artists/batch'), true);
     assert.equal(covered('/api/artists/followed'), true);
     assert.equal(covered('/api/artists/Far2rKTQV98sbAf1iqxw/name'), true);
+    assert.equal(covered('/api/artists/Far2rKTQV98sbAf1iqxw/stats'), true);
     assert.equal(covered('/api/auth/viewer'), true);
     assert.equal(covered('/api/artists/search'), false);
     assert.equal(covered('/api/artists/display'), false);
     assert.equal(covered('/api/artists/Far2rKTQV98sbAf1iqxw/coin-quote'), false);
     assert.equal(covered('/songs/song-1'), true);
     assert.equal(covered('/api/songs/song-1/token-metadata'), true);
+    assert.equal(covered('/api/songs/song-1/cover-moderation'), true);
   });
 
   it('gates the song page on a verified viewer and keeps the private title out of metadata', () => {
@@ -329,7 +334,8 @@ describe('viewer cache and private artist 404', () => {
     assert.match(song, /verifiedViewerIdFromPage\(/);
     assert.match(song, /adminGetSong\(/);
     assert.match(song, /rejectHiddenSong\(/);
-    assert.match(song, /hiddenSongPageMetadata\(/);
+    assert.match(song, /metadataFromShareFacts\(/);
+    assert.match(read('lib/songs/shareCard.ts'), /hiddenSongPageMetadata\(/);
     assert.match(song, /toPlain\(/);
     assert.equal(song.includes('requireUser'), false);
     assert.equal(song.includes('ss_viewer'), false);

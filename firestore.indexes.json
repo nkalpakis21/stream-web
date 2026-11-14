@@ -176,6 +176,31 @@
         { "fieldPath": "deletedAt", "order": "ASCENDING" },
         { "fieldPath": "displayName", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "funnelEvents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "props.songId", "order": "ASCENDING" },
+        { "fieldPath": "at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "funnelEvents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "props.artistId", "order": "ASCENDING" },
+        { "fieldPath": "at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "xSongPosts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "artistId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "postedAtMs", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
@@ -193,6 +218,12 @@
     },
     {
       "collectionGroup": "musicgptTasks",
+      "fieldPath": "expireAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "lyricsDraftQuota",
       "fieldPath": "expireAt",
       "ttl": true,
       "indexes": []

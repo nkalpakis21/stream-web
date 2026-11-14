@@ -17,8 +17,9 @@ import {
   Timestamp,
   serverTimestamp,
   writeBatch,
+  runTransaction,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { auth, db } from '@/lib/firebase/config';
 import {
   COLLECTIONS,
   getSongPath,
@@ -33,7 +34,12 @@ import type {
 } from '@/types/firestore';
 import { getArtist } from './artists';
 import { getNotificationsBySong } from './notifications';
-import { SITE_ORIGIN } from '@/lib/brand/site';
+import { isListedOnPublicShelf, type CatalogSongRef } from '@/lib/songs/catalogAudio';
+import {
+  commitIdempotentSongCreate,
+  isSongCreateIdempotencyKey,
+  SongCreateIdTaken,
+} from '@/lib/songs/songCreate';
 
 /**
  * Create a new song
@@ -48,8 +54,13 @@ export async function createSong(
     isPublic?: boolean;
     parentSongId?: string | null;
     collaborationType?: CollaborationType | null;
+    /** Client id. A retry inside the window returns the same song. */
+    idempotencyKey?: string | null;
+    /** Kept so a failed shell can be retried from the owner tile. */
+    prompt?: string | null;
+    lyrics?: string | null;
   }
-): Promise<SongDocument> {
+): Promise<{ song: SongDocument; reused: boolean }> {
   // Validate that the artist belongs to the user
   const artistRef = doc(db, getArtistPath(data.artistId));
   const artistSnapshot = await getDoc(artistRef);
@@ -67,80 +78,136 @@ export async function createSong(
   if (artist.deletedAt !== null) {
     throw new Error('Cannot create songs for deleted artists');
   }
-  const songRef = doc(collection(db, COLLECTIONS.songs));
-  const songId = songRef.id;
-
   const now = Timestamp.now();
+  const nowMs = now.toMillis();
+  const releasePublic = data.isPublic !== false;
+  const idempotencyKey = isSongCreateIdempotencyKey(data.idempotencyKey)
+    ? data.idempotencyKey
+    : null;
+  const createPrompt = typeof data.prompt === 'string' ? data.prompt.trim().slice(0, 300) : '';
+  const createLyrics = typeof data.lyrics === 'string' ? data.lyrics.trim().slice(0, 2000) : '';
 
-  // Create initial version
-  const versionRef = doc(collection(db, COLLECTIONS.songVersions));
-  const versionId = versionRef.id;
+  const result = await commitIdempotentSongCreate<SongDocument>(
+    {
+      async get(id) {
+        const snap = await getDoc(doc(db, getSongPath(id)));
+        if (!snap.exists()) return null;
+        return snap.data() as SongDocument;
+      },
+      async insert(song) {
+        const songRef = doc(db, getSongPath(song.id));
+        await runTransaction(db, async transaction => {
+          const snap = await transaction.get(songRef);
+          if (snap.exists()) throw new SongCreateIdTaken();
+          transaction.set(songRef, song);
+        });
+      },
+      newId() {
+        return doc(collection(db, COLLECTIONS.songs)).id;
+      },
+    },
+    {
+      ownerId,
+      idempotencyKey,
+      nowMs,
+      identity: song => ({
+        ownerId: song.ownerId,
+        deletedAt: song.deletedAt,
+        createdAtMs:
+          song.createdAt && typeof song.createdAt.toMillis === 'function'
+            ? song.createdAt.toMillis()
+            : 0,
+      }),
+      build(songId) {
+        const versionId = doc(collection(db, COLLECTIONS.songVersions)).id;
+        const song: SongDocument = {
+          id: songId,
+          ownerId,
+          artistId: data.artistId,
+          artistVersionId: data.artistVersionId,
+          title: data.title,
+          // Hidden until the first audio file. A private create stays private.
+          isPublic: false,
+          audioReady: false,
+          ...(releasePublic ? { publicOnReady: true } : {}),
+          ...(idempotencyKey ? { idempotencyKey } : {}),
+          ...(createPrompt ? { createPrompt } : {}),
+          ...(createLyrics ? { createLyrics } : {}),
+          createSubmittedAt: now,
+          createdAt: now,
+          updatedAt: now,
+          deletedAt: null,
+          currentVersionId: versionId,
+          parentSongId: data.parentSongId || null,
+          collaborationType: data.collaborationType || null,
+          albumCoverPath: null,
+          albumCoverThumbnail: null,
+          coverPosterUrl: null,
+          coverVideoUrl: null,
+          coverMotionStatus: null,
+          coverMotionError: null,
+          coverUpdatedAt: null,
+          coverProvider: null,
+          playCount: 0,
+        };
+        return song;
+      },
+    }
+  );
 
-  const version: SongVersionDocument = {
-    id: versionId,
-    songId,
-    versionNumber: 1,
-    title: data.title,
-    createdBy: ownerId,
-    createdAt: now,
-    parentVersionId: null,
-    audioURL: null,
-    providerOutputId: null,
-    isPrimary: true,
-  };
-
-  // Create song document
-  const song: SongDocument = {
-    id: songId,
-    ownerId,
-    artistId: data.artistId,
-    artistVersionId: data.artistVersionId,
-    title: data.title,
-    isPublic: data.isPublic ?? true,
-    createdAt: now,
-    updatedAt: now,
-    deletedAt: null,
-    currentVersionId: versionId,
-    parentSongId: data.parentSongId || null,
-    collaborationType: data.collaborationType || null,
-    albumCoverPath: null,
-    albumCoverThumbnail: null,
-    coverPosterUrl: null,
-    coverVideoUrl: null,
-    coverMotionStatus: null,
-    coverMotionError: null,
-    coverUpdatedAt: null,
-    coverProvider: null,
-    playCount: 0,
-  };
-
-  // Write both documents
-  await setDoc(songRef, song);
-  await setDoc(versionRef, version);
-
-  // Revalidate homepage if song is public
-  // Note: This runs client-side, so we call the revalidation API
-  if (data.isPublic ?? true) {
+  if (!result.reused) {
+    const version: SongVersionDocument = {
+      id: result.song.currentVersionId,
+      songId: result.song.id,
+      versionNumber: 1,
+      title: result.song.title,
+      createdBy: ownerId,
+      createdAt: result.song.createdAt,
+      parentVersionId: null,
+      audioURL: null,
+      providerOutputId: null,
+      isPrimary: true,
+    };
     try {
-      const revalidateUrl = typeof window !== 'undefined'
-        ? '/api/revalidate'
-        : (process.env.NEXT_PUBLIC_APP_URL 
-            ? `${process.env.NEXT_PUBLIC_APP_URL}/api/revalidate`
-            : `${SITE_ORIGIN}/api/revalidate`);
-      
-      await fetch(revalidateUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      await setDoc(doc(db, getSongVersionPath(version.id)), version);
     } catch (error) {
-      // Don't fail song creation if revalidation fails
-      console.error('Failed to revalidate homepage:', error);
+      await abandonFailedSongCreate(result.song.id);
+      throw error;
     }
   }
 
-  return song;
+  return result;
+}
+
+/**
+ * Soft-delete a song this client just created when generation never started.
+ * Uses the server admin delete. Returns false when the delete did not land,
+ * so the caller can reuse the same idempotency key.
+ */
+export async function abandonFailedSongCreate(
+  songId: string,
+  input?: { prompt?: string; lyrics?: string }
+): Promise<boolean> {
+  const user = auth.currentUser;
+  if (!user) return false;
+  try {
+    const token = await user.getIdToken();
+    const response = await fetch(`/api/songs/${encodeURIComponent(songId)}/abandon`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...(input?.prompt ? { prompt: input.prompt } : {}),
+        ...(input?.lyrics ? { lyrics: input.lyrics } : {}),
+      }),
+    });
+    return response.ok || response.status === 404 || response.status === 409;
+  } catch (error) {
+    console.error('[abandonFailedSongCreate] failed', error);
+    return false;
+  }
 }
 
 /**
@@ -280,21 +347,27 @@ export async function getPublicSongs(
   options: { excludeDeleted?: boolean } = {}
 ): Promise<SongDocument[]> {
   const { excludeDeleted = true } = options;
+  const fetchCount = publicShelfFetchCount(limitCount);
 
   if (excludeDeleted) {
     // Query excludes deleted songs at the database level
     // Firestore's == null matches documents where deletedAt is null or doesn't exist
     // This requires a composite index: (isPublic, deletedAt, createdAt)
+    // Playable audio is applied after the read so older docs with no audioReady
+    // field still match. Shells and expired files do not fill the page.
     try {
       const q = query(
         collection(db, COLLECTIONS.songs),
         where('isPublic', '==', true),
         where('deletedAt', '==', null),
         orderBy('createdAt', 'desc'),
-        limit(limitCount)
+        limit(fetchCount)
       );
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => doc.data() as SongDocument);
+      return takePlayablePublic(
+        snapshot.docs.map(doc => doc.data() as SongDocument),
+        limitCount
+      );
     } catch (error: any) {
       // If composite index doesn't exist, fall back to filtering in memory
       if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
@@ -304,33 +377,33 @@ export async function getPublicSongs(
           collection(db, COLLECTIONS.songs),
           where('isPublic', '==', true),
           orderBy('createdAt', 'desc'),
-          limit(limitCount * 2) // Fetch more to account for deleted songs
+          limit(fetchCount)
         );
         const snapshot = await getDocs(q);
-        return snapshot.docs
-          .map(doc => doc.data() as SongDocument)
-          .filter(song => !song.deletedAt)
-          .slice(0, limitCount);
+        return takePlayablePublic(
+          snapshot.docs
+            .map(doc => doc.data() as SongDocument)
+            .filter(song => !song.deletedAt),
+          limitCount
+        );
       }
       throw error;
     }
   } else {
     // Legacy behavior: fetch all and filter in memory (for backward compatibility)
-    // Fetch extra to account for deleted songs that will be filtered out
-    const fetchLimit = Math.ceil(limitCount * 1.5);
-    
     const q = query(
       collection(db, COLLECTIONS.songs),
       where('isPublic', '==', true),
       orderBy('createdAt', 'desc'),
-      limit(fetchLimit)
+      limit(fetchCount)
     );
     const snapshot = await getDocs(q);
-    // Filter out deleted songs in memory
-    return snapshot.docs
-      .map(doc => doc.data() as SongDocument)
-      .filter(song => !song.deletedAt)
-      .slice(0, limitCount);
+    return takePlayablePublic(
+      snapshot.docs
+        .map(doc => doc.data() as SongDocument)
+        .filter(song => !song.deletedAt),
+      limitCount
+    );
   }
 }
 
@@ -346,14 +419,69 @@ export async function getArtistSongs(
     where('artistId', '==', artistId),
     where('isPublic', '==', true),
     orderBy('createdAt', 'desc'),
-    limit(limitCount)
+    limit(publicShelfFetchCount(limitCount))
   );
   const snapshot = await getDocs(q);
   // Filter out deleted songs in memory (Firestore doesn't handle null comparisons well)
   // Handle both null and undefined (for older documents without deletedAt field)
-  return snapshot.docs
-    .map(doc => doc.data() as SongDocument)
-    .filter(song => !song.deletedAt);
+  return takePlayablePublic(
+    snapshot.docs
+      .map(doc => doc.data() as SongDocument)
+      .filter(song => !song.deletedAt),
+    limitCount
+  );
+}
+
+type ShelfSong = CatalogSongRef & { id: string };
+
+function publicShelfFetchCount(limitCount: number): number {
+  return Math.min(Math.max(limitCount * 4, limitCount), Math.max(limitCount, 500));
+}
+
+async function takePlayablePublic(
+  songs: SongDocument[],
+  limitCount: number
+): Promise<SongDocument[]> {
+  return (await omitExpiredAudioSongs(songs)).slice(0, limitCount);
+}
+
+/**
+ * Songs a public shelf must skip.
+ * `audioReady: false` is skipped without a version read.
+ * A failed version read keeps any other song.
+ * Expired audio and confirmed silence are skipped. Order is not used here.
+ */
+export async function unplayablePublicSongIds<T extends ShelfSong>(
+  songs: readonly T[]
+): Promise<Set<string>> {
+  const blocked = new Set<string>();
+  await Promise.all(
+    songs.map(async song => {
+      if (song.deletedAt || song.isPublic !== true || song.audioReady === false) {
+        blocked.add(song.id);
+        return;
+      }
+      try {
+        const versions = await getSongVersions(song.id);
+        if (!isListedOnPublicShelf(song, versions)) blocked.add(song.id);
+      } catch (error) {
+        console.warn('[unplayablePublicSongIds] version lookup failed', song.id, error);
+      }
+    })
+  );
+  return blocked;
+}
+
+/**
+ * New, Heat, Discover, and search drop shells and expired audio.
+ * Order of the input list is kept.
+ */
+export async function omitExpiredAudioSongs<T extends ShelfSong>(
+  songs: readonly T[]
+): Promise<T[]> {
+  if (songs.length === 0) return [];
+  const blocked = await unplayablePublicSongIds(songs);
+  return songs.filter(song => !blocked.has(song.id));
 }
 
 /**
@@ -361,10 +489,12 @@ export async function getArtistSongs(
  * 
  * Uses composite index: (isPublic, deletedAt, playCount)
  * This allows direct querying by playCount for accurate top songs.
+ * Over-fetches so shells and expired audio do not consume a Heat slot.
  */
 export async function getTopSongs(
   limitCount: number = 12
 ): Promise<SongDocument[]> {
+  const fetchCount = Math.min(Math.max(limitCount * 5, limitCount), 100);
   try {
     // Query directly by playCount using the composite index
     const q = query(
@@ -372,13 +502,14 @@ export async function getTopSongs(
       where('isPublic', '==', true),
       where('deletedAt', '==', null),
       orderBy('playCount', 'desc'),
-      limit(limitCount)
+      limit(fetchCount)
     );
     const snapshot = await getDocs(q);
     
-    return snapshot.docs
+    const ranked = snapshot.docs
       .map(doc => doc.data() as SongDocument)
       .filter(song => !song.deletedAt); // Double-check filter for safety
+    return (await omitExpiredAudioSongs(ranked)).slice(0, limitCount);
   } catch (error: any) {
     // Fallback if composite index doesn't exist yet
     if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
@@ -394,11 +525,11 @@ export async function getTopSongs(
       );
       const snapshot = await getDocs(q);
       
-      return snapshot.docs
+      const ranked = snapshot.docs
         .map(doc => doc.data() as SongDocument)
         .filter(song => !song.deletedAt)
-        .sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0))
-        .slice(0, limitCount);
+        .sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0));
+      return (await omitExpiredAudioSongs(ranked)).slice(0, limitCount);
     }
     throw error;
   }

@@ -15,16 +15,29 @@ import { AiMark } from '@/components/brand/AiMark';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { toPlain, type Plain } from '@/lib/serialize/toPlain';
 import type { AIArtistDocument, PumpFunCoin } from '@/types/firestore';
+import type { PublicStreamstarVoice } from '@/lib/voices/streamstarVoices';
 
 interface ArtistHeroProps {
   artist: Plain<AIArtistDocument>;
   coin?: ArtistCoinQuote | null;
   /** Song-card face order. Empty means the initials disc, never a blank circle. */
   faceSources?: string[];
+  followerCount?: number | null;
+  /** Server-side. False hides Connect X. Never a key value. */
+  xConfigured?: boolean;
+  voices?: readonly PublicStreamstarVoice[];
   children?: React.ReactNode;
 }
 
-export function ArtistHero({ artist, coin = null, faceSources = [], children }: ArtistHeroProps) {
+export function ArtistHero({
+  artist,
+  coin = null,
+  faceSources = [],
+  followerCount = null,
+  xConfigured = false,
+  voices = [],
+  children,
+}: ArtistHeroProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const isOwner = Boolean(user && user.uid === artist.ownerId);
@@ -83,9 +96,7 @@ export function ArtistHero({ artist, coin = null, faceSources = [], children }: 
   return (
     <>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-      {loading ? (
-        <div className="mb-12 h-48 animate-pulse rounded-[12px]" style={{ background: 'var(--surface)' }} />
-      ) : isOwner ? (
+      {!loading && isOwner ? (
         <>
           <ArtistOwnerPanel
             artist={{ ...artist, pumpFun, lore }}
@@ -99,6 +110,9 @@ export function ArtistHero({ artist, coin = null, faceSources = [], children }: 
             }}
             locking={locking}
             showLaunch={showLaunch}
+            followerCount={followerCount}
+            xConfigured={xConfigured}
+            voices={voices}
             onLaunched={(next: PumpFunCoin) => {
               setPumpFun(toPlain(next));
               router.refresh();
@@ -114,7 +128,7 @@ export function ArtistHero({ artist, coin = null, faceSources = [], children }: 
               <div className="mb-2">
                 <AiMark />
               </div>
-              <ArtistHeader artist={{ ...artist, pumpFun }} />
+              <ArtistHeader artist={{ ...artist, pumpFun }} followerCount={followerCount} />
             </div>
           </div>
           {coinAside}

@@ -35,7 +35,7 @@ export default function SupportPage() {
           <section>
             <h2 className="mb-4 text-2xl font-semibold">How to create a song</h2>
             <p className="leading-relaxed text-muted-foreground">
-              Sign in, open Studio, and go to Songs. Pick an artist you own, then add a title and a prompt. Create an artist first if you do not have one yet.
+              Sign in and open Create. Name the artist and describe the first song. Later songs are in Studio, under Songs.
             </p>
           </section>
 

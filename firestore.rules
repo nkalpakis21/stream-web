@@ -259,20 +259,6 @@ service cloud.firestore {
         );
     }
 
-    function sameCoverProvider() {
-      return (
-        (!('coverProvider' in resource.data) || resource.data.coverProvider == null)
-        && (!('coverProvider' in request.resource.data) || request.resource.data.coverProvider == null)
-      ) || (
-        resource.data.coverProvider != null
-        && request.resource.data.coverProvider != null
-        && request.resource.data.coverProvider.posterModel == resource.data.coverProvider.posterModel
-        && request.resource.data.coverProvider.loopModel == resource.data.coverProvider.loopModel
-        && request.resource.data.coverProvider.posterRequestId == resource.data.coverProvider.posterRequestId
-        && request.resource.data.coverProvider.loopRequestId == resource.data.coverProvider.loopRequestId
-      );
-    }
-
     function artistProfileUpdate() {
       return isOwner(resource.data.ownerId)
         && fieldUnchanged('name')
@@ -297,60 +283,24 @@ service cloud.firestore {
         // A client cannot add or change either field.
     }
 
+    // Owner edits may touch only these keys. createOptions, coverModeration,
+    // voiceChange, voiceSplit, covers, play counts, and the other server fields stay as
+    // stored. affectedKeys stays under the rules expression limit; a per-field
+    // fieldUnchanged list does not once both server maps are guarded.
     function songServerFieldsUnchanged() {
-      return fieldUnchanged('ownerId')
-        && fieldUnchanged('artistId')
-        && fieldUnchanged('id')
-        && fieldUnchanged('createdAt')
-        && fieldUnchanged('parentSongId')
-        && fieldUnchanged('collaborationType')
-        && fieldUnchanged('albumCoverPath')
-        && fieldUnchanged('albumCoverThumbnail')
-        && fieldUnchanged('coverPosterUrl')
-        && fieldUnchanged('coverVideoUrl')
-        && fieldUnchanged('coverMotionStatus')
-        && fieldUnchanged('coverMotionError')
-        && fieldUnchanged('coverUpdatedAt')
-        && fieldUnchanged('tokenMintAddress')
-        && fieldUnchanged('tokenMintCreatedAt')
-        && fieldUnchanged('duration')
-        && sameCoverProvider()
-        && request.resource.data.keys().hasOnly([
-          'id',
-          'ownerId',
-          'artistId',
-          'artistVersionId',
-          'title',
-          'isPublic',
-          'createdAt',
-          'updatedAt',
-          'deletedAt',
-          'currentVersionId',
-          'parentSongId',
-          'collaborationType',
-          'albumCoverPath',
-          'albumCoverThumbnail',
-          'coverPosterUrl',
-          'coverVideoUrl',
-          'coverMotionStatus',
-          'coverMotionError',
-          'coverUpdatedAt',
-          'coverProvider',
-          'playCount',
-          'playsBySource',
-          'playsBackground',
-          'duration',
-          'tokenMintAddress',
-          'tokenMintCreatedAt'
-        ]);
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'title',
+        'isPublic',
+        'updatedAt',
+        'deletedAt',
+        'currentVersionId',
+        'artistVersionId'
+      ]);
     }
 
     function songOwnerUpdate() {
       return isOwner(resource.data.ownerId)
         && songServerFieldsUnchanged()
-        && fieldUnchanged('playCount')
-        && fieldUnchanged('playsBySource')
-        && fieldUnchanged('playsBackground')
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
         && request.resource.data.title.size() <= 300
@@ -370,10 +320,53 @@ service cloud.firestore {
         && (!('coverMotionError' in request.resource.data) || request.resource.data.coverMotionError == null)
         && (!('coverUpdatedAt' in request.resource.data) || request.resource.data.coverUpdatedAt == null)
         && (!('coverProvider' in request.resource.data) || request.resource.data.coverProvider == null)
+        && !('coverModeration' in request.resource.data)
         && (!('albumCoverPath' in request.resource.data) || request.resource.data.albumCoverPath == null)
         && (!('albumCoverThumbnail' in request.resource.data) || request.resource.data.albumCoverThumbnail == null)
         && (!('tokenMintAddress' in request.resource.data) || request.resource.data.tokenMintAddress == null)
-        && (!('tokenMintCreatedAt' in request.resource.data) || request.resource.data.tokenMintCreatedAt == null);
+        && (!('tokenMintCreatedAt' in request.resource.data) || request.resource.data.tokenMintCreatedAt == null)
+        && (!('audioReady' in request.resource.data) || request.resource.data.audioReady == false)
+        && (!('publicOnReady' in request.resource.data) || request.resource.data.publicOnReady == true)
+        && (!('idempotencyKey' in request.resource.data) || (
+          request.resource.data.idempotencyKey is string
+          && request.resource.data.idempotencyKey.size() >= 8
+          && request.resource.data.idempotencyKey.size() <= 80
+          && request.resource.data.idempotencyKey.matches('^[A-Za-z0-9_-]+$')
+        ))
+        && !('generationStatus' in request.resource.data)
+        && !('generationAttemptAt' in request.resource.data)
+        && (!('createPrompt' in request.resource.data) || (
+          request.resource.data.createPrompt is string
+          && request.resource.data.createPrompt.size() > 0
+          && request.resource.data.createPrompt.size() <= 300
+        ))
+        && (!('createLyrics' in request.resource.data) || (
+          request.resource.data.createLyrics is string
+          && request.resource.data.createLyrics.size() <= 2000
+        ))
+        && !('createOptions' in request.resource.data)
+        && !('voiceSlug' in request.resource.data)
+        && !('path' in request.resource.data)
+        && !('beatFirst' in request.resource.data)
+        && !('singOver' in request.resource.data)
+        && !('voiceChange' in request.resource.data)
+        && !('voiceSplit' in request.resource.data)
+        && (!('createSubmittedAt' in request.resource.data)
+          || request.resource.data.createSubmittedAt is timestamp);
+    }
+
+    function curatedVoiceSlug(slug) {
+      return slug == 'calla' || slug == 'vesper' || slug == 'sable' || slug == 'wren'
+        || slug == 'briar' || slug == 'harbor' || slug == 'wells' || slug == 'flint'
+        || slug == 'slate' || slug == 'keel';
+    }
+
+    function voiceSlugOnCreate() {
+      return !('voiceSlug' in request.resource.data)
+        || (
+          request.resource.data.voiceSlug is string
+          && curatedVoiceSlug(request.resource.data.voiceSlug)
+        );
     }
 
     function coinMetadataClean() {
@@ -472,6 +465,13 @@ service cloud.firestore {
         allow read: if isOwner(uid);
         allow write: if false;
       }
+
+      // Expo push tokens. POST /api/push/register writes these with Admin.
+      // The owner can read their own tokens. Clients cannot write them.
+      match /pushTokens/{tokenId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
     }
 
     match /artists/{artistId} {
@@ -491,6 +491,7 @@ service cloud.firestore {
         && pumpFunOnCreate()
         && xOnCreate()
         && coinMetadataClean()
+        && voiceSlugOnCreate()
         && !('mintSweepExemptAt' in request.resource.data)
         && !('mintFirstSeenAt' in request.resource.data);
 
@@ -896,6 +897,24 @@ service cloud.firestore {
           )
         );
       allow read, update, delete: if false;
+    }
+
+    // Lyrics draft counters. Doc id is the uid. Admin SDK only.
+    match /lyricsDraftQuota/{uid} {
+      allow read, write: if false;
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // Funnel events. First-time docs are `${uid}_${event}`. play and
+    // song_shared are auto ids. Anonymous share-page plays are auto ids too.
+    // Admin SDK only, including nested docs. No client access.
+    match /funnelEvents/{eventId} {
+      allow read, write: if false;
+      match /{document=**} {
+        allow read, write: if false;
+      }
     }
 
     match /{document=**} {

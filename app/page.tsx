@@ -1,12 +1,13 @@
 import { Suspense } from 'react';
 import { getPublicSongs, getTopSongs, getSongVersions } from '@/lib/services/songs';
+import { playableAudioUrl } from '@/lib/songs/audioAvailability';
 import { getArtistCardContext } from '@/lib/server/artistDisplay';
 import { fetchCoinQuotes } from '@/lib/solana/fetchCoinQuotes';
 import type { ArtistCoinQuote } from '@/lib/brand/coinStats';
 import { HomeListenShell } from '@/components/homepage/HomeListenShell';
 import { HomeListenSkeleton } from '@/components/homepage/HomeListenSkeleton';
 import type { SongDocument } from '@/types/firestore';
-import { coverFieldsFromSong } from '@/lib/covers/resolve';
+import { isCoverModerationEnabled, resolveVisibleCover } from '@/lib/covers/moderation';
 
 const HEAT_LIMIT = 8;
 const LIVE_LIMIT = 12;
@@ -17,10 +18,7 @@ export const revalidate = 120;
 async function firstPlayableAudio(songs: SongDocument[]): Promise<{ song: SongDocument; audioUrl: string } | null> {
   for (const song of songs) {
     const versions = await getSongVersions(song.id);
-    const audio =
-      versions.find(v => v.isPrimary && v.audioURL)?.audioURL ||
-      versions.find(v => v.audioURL)?.audioURL ||
-      null;
+    const audio = playableAudioUrl(versions);
     if (audio) {
       return { song, audioUrl: audio };
     }
@@ -61,6 +59,7 @@ async function HomeListenContent() {
     return quotes.get(mint) ?? null;
   };
 
+  const moderationEnabled = isCoverModerationEnabled();
   const artistFields = (artistId: string) => {
     const display = displays.get(artistId);
     const coin = coins.get(artistId);
@@ -72,6 +71,15 @@ async function HomeListenContent() {
       coinIcon: coin?.coinIcon ?? null,
     };
   };
+  const presentCover = (song: SongDocument) => {
+    const artist = artistFields(song.artistId);
+    const visible = resolveVisibleCover(song, {
+      enabled: moderationEnabled,
+      faceUrl: artist.artistPhotoUrl,
+      artistName: artist.artistName,
+    });
+    return { cover: visible.fields, emptyInitials: visible.initials };
+  };
 
   return (
     <HomeListenShell
@@ -82,7 +90,7 @@ async function HomeListenContent() {
                 title: featured.song.title,
                 ...artistFields(featured.song.artistId),
                 artistId: featured.song.artistId,
-                cover: coverFieldsFromSong(featured.song),
+                ...presentCover(featured.song),
                 audioUrl: featured.audioUrl,
                 coin: quoteForArtist(featured.song.artistId),
               }
@@ -93,7 +101,7 @@ async function HomeListenContent() {
           title: song.title,
           ...artistFields(song.artistId),
           artistId: song.artistId,
-          cover: coverFieldsFromSong(song),
+          ...presentCover(song),
           playCount: song.playCount ?? 0,
           coin: quoteForArtist(song.artistId),
         }))}
@@ -102,7 +110,7 @@ async function HomeListenContent() {
           title: song.title,
           ...artistFields(song.artistId),
           artistId: song.artistId,
-          cover: coverFieldsFromSong(song),
+          ...presentCover(song),
           playCount: song.playCount ?? 0,
           coin: null,
         }))}

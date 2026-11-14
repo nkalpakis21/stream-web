@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ANALYTICS_EVENTS, trackEvent } from '@/lib/analytics/track';
-import { STUDIO_NEW_ARTIST_HREF, STUDIO_NEW_SONG_HREF } from '@/lib/create/paths';
+import { CREATE_ARTIST_HREF, STUDIO_NEW_SONG_HREF } from '@/lib/create/paths';
 
 interface CreateEntrySheetProps {
   open: boolean;
@@ -49,7 +49,7 @@ export function CreateEntrySheet({ open, onOpenChange }: CreateEntrySheetProps) 
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-entry-title"
-        className="relative w-full max-w-md rounded-xl border border-white/10 bg-card p-6 shadow-xl sm:p-8"
+        className="relative w-full max-w-md rounded-[12px] border border-white/10 bg-card p-6 shadow-xl sm:p-8"
       >
         <h2
           id="create-entry-title"
@@ -65,7 +65,7 @@ export function CreateEntrySheet({ open, onOpenChange }: CreateEntrySheetProps) 
           <button
             type="button"
             onClick={() => go(STUDIO_NEW_SONG_HREF, ANALYTICS_EVENTS.CREATE_SHEET_SONG)}
-            className="w-full rounded-xl border border-white/10 bg-card/60 p-4 text-left transition-colors hover:border-primary/40"
+            className="w-full rounded-[12px] border border-white/10 bg-card/60 p-4 text-left transition-colors hover:border-primary/40"
           >
             <p className="text-base font-semibold text-foreground">New song</p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -74,12 +74,12 @@ export function CreateEntrySheet({ open, onOpenChange }: CreateEntrySheetProps) 
           </button>
           <button
             type="button"
-            onClick={() => go(STUDIO_NEW_ARTIST_HREF, ANALYTICS_EVENTS.CREATE_SHEET_ARTIST)}
-            className="w-full rounded-xl border border-white/10 bg-card/60 p-4 text-left transition-colors hover:border-primary/40"
+            onClick={() => go(CREATE_ARTIST_HREF, ANALYTICS_EVENTS.CREATE_SHEET_ARTIST)}
+            className="w-full rounded-[12px] border border-white/10 bg-card/60 p-4 text-left transition-colors hover:border-primary/40"
           >
             <p className="text-base font-semibold text-foreground">New artist</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Photo first. Name, lore, voice. Coin optional.
+              Name, an optional face, and the first song.
             </p>
           </button>
         </div>
